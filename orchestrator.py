@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
 import hmac
 import json
@@ -761,9 +762,433 @@ def log(message: str, **details) -> None:
     LOGS.mkdir(parents=True, exist_ok=True)
     record = {"at": stamp(), "message": message, **details}
     line = json.dumps(record, ensure_ascii=False)
-    print(f"[{record['at']}] {message}", flush=True)
+    _view().log_line(f"[{record['at']}] {message}")
     with (LOGS / "orchestrator.jsonl").open("a", encoding="utf-8") as f:
         f.write(line + "\n")
+
+
+# ===========================================================================
+# RICH-CONSOLE-UX: optional Rich-backed console presentation layer.
+#
+# Presentation ONLY. This section holds no protocol state: it renders events
+# and panels to the interactive console while every protocol fact stays in
+# control/, handoff/, and the durable logs/orchestrator.jsonl file. Invariants:
+#
+# 1. Rendering can never crash orchestration or change a protocol outcome.
+#    Every public entry point is fail-safe: any internal failure (missing
+#    optional dependency, broken stream, injected exception) is swallowed
+#    after attempting one plain-text fallback, so state transitions, exit
+#    codes, ledger behavior, and durable event logging are unaffected.
+# 2. Rich is optional and only used when appropriate. It is imported lazily
+#    and used only when importable (and, in auto mode, only on an interactive
+#    stdout). Plain text is the universal fallback; the plain path never
+#    emits ANSI control sequences and survives consoles with restrictive
+#    encodings.
+#
+# ORCHESTRATOR_CONSOLE environment variable selects the mode:
+#     auto (default) | rich | plain | off
+# "off" disables interactive rendering entirely; durable file logging keeps
+# recording the same substantive events.
+# ===========================================================================
+
+CONSOLE_VIEW_MODES = ("auto", "rich", "plain", "off")
+
+
+def _console_view_mode() -> str:
+    raw = (os.environ.get("ORCHESTRATOR_CONSOLE") or "").strip().lower()
+    return raw if raw in CONSOLE_VIEW_MODES else "auto"
+
+
+def _fail_safe(method):
+    """Console rendering entry points can never propagate an exception.
+
+    This decorator is the outermost presentation boundary: whatever happens
+    inside (missing optional dependency, broken stream, corrupted payload,
+    injected failure), the callable returns None and orchestration continues
+    with unchanged protocol behavior.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            return None
+    return wrapper
+
+
+class ConsoleView:
+    """Fail-safe interactive renderer for orchestrator events.
+
+    Plain text is the baseline rendering; Rich panels, lifecycle highlights,
+    and a WAITING_EXECUTOR live spinner are optional enhancements. ``mode``
+    forces a rendering path: ``auto`` (Rich only when importable and stdout is
+    interactive), ``rich``, ``plain``, or ``off`` (no interactive rendering).
+    ``stream`` pins an output file; the default uses the current sys.stdout at
+    each write so redirected/captured output is honored.
+    """
+
+    TERMINAL_STYLE = "green"
+    REVIEW_STYLE = "magenta"
+    ERROR_STYLE = "red"
+    LIFECYCLE_STYLES = {
+        "EXECUTOR_TASK_PUBLISHED": "cyan",
+        "COMPLETION_CONSUMED": "green",
+        "COMPLETION_SEALED": "magenta",
+        "COMPLETION_REJECTED": "red",
+        "EXECUTOR_TIMEOUT": "yellow",
+    }
+
+    def __init__(self, mode: str | None = None, *, stream=None):
+        requested = (mode or _console_view_mode()).strip().lower()
+        self._mode = requested if requested in CONSOLE_VIEW_MODES else "auto"
+        self._stream = stream  # None => current sys.stdout at each write
+        self._rich_probe: bool | None = None
+        self._rich_console = None
+        self._live = None
+        self._wait_key = None
+        self._wait_started = 0.0
+        self._wait_polls = 0
+        self._plain_wait_done = False
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    # -- capability probing --------------------------------------------------
+
+    def _use_rich(self) -> bool:
+        if self._mode not in ("auto", "rich"):
+            return False
+        if self._rich_probe is None:
+            self._rich_probe = self._probe_rich()
+        return self._rich_probe
+
+    def _probe_rich(self) -> bool:
+        try:
+            if self._mode == "auto":
+                stream = self._stream if self._stream is not None else sys.stdout
+                if stream is None or not stream.isatty():
+                    return False
+            return self._ensure_rich_console() is not None
+        except Exception:
+            return False
+
+    def _ensure_rich_console(self):
+        if self._rich_console is None:
+            from rich.console import Console  # lazy, optional dependency
+
+            self._rich_console = Console(file=self._stream, highlight=False, emoji=False)
+        return self._rich_console
+
+    # -- rendering core (never raises) ----------------------------------------
+
+    def _render(self, rich_renderer, plain_text: str | None) -> None:
+        if self._mode == "off":
+            return
+        self._stop_live()
+        try:
+            if self._use_rich():
+                try:
+                    rich_renderer(self._ensure_rich_console())
+                    return
+                except Exception:
+                    pass  # any Rich failure degrades this one render to plain text
+            if plain_text is not None:
+                self._write_line(plain_text)
+        except Exception:
+            pass
+
+    def _write_line(self, text: str) -> None:
+        stream = self._stream if self._stream is not None else sys.stdout
+        if stream is None:
+            return
+        try:
+            print(text, file=stream, flush=True)
+        except UnicodeEncodeError:
+            encoding = getattr(stream, "encoding", None) or "utf-8"
+            safe = text.encode(encoding, "backslashreplace").decode(encoding, "replace")
+            print(safe, file=stream, flush=True)
+
+    # -- WAITING_EXECUTOR live status ------------------------------------------
+
+    @staticmethod
+    def _wait_text(key, elapsed_seconds: float, polls: int) -> str:
+        message_id, task_id, stage_id, attempt = key
+        minutes, seconds = divmod(max(0, int(elapsed_seconds)), 60)
+        detail_bits = [bit for bit in (f"task {task_id}" if task_id is not None else "",
+                                       f"stage {stage_id}" if stage_id is not None else "") if bit]
+        identity = f"message {message_id}" if message_id is not None else "no message"
+        if attempt is not None:
+            identity += f", attempt {attempt}"
+        return (
+            f"WAITING_EXECUTOR — waiting for Executor ({' '.join(detail_bits) or 'no task'}; {identity}) "
+            f"elapsed {minutes:02d}:{seconds:02d}, polls {polls}"
+        )
+
+    @_fail_safe
+    def waiting_tick(self, *, message_id=None, task_id=None, stage_id=None, attempt=None) -> None:
+        """Advance the WAITING_EXECUTOR live status (spinner when Rich is active).
+
+        One wait episode owns at most one spinner (Rich) or one plain status
+        line; repeated polls refresh in place instead of printing new lines.
+        """
+        if self._mode == "off":
+            return
+        key = (message_id, task_id, stage_id, attempt)
+        try:
+            if self._wait_key != key:
+                self._stop_live()
+                self._wait_key = key
+                self._wait_started = time.monotonic()
+                self._wait_polls = 0
+                self._plain_wait_done = False
+                self._announce_wait()
+            else:
+                self._wait_polls += 1
+                if self._use_rich():
+                    if self._live is not None:
+                        self._refresh_live()
+                    else:
+                        # Interleaved output stopped the spinner; restore it.
+                        self._announce_wait()
+        except Exception:
+            pass
+
+    @_fail_safe
+    def waiting_stop(self) -> None:
+        """End the current wait episode; safe to call at any time."""
+        self._wait_key = None
+        self._wait_polls = 0
+        self._plain_wait_done = False
+        self._stop_live()
+
+    def _announce_wait(self) -> None:
+        text = self._wait_text(self._wait_key, 0.0, 0)
+        if self._use_rich():
+            self._start_live(text)
+            if self._live is not None:
+                return
+        if not self._plain_wait_done:
+            self._write_line(text)
+            self._plain_wait_done = True
+
+    def _start_live(self, text: str) -> None:
+        try:
+            from rich.live import Live
+            from rich.spinner import Spinner
+
+            self._live = Live(
+                Spinner("dots", text=text),
+                console=self._ensure_rich_console(),
+                transient=True,
+                refresh_per_second=4,
+            )
+            self._live.start()
+        except Exception:
+            self._live = None  # caller falls back to the plain status line
+
+    def _refresh_live(self) -> None:
+        try:
+            from rich.spinner import Spinner
+
+            elapsed = time.monotonic() - self._wait_started
+            self._live.update(
+                Spinner("dots", text=self._wait_text(self._wait_key, elapsed, self._wait_polls))
+            )
+        except Exception:
+            self._stop_live()
+
+    def _stop_live(self) -> None:
+        live, self._live = self._live, None
+        if live is None:
+            return
+        try:
+            live.stop()
+        except Exception:
+            pass
+
+    # -- event renderers --------------------------------------------------------
+
+    @_fail_safe
+    def log_line(self, text: str) -> None:
+        """Mirror one durable log event on the console (plain text identical)."""
+        self._render(
+            lambda console: console.print(text, markup=False, highlight=False),
+            text,
+        )
+
+    @_fail_safe
+    def supervisor_decision(self, *, turn, decision=None, scope=None,
+                            project_status=None, elapsed_seconds=None, reason=None) -> None:
+        """Concise panel describing the outcome of one Supervisor turn."""
+        elapsed = (
+            f"{elapsed_seconds:.1f}s" if isinstance(elapsed_seconds, (int, float)) else "-"
+        )
+        supervisor_reason = re.sub(r"\s+", " ", str(reason or "-")).strip()[:220]
+        fields = [
+            f"Decision : {decision or '-'}",
+            f"Scope    : {scope or '-'}",
+            f"Status   : {project_status or '-'}",
+            f"Turn     : {turn or '-'} ({elapsed})",
+            f"Reason   : {supervisor_reason or '-'}",
+        ]
+        plain = "Supervisor decision:\n" + "\n".join(fields)
+
+        def renderer(console):
+            from rich.markup import escape
+            from rich.panel import Panel
+
+            console.print(Panel(
+                escape("\n".join(fields)),
+                title=escape(f"Supervisor decision — {turn or '-'}"),
+                border_style="cyan",
+                expand=False,
+            ))
+
+        self._render(renderer, plain)
+
+    @_fail_safe
+    def lifecycle_event(self, event: str, **details) -> None:
+        """Concise, color-highlighted authoritative lifecycle feedback."""
+        shown = ", ".join(f"{key}={value}" for key, value in details.items() if value is not None)
+        text = f"{event}" + (f": {shown}" if shown else "")
+        plain = f">>> {text}"
+
+        def renderer(console):
+            from rich.markup import escape
+
+            style = self.LIFECYCLE_STYLES.get(str(event).upper(), "white")
+            console.print(f"[bold {style}]>>>[/bold {style}] {escape(text)}")
+
+        self._render(renderer, plain)
+
+    # -- distinct notification presentations ------------------------------------
+
+    @staticmethod
+    def _banner_body_lines(payload: dict) -> list:
+        lines = [f"AGENT HANDSHAKE — {payload.get('headline') or ''}"]
+        lines.append(f"Event: {payload.get('event')}")
+        lines.append(f"Phase: {payload.get('phase') or '-'}")
+        lines.append(f"Decision: {payload.get('supervisor_decision') or '-'}")
+        if payload.get("reason"):
+            compact_reason = re.sub(r"\s+", " ", str(payload["reason"])).strip()
+            lines.append(f"Reason: {compact_reason[:500]}")
+        if payload.get("final_report"):
+            lines.append(f"Final report: {payload['final_report']}")
+        lines.append(f"User status: {payload.get('user_status_report')}")
+        if payload.get("no_further_executor_tasks"):
+            lines.append("No further Executor tasks will be dispatched for this terminal state.")
+            lines.append("You may pause ZCode Scheduled Automation.")
+        return lines
+
+    @classmethod
+    def _banner_lines(cls, payload: dict) -> list:
+        width = 76
+        return ["", "=" * width, *cls._banner_body_lines(payload), "=" * width, ""]
+
+    def _panel_payload_lines(self, payload: dict) -> list:
+        return self._banner_body_lines(payload)
+
+    @_fail_safe
+    def terminal_panel(self, payload: dict) -> None:
+        """Distinct presentation for terminal project states (COMPLETE/BLOCKED/STOPPED)."""
+        plain = "\n".join(self._banner_lines(payload))
+
+        def renderer(console):
+            from rich.panel import Panel
+            from rich.text import Text
+
+            console.print(Panel(
+                Text("\n".join(self._panel_payload_lines(payload))),
+                title=f"TERMINAL: {payload.get('event') or '-'}",
+                border_style=self.TERMINAL_STYLE,
+                expand=False,
+            ))
+
+        self._render(renderer, plain)
+
+    @_fail_safe
+    def human_review_panel(self, payload: dict) -> None:
+        """Distinct presentation for HUMAN_REVIEW (automation paused for a human)."""
+        plain = "\n".join(self._banner_lines(payload))
+
+        def renderer(console):
+            from rich.panel import Panel
+            from rich.text import Text
+
+            console.print(Panel(
+                Text("\n".join(self._panel_payload_lines(payload))),
+                title="HUMAN REVIEW REQUIRED",
+                subtitle=str(payload.get("event") or ""),
+                border_style=self.REVIEW_STYLE,
+                expand=False,
+            ))
+
+        self._render(renderer, plain)
+
+    @_fail_safe
+    def error_panel(self, payload: dict, error: str | None = None) -> None:
+        """Distinct presentation for unrecoverable orchestrator errors."""
+        body_lines = self._panel_payload_lines(payload)
+        if error:
+            body_lines.append(f"Error: {error}")
+        plain = "\n".join(["", "=" * 76, *body_lines, "=" * 76, ""])
+
+        def renderer(console):
+            from rich.panel import Panel
+            from rich.text import Text
+
+            console.print(Panel(
+                Text("\n".join(body_lines)),
+                title="ORCHESTRATOR ERROR",
+                border_style=self.ERROR_STYLE,
+                expand=False,
+            ))
+
+        self._render(renderer, plain)
+
+    @_fail_safe
+    def event_panel(self, payload: dict) -> None:
+        """Route one user notification to its distinct presentation."""
+        event = str(payload.get("event") or "").upper()
+        if event == "HUMAN_REVIEW":
+            self.human_review_panel(payload)
+        elif event == "ORCHESTRATOR_ERROR":
+            details = payload.get("details")
+            error = details.get("error") if isinstance(details, dict) else None
+            self.error_panel(payload, error=str(error) if error else None)
+        else:
+            self.terminal_panel(payload)
+
+
+class _NullConsoleView:
+    """Last-resort sink if ConsoleView construction itself fails: rendering is
+    permanently disabled and protocol behavior is unchanged."""
+
+    mode = "off"
+
+    def log_line(self, *args, **kwargs): ...
+    def supervisor_decision(self, *args, **kwargs): ...
+    def lifecycle_event(self, *args, **kwargs): ...
+    def waiting_tick(self, *args, **kwargs): ...
+    def waiting_stop(self, *args, **kwargs): ...
+    def event_panel(self, *args, **kwargs): ...
+    def terminal_panel(self, *args, **kwargs): ...
+    def human_review_panel(self, *args, **kwargs): ...
+    def error_panel(self, *args, **kwargs): ...
+
+
+_VIEW: ConsoleView | None = None
+
+
+def _view():
+    global _VIEW
+    if _VIEW is None:
+        try:
+            _VIEW = ConsoleView()
+        except Exception:
+            _VIEW = _NullConsoleView()
+    return _VIEW
 
 
 
@@ -1003,23 +1428,9 @@ def emit_user_notification(runtime: dict, kind: str, state: dict, details: dict 
         log("User notification persistence failed; orchestration continues", error=repr(exc))
 
     if USER_NOTIFICATION_CONSOLE_ENABLED:
-        width = 76
-        print("\n" + "=" * width, flush=True)
-        print(f"AGENT HANDSHAKE — {payload['headline']}", flush=True)
-        print("=" * width, flush=True)
-        print(f"Event: {payload['event']}", flush=True)
-        print(f"Phase: {payload.get('phase') or '-'}", flush=True)
-        print(f"Decision: {payload.get('supervisor_decision') or '-'}", flush=True)
-        if payload.get("reason"):
-            compact_reason = re.sub(r"\s+", " ", str(payload["reason"])).strip()
-            print(f"Reason: {compact_reason[:500]}", flush=True)
-        if payload.get("final_report"):
-            print(f"Final report: {payload['final_report']}", flush=True)
-        print(f"User status: {payload['user_status_report']}", flush=True)
-        if payload.get("no_further_executor_tasks"):
-            print("No further Executor tasks will be dispatched for this terminal state.", flush=True)
-            print("You may pause ZCode Scheduled Automation.", flush=True)
-        print("=" * width + "\n", flush=True)
+        # RICH-CONSOLE-UX: distinct terminal / HUMAN_REVIEW / error presentations.
+        # The view is fail-safe; plain mode keeps the historical banner text.
+        _view().event_panel(payload)
 
     body = payload.get("reason") or payload.get("next_step") or payload.get("headline")
     desktop = launch_windows_desktop_notification(
@@ -2727,6 +3138,17 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     else:
         state = read_project_state()
     log("Codex supervisor turn finished", reason=reason, elapsed_seconds=elapsed, project_status=state.get("status"))
+    # RICH-CONSOLE-UX: concise Supervisor decision feedback (presentation only).
+    last_decision = state.get("last_supervisor_decision")
+    last_decision = last_decision if isinstance(last_decision, dict) else {}
+    _view().supervisor_decision(
+        turn=reason,
+        decision=last_decision.get("decision"),
+        scope=last_decision.get("scope"),
+        project_status=state.get("status"),
+        elapsed_seconds=elapsed,
+        reason=last_decision.get("reason"),
+    )
 
     if state.get("status") == "SUPERVISOR_TURN":
         runtime["consecutive_codex_without_executor"] = int(runtime.get("consecutive_codex_without_executor", 0)) + 1
@@ -2778,6 +3200,13 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
             save_runtime(runtime)
         log(
             "Fresh Executor task published",
+            message_id=task["MESSAGE_ID"],
+            task_id=task["TASK_ID"],
+            stage_id=task["STAGE_ID"],
+            attempt=task["ATTEMPT"],
+        )
+        _view().lifecycle_event(
+            "EXECUTOR_TASK_PUBLISHED",
             message_id=task["MESSAGE_ID"],
             task_id=task["TASK_ID"],
             stage_id=task["STAGE_ID"],
@@ -2865,6 +3294,15 @@ def _mark_completion_consumed(
         archive=archive,
         final_verification_evaluated=final_verification_result is not None,
     )
+    _view().lifecycle_event(
+        "COMPLETION_CONSUMED",
+        message_id=entry["MESSAGE_ID"],
+        task_id=entry["TASK_ID"],
+        stage_id=entry["STAGE_ID"],
+        commit_id=entry["COMMIT_ID"],
+        status=(entry.get("RECEIPT") or {}).get("STATUS"),
+        final_verification=final_verification_result is not None,
+    )
 
 
 def seal_completions(runtime: dict, state: dict) -> int:
@@ -2899,6 +3337,9 @@ def seal_completions(runtime: dict, state: dict) -> int:
             "NONCE": entry["NONCE"],
         })
         log("Completion sealed", message_id=entry["MESSAGE_ID"], commit_id=entry["COMMIT_ID"])
+        _view().lifecycle_event(
+            "COMPLETION_SEALED", message_id=entry["MESSAGE_ID"], commit_id=entry["COMMIT_ID"]
+        )
         sealed += 1
     return sealed
 
@@ -2951,6 +3392,9 @@ def reconcile_completion_ledger(runtime: dict, state: dict) -> None:
                     "MESSAGE_ID": message_id,
                 })
                 log("Completion sealed", message_id=message_id, commit_id=entry["COMMIT_ID"])
+                _view().lifecycle_event(
+                    "COMPLETION_SEALED", message_id=message_id, commit_id=entry["COMMIT_ID"]
+                )
             continue
         if entry["STATUS"] == completion.STATUS_COMMITTED:
             if message_id <= last_consumed:
@@ -3058,6 +3502,12 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
                 message_id=raw_msg,
                 detail=report["detail"],
             )
+        _view().lifecycle_event(
+            "COMPLETION_REJECTED",
+            classification=classification,
+            message_id=raw_msg,
+            detail=str(report.get("detail") or "")[:200],
+        )
         save_runtime(runtime)
         return True, None
 
@@ -3080,6 +3530,11 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
         })
         log("Ledger entry hash binding broken; raw completion signal rejected",
             commit_id=entry.get("COMMIT_ID"))
+        _view().lifecycle_event(
+            "COMPLETION_REJECTED",
+            classification="LEDGER_HASH_BROKEN",
+            message_id=(report.get("raw_identity") or {}).get("MESSAGE_ID"),
+        )
         return True, None
 
     msg_id = int(entry["MESSAGE_ID"])
@@ -3120,6 +3575,12 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
             message_id=msg_id,
             project_status=state.get("status"),
             identity_match=task_identity_matches(entry, current),
+        )
+        _view().lifecycle_event(
+            "COMPLETION_REJECTED",
+            classification="ORPHAN_COMPLETION",
+            message_id=msg_id,
+            project_status=state.get("status"),
         )
         return True, None
 
@@ -3434,6 +3895,13 @@ def main() -> int:
             timeout_event = executor_timeout_event(runtime, state)
             if timeout_event:
                 log("Executor timeout detected", **timeout_event)
+                _view().lifecycle_event(
+                    "EXECUTOR_TIMEOUT",
+                    message_id=timeout_event.get("message_id"),
+                    task_id=timeout_event.get("task_id"),
+                    stage_id=timeout_event.get("stage_id"),
+                    deadline=timeout_event.get("deadline"),
+                )
                 invoke_codex(runtime, "EXECUTOR_TIMEOUT", timeout_event)
                 continue
 
@@ -3455,6 +3923,15 @@ def main() -> int:
                     f"{state.get('status')!r}"
                 )
 
+            # RICH-CONSOLE-UX: live WAITING_EXECUTOR status (spinner in Rich mode,
+            # one non-repeated plain status line otherwise). Presentation only.
+            current_wait = state.get("current_task") or {}
+            _view().waiting_tick(
+                message_id=task_value(current_wait, "MESSAGE_ID"),
+                task_id=task_value(current_wait, "TASK_ID"),
+                stage_id=task_value(current_wait, "STAGE_ID"),
+                attempt=task_value(current_wait, "ATTEMPT"),
+            )
             time.sleep(POLL_SECONDS)
 
     except KeyboardInterrupt:
@@ -3474,6 +3951,7 @@ def main() -> int:
         emit_user_notification(runtime, "ORCHESTRATOR_ERROR", state, {"error": repr(exc)})
         return 1
     finally:
+        _view().waiting_stop()
         release_lock()
 
 

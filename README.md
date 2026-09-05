@@ -147,6 +147,29 @@ project must produce independently re-runnable evidence (fresh execution runs, r
 claim counts) that satisfies the policy's claims — otherwise the gate blocks the
 completion attempt and records the block reason.
 
+## Console output (optional Rich)
+
+The Orchestrator renders its console output through a presentation-only view
+layer. With the optional [`rich`](https://github.com/Textualize/rich) package
+installed and an interactive terminal, you get concise Supervisor decision
+panels, color-highlighted claim/completion lifecycle events (dispatch
+published, completion consumed, sealed, rejected, timeout), a live
+WAITING_EXECUTOR spinner that refreshes in place (no polling-line spam), and
+distinct terminal / HUMAN_REVIEW / unrecoverable-error panels.
+
+Without Rich — or on a pipe, a non-interactive session, or any console error —
+the Runtime automatically falls back to plain, understandable text with no ANSI
+control sequences and no TTY requirement, so Windows PowerShell and scheduled
+(non-interactive) runs are always safe. The layer is strictly presentation:
+durable event logging stays in `logs/orchestrator.jsonl` regardless of console
+mode, and a rendering failure (including a forced Rich import failure) can
+never crash orchestration or change a protocol outcome — the regression suite
+covers this explicitly.
+
+Set `ORCHESTRATOR_CONSOLE` to control the mode: `auto` (default: Rich when
+available and stdout is interactive), `rich`, `plain`, or `off` (no
+interactive rendering; durable logging unchanged).
+
 ## Safety boundaries
 
 - The Executor works only inside the active project root; the Orchestrator validates
