@@ -1,0 +1,7 @@
+{
+  "decision_content": "<verbatim human decision and authorization scope>",
+  "constraints_verbatim": [
+    "<verbatim constraint 1>",
+    "<verbatim constraint 2>"
+  ]
+}

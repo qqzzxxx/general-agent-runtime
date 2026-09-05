@@ -1,0 +1,93 @@
+{
+  "policy_schema_version": 1,
+  "policy_id": "GENERAL_FV_V1",
+  "policy_version": 1,
+  "claim_count": {
+    "min": 3,
+    "max": 8
+  },
+  "allowed_result_statuses": [
+    "SUPPORTED",
+    "PARTIALLY_SUPPORTED",
+    "WEAK",
+    "UNSUPPORTED",
+    "CONTRADICTED",
+    "NOT_VERIFIABLE"
+  ],
+  "impact_acceptance": {
+    "HIGH": [
+      "SUPPORTED"
+    ],
+    "MEDIUM": [
+      "SUPPORTED",
+      "PARTIALLY_SUPPORTED"
+    ]
+  },
+  "unknown_claim_type": "FAIL_CLOSED",
+  "claim_types": {
+    "FACTUAL": {
+      "required_checks": [
+        {
+          "field": "source_support_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires source_support_check=PASS"
+        },
+        {
+          "field": "source_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires source_pointers"
+        }
+      ]
+    },
+    "NUMERICAL": {
+      "required_checks": [
+        {
+          "field": "calculation_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires calculation_check=PASS"
+        },
+        {
+          "field": "calculation_artifact",
+          "op": "NONEMPTY_STRING",
+          "message": "requires calculation_artifact"
+        }
+      ]
+    },
+    "SOURCE_SUPPORT": {
+      "required_checks": [
+        {
+          "field": "source_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires source_pointers"
+        }
+      ]
+    },
+    "DELIVERABLE_INTEGRITY": {
+      "required_checks": [
+        {
+          "field": "deliverable_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires deliverable_check=PASS"
+        },
+        {
+          "field": "deliverable_path",
+          "op": "NONEMPTY_STRING",
+          "message": "requires deliverable_path"
+        }
+      ]
+    },
+    "CONSTRAINT_COMPLIANCE": {
+      "required_checks": [
+        {
+          "field": "constraint_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires constraint_check=PASS"
+        }
+      ]
+    }
+  }
+}

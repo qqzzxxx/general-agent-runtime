@@ -1,0 +1,55 @@
+# --- Runtime wire files / live state (never commit) ---
+TO_ZCODE.md
+TO_ZCODE.md.*.tmp
+SUPERVISOR_BRIEF.md
+SUPERVISOR_BRIEF.md.tmp
+FROM_ZCODE.md
+ZCODE_DONE.flag
+ZCODE_LAST_PROCESSED.txt
+CODEX_LAST_OUTPUT.txt
+ORCHESTRATOR_STATE.json
+RESEARCH_STATE.md
+orchestrator.log
+
+# --- Control-plane live state (ship examples instead: control/project_state.example.json) ---
+control/.orchestrator.lock
+control/orchestrator_runtime.json
+control/ACTIVE_PROJECT.json
+control/project_state.json
+control/STOP
+control/USER_ATTENTION.json
+
+# --- Handoff / claim / archive state ---
+handoff/executor_claims/*
+!handoff/executor_claims/.gitkeep
+handoff/archive/*
+!handoff/archive/.gitkeep
+handoff/quarantine/*
+!handoff/quarantine/.gitkeep
+handoff/completion_ledger/*
+!handoff/completion_ledger/.gitkeep
+handoff/TO_ZCODE.md
+handoff/SUPERVISOR_BRIEF.md
+
+# --- Projects: user data never enters the repo. Only the documented README ships. ---
+projects/*
+!projects/README.md
+
+# --- Task workspace and logs ---
+tasks/
+logs/
+workspace/
+*.log
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# --- OS / editor ---
+Thumbs.db
+.DS_Store
+
+# --- Runtime-generated user status ---
+reports/USER_STATUS.md

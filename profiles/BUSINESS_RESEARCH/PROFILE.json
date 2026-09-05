@@ -1,0 +1,9 @@
+{
+  "profile_schema_version": 1,
+  "profile_id": "BUSINESS_RESEARCH",
+  "profile_version": "1.0",
+  "display_name": "Business Research",
+  "supervisor_guidance_file": "SUPERVISOR_GUIDANCE.md",
+  "executor_guidance_file": "EXECUTOR_GUIDANCE.md",
+  "final_verification_policy_id": "BUSINESS_RESEARCH_FV_V1"
+}

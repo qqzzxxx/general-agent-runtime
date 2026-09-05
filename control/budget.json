@@ -1,0 +1,21 @@
+{
+  "schema_version": 3,
+  "mode": "default",
+  "max_unattended_seconds": 86400,
+  "same_method_max_retries": 2,
+  "max_methods_per_problem": 3,
+  "max_consecutive_no_information_stages": 3,
+  "default_executor_max_seconds": 2700,
+  "default_scheduler_grace_seconds": 3600,
+  "orchestrator_poll_seconds": 2,
+  "codex_supervisor_timeout_seconds": 1200,
+  "reasoning_policy": {
+    "production_start": "high",
+    "ordinary_executor_review": "medium",
+    "strategic_executor_review": "high_when_task_marks_SUPERVISOR_REVIEW_EFFORT_high",
+    "executor_timeout": "medium"
+  },
+  "token_limit": null,
+  "cost_limit": null,
+  "note": "Python injects compressed Supervisor context verbatim to reduce repeated shell reads and token overhead. Codex remains high-level; GLM performs bulk execution."
+}

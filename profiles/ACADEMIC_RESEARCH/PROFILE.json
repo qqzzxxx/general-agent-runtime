@@ -1,0 +1,9 @@
+{
+  "profile_schema_version": 1,
+  "profile_id": "ACADEMIC_RESEARCH",
+  "profile_version": "1.0",
+  "display_name": "Academic Research",
+  "supervisor_guidance_file": "SUPERVISOR_GUIDANCE.md",
+  "executor_guidance_file": "EXECUTOR_GUIDANCE.md",
+  "final_verification_policy_id": "ACADEMIC_FV_V1"
+}

@@ -1,0 +1,107 @@
+{
+  "policy_schema_version": 1,
+  "policy_id": "ACADEMIC_FV_V1",
+  "policy_version": 1,
+  "claim_count": {
+    "min": 3,
+    "max": 8
+  },
+  "allowed_result_statuses": [
+    "SUPPORTED",
+    "PARTIALLY_SUPPORTED",
+    "WEAK",
+    "UNSUPPORTED",
+    "CONTRADICTED",
+    "NOT_VERIFIABLE"
+  ],
+  "impact_acceptance": {
+    "HIGH": [
+      "SUPPORTED"
+    ],
+    "MEDIUM": [
+      "SUPPORTED",
+      "PARTIALLY_SUPPORTED"
+    ]
+  },
+  "unknown_claim_type": "FAIL_CLOSED",
+  "claim_types": {
+    "CORE_RESULT": {
+      "required_checks": [
+        {
+          "field": "reproduction_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires reproduction_check=PASS"
+        },
+        {
+          "field": "result_artifact",
+          "op": "NONEMPTY_STRING",
+          "message": "requires result_artifact"
+        }
+      ]
+    },
+    "BASELINE_COMPARISON": {
+      "required_checks": [
+        {
+          "field": "baseline_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires baseline_check=PASS"
+        },
+        {
+          "field": "baseline_artifact",
+          "op": "NONEMPTY_STRING",
+          "message": "requires baseline_artifact"
+        }
+      ]
+    },
+    "REPRODUCIBILITY": {
+      "required_checks": [
+        {
+          "field": "reproduction_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires reproduction_check=PASS"
+        },
+        {
+          "field": "environment_config",
+          "op": "NONEMPTY_LIST",
+          "message": "requires environment_config"
+        }
+      ]
+    },
+    "CONTROL_VALIDITY": {
+      "required_checks": [
+        {
+          "field": "control_condition_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires control_condition_check=PASS"
+        },
+        {
+          "field": "controls_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires controls_pointers"
+        }
+      ]
+    },
+    "NUMERICAL_STATISTICAL": {
+      "required_checks": [
+        {
+          "field": "calculation_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires calculation_check=PASS"
+        },
+        {
+          "field": "calculation_artifact",
+          "op": "NONEMPTY_STRING",
+          "message": "requires calculation_artifact"
+        }
+      ]
+    },
+    "THEORETICAL_INTERPRETATION": {
+      "required_checks": []
+    }
+  }
+}
