@@ -53,3 +53,8 @@ Thumbs.db
 
 # --- Runtime-generated user status ---
 reports/USER_STATUS.md
+
+# --- Human-review live authorization / receipts ---
+control/HUMAN_REVIEW
+control/HUMAN_DECISION_*.json
+control/HUMAN_REVIEW_RECEIPT_*.json
