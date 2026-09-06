@@ -18,13 +18,25 @@ PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 LIFECYCLE_STATUSES = {"SUPERVISOR_TURN", "WAITING_EXECUTOR", "COMPLETE", "BLOCKED",
                       "STOPPED", "HUMAN_REVIEW"}
 
+# fresh-clone preflight: required files are mode-specific. Runtime-core files are required in
+# every mode. The legacy single-project bootstrap artifacts (root control\project_state.json,
+# root RESEARCH_STATE.md, ZCODE_LAST_PROCESSED.txt) are required only when no
+# ACTIVE_PROJECT pointer exists — a pointer-bearing Runtime is in isolated (or
+# invalid-pointer, which still fails closed below) mode and must be validated against
+# its active project instead of legacy root state. ZCODE_LAST_PROCESSED.txt keeps the
+# canonical executor_claim.read_last_processed semantics below (missing file =
+# "nothing processed yet", malformed file = fail closed); no compatibility file is
+# ever fabricated to pass this check.
 required = [
     ROOT / "orchestrator.py",
-    CONTROL / "project_state.json",
     CONTROL / "CODEX_SUPERVISOR_RUNTIME.md",
-    ROOT / "RESEARCH_STATE.md",
-    ROOT / "ZCODE_LAST_PROCESSED.txt",
 ]
+if not ACTIVE_PROJECT.exists():
+    required += [
+        CONTROL / "project_state.json",
+        ROOT / "RESEARCH_STATE.md",
+        ROOT / "ZCODE_LAST_PROCESSED.txt",
+    ]
 
 errors = [f"missing: {p}" for p in required if not p.exists()]
 state = {}
@@ -137,9 +149,11 @@ if state and not errors:
                 if not (CONTROL / "INFRA_TEST_PLAN.md").exists():
                     errors.append("infrastructure phase missing control/INFRA_TEST_PLAN.md")
 
-        # ZCODE_LAST_PROCESSED.txt: use the Runtime canonical parser
-        # (scripts/executor_claim.py) — the same wire-format semantics as
-        # resume_human_review.py — so no entry point keeps a divergent dialect.
+        # ZCODE_LAST_PROCESSED.txt: use the Runtime canonical reader
+        # (scripts/executor_claim.py read_last_processed) — the same wire-format
+        # semantics as resume_human_review.py — so no entry point keeps a divergent
+        # dialect and a MISSING file keeps the canonical "nothing processed yet"
+        # (-1) meaning; a malformed existing file still fails closed (fresh-clone preflight).
         last = -1
         try:
             import executor_claim as _claim_helper
@@ -147,20 +161,19 @@ if state and not errors:
             _claim_helper = None
         if _claim_helper is not None:
             try:
-                last = _claim_helper.parse_last_processed_identity(
-                    (ROOT / "ZCODE_LAST_PROCESSED.txt").read_text(
-                        encoding="utf-8-sig", errors="replace"
-                    )
-                )["MESSAGE_ID"]
+                last = _claim_helper.read_last_processed(ROOT)["MESSAGE_ID"]
             except _claim_helper.LastProcessedFormatError as exc:
                 errors.append(f"ZCODE_LAST_PROCESSED.txt is malformed: {exc}")
         else:
-            # Canonical helper unavailable: keep the historical first-integer scan.
-            _lp_text = (ROOT / "ZCODE_LAST_PROCESSED.txt").read_text(
-                encoding="utf-8-sig", errors="replace"
-            ).strip()
-            _lp_match = re.search(r"-?\d+", _lp_text)
-            last = int(_lp_match.group(0)) if _lp_match else -1
+            # Canonical helper unavailable: keep the historical first-integer scan,
+            # aligned with the canonical missing-file semantics.
+            _lp_path = ROOT / "ZCODE_LAST_PROCESSED.txt"
+            if _lp_path.exists():
+                _lp_text = _lp_path.read_text(
+                    encoding="utf-8-sig", errors="replace"
+                ).strip()
+                _lp_match = re.search(r"-?\d+", _lp_text)
+                last = int(_lp_match.group(0)) if _lp_match else -1
         inbox = ROOT / "TO_ZCODE.md"
         if state.get("status") == "WAITING_EXECUTOR" and not inbox.exists():
             # FIX-700102: a mechanically rejected dispatch candidate is quarantined out

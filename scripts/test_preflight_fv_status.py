@@ -19,16 +19,19 @@ PY = sys.executable
 
 
 def build_fixture(root: Path, fv_status) -> Path:
+    # Fresh-clone preflight: fresh-clone-shaped isolated fixture. It deliberately omits the
+    # legacy/bootstrap root files (control/project_state.json, root
+    # RESEARCH_STATE.md, ZCODE_LAST_PROCESSED.txt — all .gitignore'd live state a
+    # fresh clone never contains) so this suite can no longer mask the
+    # fresh-clone preflight defect; project memory lives in the project.
     control = root / "control"
     control.mkdir(parents=True)
-    (root / "RESEARCH_STATE.md").write_text("sandbox\n", encoding="utf-8")
     (root / "orchestrator.py").write_text("# stub\n", encoding="utf-8")
     (control / "CODEX_SUPERVISOR_RUNTIME.md").write_text("sandbox\n", encoding="utf-8")
-    (control / "project_state.json").write_text("{}", encoding="utf-8")
-    (root / "ZCODE_LAST_PROCESSED.txt").write_text("42\n", encoding="utf-8")
     pid = "fv-sandbox-001"
     proot = root / "projects" / pid
     proot.mkdir(parents=True)
+    (proot / "RESEARCH_STATE.md").write_text("sandbox\n", encoding="utf-8")
     (control / "ACTIVE_PROJECT.json").write_text(json.dumps(
         {"schema_version": 1, "project_id": pid, "project_root": f"projects/{pid}"}),
         encoding="utf-8")
@@ -59,6 +62,8 @@ def build_fixture(root: Path, fv_status) -> Path:
     scripts = root / "scripts"
     scripts.mkdir()
     shutil.copy(CANDIDATE / "scripts" / "preflight.py", scripts / "preflight.py")
+    shutil.copy(CANDIDATE / "scripts" / "executor_claim.py",
+                scripts / "executor_claim.py")
     return proot / "project_state.json"
 
 

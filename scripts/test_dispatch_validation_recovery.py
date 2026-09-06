@@ -543,15 +543,20 @@ class PreflightRecoveryMiddleStateTests(unittest.TestCase):
         shutil.copy(CANDIDATE / "orchestrator.py", cls.root / "orchestrator.py")
         cls.project_id = "preflight-smoke-001"
         (cls.root / "projects" / cls.project_id).mkdir(parents=True)
-        (cls.root / "control" / "project_state.json").write_text("{}\n", encoding="utf-8")
+        # Fresh-clone preflight: fresh-clone-shaped isolated fixture — the legacy/bootstrap
+        # root files (control/project_state.json, root RESEARCH_STATE.md,
+        # ZCODE_LAST_PROCESSED.txt) are .gitignore'd live state a fresh clone
+        # never contains, so they are no longer seeded here.
+        (cls.root / "projects" / cls.project_id / "RESEARCH_STATE.md").write_text(
+            "memory\n", encoding="utf-8")
         (cls.root / "control" / "ACTIVE_PROJECT.json").write_text(json.dumps({
             "schema_version": 1,
             "project_id": cls.project_id,
             "project_root": f"projects/{cls.project_id}",
         }), encoding="utf-8")
         (cls.root / "control" / "CODEX_SUPERVISOR_RUNTIME.md").write_text("contract\n", encoding="utf-8")
-        (cls.root / "RESEARCH_STATE.md").write_text("memory\n", encoding="utf-8")
-        (cls.root / "ZCODE_LAST_PROCESSED.txt").write_text("700013\n", encoding="utf-8")
+        shutil.copy(CANDIDATE / "scripts" / "executor_claim.py",
+                    cls.root / "scripts" / "executor_claim.py")
 
     @classmethod
     def tearDownClass(cls):
