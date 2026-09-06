@@ -1,106 +1,293 @@
 # QUICKSTART
 
-Requirements: Windows with PowerShell 5+, Python 3.12+ on `PATH`, a Supervisor backend
-CLI (current default: Codex CLI) on `PATH`, and ZCode Desktop Scheduled Automation (or
-an equivalent scheduled automation) available for the Executor role.
+This walkthrough is the normal path for a **fresh clone** of General Agent Runtime V1.
 
-## 1. Bootstrap the empty runtime
+A fresh checkout intentionally contains **no live Runtime state**. Do not manually create
+legacy root state files before your first project.
 
-A fresh checkout contains no runtime state (all live state is gitignored on purpose).
-Create the minimal bootstrap files once, from the runtime root:
+## Requirements
 
-```powershell
-Copy-Item control\project_state.example.json control\project_state.json
-Set-Content -Path ZCODE_LAST_PROCESSED.txt -Value 0
-Set-Content -Path RESEARCH_STATE.md -Value "# Project memory (empty)"
+- Windows with PowerShell 5+
+- Python 3.12+ on `PATH`
+- Codex CLI on `PATH` (required by the current Supervisor implementation)
+- validated V1 Supervisor configuration: **GPT-5.6 Sol + high reasoning**
+- ZCode Desktop Scheduled Automation (or an equivalent Executor implementation that conforms to the Runtime protocol)
+
+Optional: install the Python package `rich` for enhanced interactive console output.
+
+## 1. Open the Runtime Root
+
+Run commands from the repository root — the directory containing files such as:
+
+```text
+START_PROJECT.ps1
+START_AGENT_SYSTEM.ps1
+orchestrator.py
+control\
+profiles\
+projects\
+scripts\
 ```
 
-Verify the runtime passes its mechanical checks:
+A fresh checkout does **not** need these live/legacy files:
 
-```powershell
-python scripts\preflight.py          # -> PREFLIGHT: OK (Mode: legacy, empty state)
-python -m unittest discover -s scripts -p "test_*.py" -v
+```text
+control\project_state.json
+RESEARCH_STATE.md
+ZCODE_LAST_PROCESSED.txt
+TO_ZCODE.md
+SUPERVISOR_BRIEF.md
 ```
 
-## 2. Create a project
+Do not create them to "bootstrap" the Runtime. The isolated-project flow creates or
+generates the state it actually needs.
 
-Projects are isolated directories under `projects\<project-id>\`. `START_PROJECT.ps1`
-performs mechanical creation only (validate → build in a staging directory → verify →
-atomic rename → activate `control/ACTIVE_PROJECT.json` last). It never calls a model.
+## 2. Configure the Executor Automation Once
+
+Create one ZCode Scheduled Automation for this Runtime installation.
+
+- Workspace: the **Runtime Root**, not `projects\<project-id>\`
+- Prompt: copy the full contents of
+  `control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`
+- Replace every literal `<RUNTIME_ROOT>` in that prompt with this installation's absolute
+  Runtime Root
+- Keep the Automation **paused during setup**
+
+The Automation is Runtime-level. You do not create a new Automation when you create a
+new project in the same Runtime, and you do not change its Workspace between projects.
+
+See [ZCODE_SETUP.md](ZCODE_SETUP.md) for the complete setup contract.
+
+## 3. Prepare a Good Goal
+
+Before starting the Runtime, make the project objective explicit.
+
+For substantial research, engineering, or business work, it is often useful to discuss
+the idea with a strong reasoning model first and turn that discussion into a deliberate
+Goal document.
+
+A good Goal usually states:
+
+- the real objective;
+- relevant context and available inputs/data/files;
+- required deliverables;
+- constraints and non-goals;
+- success / acceptance criteria;
+- evidence or reproducibility expectations;
+- important forbidden actions or risk boundaries.
+
+Do not pre-script every stage. The Supervisor is responsible for decomposing the project
+and revising the method as evidence arrives.
+
+The external Goal filename is arbitrary. `START_PROJECT.ps1` imports it into the project
+as the canonical `PROJECT_GOAL.md` and binds its SHA-256. Treat that canonical Goal as
+immutable after project creation.
+
+## 4. Create and Activate the Project
+
+`START_PROJECT.ps1` is mechanical only: it validates the input, creates the project in a
+staging directory, verifies it, atomically publishes the project directory, then
+activates `control\ACTIVE_PROJECT.json`. It does **not** call a model.
+
+Using a Goal file:
 
 ```powershell
-# either inline goal text ...
-.\START_PROJECT.ps1 -ProjectId demo-001 -ProjectType GENERAL -Goal "Analyze X and produce a decision report"
-
-# ... or a goal file
-.\START_PROJECT.ps1 -ProjectId demo-001 -ProjectType SOFTWARE_ENGINEERING -GoalFile C:\goals\demo.md
+.\START_PROJECT.ps1 `
+  -ProjectId "demo-001" `
+  -ProjectType "SOFTWARE_ENGINEERING" `
+  -GoalFile "C:\goals\demo.md"
 ```
 
-`-ProjectType` selects the profile: `GENERAL`, `SOFTWARE_ENGINEERING`,
-`ACADEMIC_RESEARCH`, or `BUSINESS_RESEARCH`. The profile binds executor guidance and a
-declarative Final Verification policy to the project.
+Or using inline Goal text:
 
-## 3. Configure the Executor automation
+```powershell
+.\START_PROJECT.ps1 `
+  -ProjectId "demo-001" `
+  -ProjectType "GENERAL" `
+  -Goal "Analyze X and produce a decision report"
+```
 
-Create a **ZCode Desktop Scheduled Automation** (or equivalent) that:
+Valid `-ProjectType` values are exactly:
 
-1. wakes periodically (the runtime budgets for an hourly cadence by default),
-2. uses the runtime root as its working directory,
-3. instructs the Executor model to follow `control/EXECUTOR_TASK_TEMPLATE.md`: read the
-   inbox `TO_ZCODE.md`, claim via `scripts/executor_claim.py` (exit 0 = proceed,
-   10/11 = exit quietly), execute the whole stage inside the project, then build a
-   completion staging directory under the project's `completion_staging\` folder and
-   commit it via `python scripts\executor_completion.py commit --staging-dir <dir>`
-   (exit 0 = the Runtime commits the authoritative completion and generates the root
-   artifacts; 10/11/12/13/14 = fail closed, publish nothing).
+```text
+GENERAL
+ACADEMIC_RESEARCH
+SOFTWARE_ENGINEERING
+BUSINESS_RESEARCH
+```
 
-The claim protocol guarantees at-most-once execution even if the automation double-wakes.
-The completion commit guarantees at-most-once authoritative completion per MESSAGE_ID;
-root `SUPERVISOR_BRIEF.md` / `ZCODE_LAST_PROCESSED.txt` / `ZCODE_DONE.flag` are generated
-by the Runtime itself and must never be written by the Executor.
+One Runtime can store many projects, but V1 has exactly **one active project at a time**.
 
-## 4. Start / stop
+## 5. Verify the Fresh Project
+
+An explicit preflight is useful during setup:
+
+```powershell
+python .\scripts\preflight.py
+```
+
+A normal fresh isolated project should report:
+
+```text
+PREFLIGHT: OK
+Mode: isolated
+Project ID: demo-001
+```
+
+A missing `ZCODE_LAST_PROCESSED.txt` is normal on a fresh Runtime: it means that no
+Executor message has been processed yet. A malformed existing pointer still fails
+closed.
+
+For release/debug validation you can also run the full regression suite:
+
+```powershell
+python -m unittest discover -s scripts -p "test_*.py"
+```
+
+`START_AGENT_SYSTEM.ps1` runs its own mechanical checks before starting the Orchestrator,
+so manually running the suite is not required for every normal project.
+
+## 6. Enable the Executor and Start the Agent System
+
+After project creation and preflight are complete, enable the already-configured ZCode
+Scheduled Automation, then run:
 
 ```powershell
 .\START_AGENT_SYSTEM.ps1
 ```
 
-The launcher: (a) checks this runtime root's own lock — a live second orchestrator in
-the *same* root blocks startup while *other* runtime roots are unaffected; (b) runs
-preflight; (c) runs the mechanical regression suite; (d) starts `orchestrator.py`,
-which drives the Supervisor loop.
+The launcher checks the Runtime-root lock, runs preflight and mechanical regressions, then
+starts `orchestrator.py`.
 
-```powershell
-.\STOP_AGENT_SYSTEM.ps1   # creates control/STOP: terminal for new Supervisor calls
+The Supervisor performs the first turn and publishes Executor tasks when needed. The
+already-enabled Automation picks up a task on a later scheduled wake.
+
+Do not manually copy a task into ZCode and do not treat `TO_ZCODE.md` as permission to
+work. The Automation reads the Runtime-root inbox and may execute a stage only after the
+canonical claim flow returns `CLAIM_ACQUIRED` / exit code 0.
+
+## 7. Let the Runtime Loop
+
+Normal lifecycle:
+
+```text
+Supervisor
+-> authorized Executor task
+-> ZCode wake
+-> claim
+-> execute exactly one stage
+-> completion staging
+-> completion commit
+-> Executor exits
+-> Orchestrator consumes + seals
+-> Supervisor reviews
+-> next stage / Final Verification / HUMAN_REVIEW / COMPLETE
 ```
 
-A real `control/STOP` is checked before any new Supervisor invocation and is a hard
-stop — the Orchestrator will not resume on its own afterwards.
+You are not the message bus. Do not relay Supervisor/Executor messages by hand.
 
-## 5. HUMAN_REVIEW
+Once the project reaches `COMPLETE`, `STOPPED`, `BLOCKED`, or `HUMAN_REVIEW`, the
+Orchestrator surfaces the terminal/attention state and stops normal progression as
+defined by the protocol. After `COMPLETE`, the ZCode Automation can be paused until the
+next project.
 
-When the Supervisor raises `HUMAN_REVIEW`, automation pauses by design. Decide offline,
-then:
+## 8. Authorization and Execution Scope
+
+Seeing `TO_ZCODE.md` is **not** authorization.
+
+The Executor must run the exact claim helper command specified by the task. Only:
+
+```text
+CLAIM_ACQUIRED
+exit code 0
+```
+
+authorizes stage execution.
+
+Exit code 10 (`CLAIM_EXISTS`) or 11 (`ALREADY_PROCESSED`) means the wake should exit
+quietly. Other claim errors fail closed according to the canonical Executor prompt.
+
+Execution scope:
+
+- never leave the configured Runtime Root;
+- normal project work stays inside the active project;
+- Runtime-core maintenance is allowed only when the current authorized task explicitly
+  grants a narrow Runtime-root scope;
+- never inspect or modify another Runtime installation.
+
+## 9. Completion Rule
+
+The Executor does not directly publish authoritative completion.
+
+Legal path:
+
+```text
+durable stage outputs
+-> project completion_staging\
+-> python scripts\executor_completion.py commit --staging-dir <dir>
+-> COMPLETION_COMMITTED
+-> immediate Executor exit
+```
+
+The Runtime owns the authoritative completion ledger, consume/seal transitions, and the
+root compatibility artifacts:
+
+```text
+SUPERVISOR_BRIEF.md
+ZCODE_LAST_PROCESSED.txt
+ZCODE_DONE.flag
+```
+
+The Executor must not create, repair, overwrite, or republish those files.
+
+## 10. HUMAN_REVIEW
+
+When the Supervisor raises `HUMAN_REVIEW`, automation pauses by design.
+
+Decide offline, then:
 
 ```powershell
 .\RESUME_HUMAN_REVIEW.ps1 -Mode Prepare -ProjectId demo-001 `
-    -DecisionFile my-decision.json -ReceiptFile receipt.json
-# inspect the hash-bound receipt ...
+  -DecisionFile my-decision.json -ReceiptFile receipt.json
+
+# inspect the hash-bound receipt, then:
 .\RESUME_HUMAN_REVIEW.ps1 -Mode Apply -ReceiptFile receipt.json
 ```
 
 `Prepare` validates the decision against the pending lifecycle record and produces a
-receipt; `Apply` commits it. Never edit runtime state files by hand.
+receipt; `Apply` commits it. Never edit live Runtime state by hand.
 
-## 6. Runtime layout
+## 11. Stop
 
+To request a hard stop:
+
+```powershell
+.\STOP_AGENT_SYSTEM.ps1
 ```
-orchestrator.py            mechanical Orchestrator (no model calls)
-START_AGENT_SYSTEM.ps1     launcher (root-scoped instance check + preflight + tests)
-control/                   policy docs + live control state (gitignored)
-profiles/<TYPE>/           project templates incl. Final Verification policies
-projects/<id>/             isolated project data (gitignored)
-handoff/                   claims + completion ledger + consumed archive (gitignored)
-TO_ZCODE.md                Executor inbox (created at runtime, gitignored)
-SUPERVISOR_BRIEF.md        Runtime-generated receipt view (gitignored)
+
+This creates `control\STOP`. A real STOP is checked before any new Supervisor invocation
+and is terminal for normal automatic continuation; the Orchestrator does not silently
+resume itself.
+
+## 12. Runtime Layout
+
+```text
+orchestrator.py                         mechanical Orchestrator
+START_PROJECT.ps1                      create/activate isolated project
+START_AGENT_SYSTEM.ps1                 preflight + tests + start Orchestrator
+STOP_AGENT_SYSTEM.ps1                  hard stop
+RESUME_HUMAN_REVIEW.ps1                audited Human Review resume wrapper
+
+control/
+  CODEX_SUPERVISOR_RUNTIME.md           Supervisor policy
+  ZCODE_SCHEDULED_AUTOMATION_PROMPT.md canonical permanent Executor prompt
+  ACTIVE_PROJECT.json                  live pointer, generated at runtime (gitignored)
+
+profiles/<TYPE>/                       project templates + FV policies
+projects/<id>/                         isolated project data (gitignored)
+handoff/                               claims + completion ledger (live data gitignored)
+
+TO_ZCODE.md                            Runtime-generated Executor inbox (gitignored)
+SUPERVISOR_BRIEF.md                    Runtime-generated completion view (gitignored)
+ZCODE_LAST_PROCESSED.txt               Runtime-generated compatibility pointer (gitignored)
 ```

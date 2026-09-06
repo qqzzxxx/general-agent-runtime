@@ -5,18 +5,22 @@ An unattended dual-Agent runtime in which a **high-reasoning Supervisor**, a
 multi-stage research and engineering projects through plain shared files — with no human
 acting as the message bus.
 
-The architecture is model-agnostic. The current implementation uses:
+The architecture separates Supervisor, Executor, and Orchestrator roles at the
+protocol level, but this release is **not plug-and-play model-agnostic**. The current
+Supervisor integration is implemented specifically for Codex CLI and pins GPT-5.6 Sol.
+The validated V1 Supervisor configuration is **Codex CLI + GPT-5.6 Sol + high reasoning**.
+Other Supervisor models/backends are not part of the validated V1 release.
 
-| Role | Current backend | Replaced by configuring |
+| Role | Current implementation | Portability |
 |---|---|---|
-| Supervisor (planning, acceptance, redirection, stop) | Codex CLI / GPT (`codex exec`) | any CLI agent with comparable batch invocation |
-| Executor (bulk implementation, evidence production) | ZCode Desktop Scheduled Automation / GLM | any scheduled automation that can read/write the wire files |
-| Orchestrator (mechanical scheduling, authorization, gating) | Python, no model calls | fixed by design |
+| Supervisor (planning, acceptance, redirection, stop) | Codex CLI / GPT-5.6 Sol (`codex exec`) | replacing it requires code-level backend/invocation adaptation |
+| Executor (bulk implementation, evidence production) | ZCode Desktop Scheduled Automation / GLM | an equivalent scheduled automation can be adapted if it fully obeys the Runtime wire, claim, scope, and completion protocols |
+| Orchestrator (mechanical scheduling, authorization, gating) | Python; mechanically invokes the Supervisor backend | fixed by design |
 
-Nothing in the protocol depends on a particular vendor: the Orchestrator only requires
-that the Supervisor backend can be invoked from a shell with a text prompt, and that the
-Executor backend wakes periodically, reads the inbox file, executes, and publishes a
-receipt.
+The shared-file protocol is vendor-neutral in concept, especially at the Executor
+boundary, but this repository's Supervisor invocation is Codex-specific today. Supporting
+another Supervisor backend requires adapting the Runtime invocation layer rather than
+changing a single configuration value.
 
 ## What problem it solves
 
@@ -26,38 +30,70 @@ cannot be audited. General Agent Runtime separates the concerns instead:
 
 - the **Supervisor** decides *what should happen next and whether it was done right*
   (high reasoning effort, expensive, invoked rarely);
-- the **Executor** does *the work of one stage at a time* (cheap, fast, invoked once per
-  stage);
+- the **Executor** does *the work of one authorized stage at a time* (cheap, fast,
+  invoked once per stage);
 - the **Orchestrator** enforces *mechanically verifiable rules* between them so neither
   agent can skip, replay, forge, or partially consume a handoff.
 
-All coordination happens through files in the runtime root — every handoff is an
-auditable artifact with a cryptographic identity binding.
+All coordination happens through files in the Runtime Root. Every handoff has an
+auditable identity and authorization trail.
+
+## Before you start: write a good Goal
+
+The Runtime is autonomous **after** a project starts, but it cannot infer the project you
+meant to ask for. The quality of the canonical `PROJECT_GOAL.md` is therefore a major
+upper bound on the quality of the resulting work.
+
+A practical workflow is:
+
+1. discuss the project with a strong reasoning model until the objective and constraints
+   are clear;
+2. write a Goal file that states the real objective, available inputs, required
+   deliverables, constraints, success criteria, evidence expectations, and important
+   forbidden actions;
+3. give that Goal file to `START_PROJECT.ps1`;
+4. let the Supervisor decide the stage plan and the Executor carry it out.
+
+Do **not** try to pre-script every stage in the Goal. Define the destination and the
+rules of the project; let the Supervisor choose and revise the route.
+
+`START_PROJECT.ps1` imports the supplied Goal as the project's canonical
+`PROJECT_GOAL.md` and Goal Anchor binds its exact SHA-256. Treat it as immutable after
+project creation: changing its bytes later fails closed instead of silently changing the
+project constitution.
 
 ## How one stage flows
 
-```
+```text
 Python Orchestrator
   -> invokes Supervisor CLI with a compressed context prompt
-  -> Supervisor writes the next dispatch to the inbox TO_ZCODE.md
-  -> Orchestrator mechanically validates the dispatch and binds an authorization record
-     (MESSAGE_ID / TASK_ID / STAGE_ID / ATTEMPT / NONCE + inbox SHA-256) in
-     control/orchestrator_runtime.json
-  -> Executor automation wakes, claims the task via scripts/executor_claim.py
-     (CLAIM_ACQUIRED is the only permission to start work)
-  -> Executor performs the whole stage, writes deliverables + evidence into the project
+  -> Supervisor proposes the next dispatch
+  -> Orchestrator mechanically validates and publishes TO_ZCODE.md
+  -> Orchestrator binds authorization to the exact task identity + inbox SHA-256
+  -> Executor automation wakes
+  -> Executor claims via scripts/executor_claim.py
+     (CLAIM_ACQUIRED / exit 0 is the only permission to start work)
+  -> Executor performs exactly the authorized stage
+     - normal project work stays inside the active project
+     - Runtime-core maintenance is allowed only when the current authorized task
+       explicitly permits the exact Runtime-root scope
+  -> Executor writes durable deliverables + evidence
   -> Executor stages a candidate completion and commits it via
-     scripts/executor_completion.py (COMPLETION_COMMITTED is the only permission to finish)
-  -> the Runtime durably records the authoritative completion in handoff/completion_ledger/
-     and itself generates SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, ZCODE_DONE.flag
-  -> Orchestrator consumes the ledger-backed completion exactly once, seals the identity,
-     clears the wake hint, and invokes the Supervisor again for review / next dispatch
+     scripts/executor_completion.py
+     (COMPLETION_COMMITTED / exit 0 is the only legal completion publication)
+  -> Runtime records the authoritative completion in handoff/completion_ledger/
+  -> Runtime generates SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, ZCODE_DONE.flag
+  -> Orchestrator consumes the ledger-backed completion exactly once and seals it
+  -> Supervisor reviews the result and chooses the next task, Final Verification,
+     HUMAN_REVIEW, STOP, or COMPLETE
 ```
 
-The complete operating contract lives in
-[control/CODEX_SUPERVISOR_RUNTIME.md](control/CODEX_SUPERVISOR_RUNTIME.md) and
-[control/EXECUTOR_TASK_TEMPLATE.md](control/EXECUTOR_TASK_TEMPLATE.md); the wire-level
-sequence is described in [handoff/PROTOCOL.md](handoff/PROTOCOL.md).
+The operating contracts live in:
+
+- [control/CODEX_SUPERVISOR_RUNTIME.md](control/CODEX_SUPERVISOR_RUNTIME.md) — Supervisor policy;
+- [control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md](control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md) — canonical permanent Executor automation prompt;
+- [control/EXECUTOR_TASK_TEMPLATE.md](control/EXECUTOR_TASK_TEMPLATE.md) — task wire/schema guidance;
+- [handoff/PROTOCOL.md](handoff/PROTOCOL.md) — handoff protocol.
 
 ## Why claim / authorization / completion-seal exist
 
@@ -68,169 +104,179 @@ Three failure classes motivated the design, and all are enforced mechanically:
    filesystem-guaranteed claim on the exact `MESSAGE_ID + NONCE` under
    `handoff/executor_claims/`; the second contender exits quietly (exit 10 = claim
    exists, exit 11 = already processed). Replays and stale re-issues are rejected.
-2. **No unauthorized dispatch.** A file appearing in the inbox is not authorization.
-   The Orchestrator publishes a dispatch *before* writing the authorization record, and
-   binds it to the exact inbox snapshot hash. A crash between the two leaves a visible
-   but unclaimable task — claim fails closed. Executor-side modifications of the inbox
-   never match the recorded hash.
+2. **No unauthorized dispatch.** Seeing `TO_ZCODE.md` is not authorization. The claim
+   helper validates the exact authorized task identity and inbox snapshot. A visible but
+   unauthorized, stale, or modified inbox fails closed.
 3. **At-most-once completion.** A claim does not by itself prove how many times a
-   finished attempt may republish its result. `executor_completion.py` therefore owns
-   the authoritative completion commit: one ledger entry per `MESSAGE_ID` under
+   finished attempt may republish its result. `executor_completion.py` owns the
+   authoritative completion commit: one ledger entry per `MESSAGE_ID` under
    `handoff/completion_ledger/`, monotonic `COMPLETION_COMMITTED -> COMPLETION_CONSUMED
    -> COMPLETION_SEALED`, never reversible. A second commit is refused (exit 10), a
    consumed/sealed identity can never drive the lifecycle again (exit 11), and the
-   Orchestrator consumes only ledger-backed completions — raw root artifacts, rewritten
-   briefs, and late replays are quarantined and audited instead.
+   Orchestrator consumes only ledger-backed completions.
 
-Additional reliability mechanisms (all preserved by the regression suite): atomic
-publication via temp-file rename, stale-lock reclaim only for provably dead owners,
-Final Verification gating before any `COMPLETE`, terminal-state supervision, budget and
-retry ceilings, and hard stop conditions.
+Additional reliability mechanisms include atomic publication, stale-lock recovery only
+for provably dead owners, Goal Anchor checks before every Supervisor turn and dispatch,
+Final Verification gating before `COMPLETE`, bounded retries/budgets, fail-closed unknown
+states, and hard stop conditions.
 
 ## Project / Profile / Runtime
 
-- **Runtime** — this repository. Owns global state (control plane, wire files, claims,
-  archive) and exactly one Orchestrator process per runtime root.
-- **Project** — one directory under `projects/<project-id>/` with its own goal, state,
-  code, evidence, and reports. Projects are isolated: the Orchestrator scopes all
-  read/write paths to the active project. The active project is named by
-  `control/ACTIVE_PROJECT.json` (the activation commit point of project creation).
-- **Profile** — a project template in `profiles/` (`GENERAL`, `SOFTWARE_ENGINEERING`,
-  `ACADEMIC_RESEARCH`, `BUSINESS_RESEARCH`) that binds a goal parameterization, executor
-  guidance, and a declarative Final Verification policy to the project type.
+- **Runtime** — one installation of this repository. It owns the control plane, wire
+  files, claims, completion ledger, logs, and exactly one active Orchestrator process.
+- **Project** — one isolated directory under `projects/<project-id>/` containing its
+  canonical Goal, state, workspace, evidence, and reports.
+- **Active Project** — one Runtime may contain many projects, but V1 activates exactly
+  one at a time through `control/ACTIVE_PROJECT.json`.
+- **Profile** — a project template in `profiles/`: `GENERAL`,
+  `SOFTWARE_ENGINEERING`, `ACADEMIC_RESEARCH`, or `BUSINESS_RESEARCH`. The profile binds
+  Executor guidance and a declarative Final Verification policy to the project type.
+
+The ZCode Automation is **Runtime-level**, not Project-level: its Workspace remains the
+Runtime Root and its permanent prompt does not change when you switch projects.
 
 ## Quick start
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full walkthrough. In short:
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full walkthrough and
+[docs/ZCODE_SETUP.md](docs/ZCODE_SETUP.md) for the Executor setup.
+
+A fresh clone needs **no manual bootstrap state files**.
 
 ```powershell
-# one-time bootstrap of the empty runtime state (see QUICKSTART for details)
-Copy-Item control\project_state.example.json control\project_state.json
-Set-Content ZCODE_LAST_PROCESSED.txt -Value 0
-Set-Content RESEARCH_STATE.md -Value "# Project memory (empty)"
+# 1) create an isolated project from a Goal file
+.\START_PROJECT.ps1 `
+  -ProjectId "demo-001" `
+  -ProjectType "GENERAL" `
+  -GoalFile "C:\goals\demo.md"
 
-# create an isolated project from a profile
-.\START_PROJECT.ps1 -ProjectId demo-001 -ProjectType GENERAL -GoalFile <your-goal.md>
+# 2) optional explicit check (START_AGENT_SYSTEM also runs preflight)
+python .\scripts\preflight.py
+# -> PREFLIGHT: OK
+# -> Mode: isolated
 
-# enable a ZCode Desktop Scheduled Automation pointing at this runtime root, then
-.\START_AGENT_SYSTEM.ps1    # preflight + regression tests + orchestrator
-.\STOP_AGENT_SYSTEM.ps1     # write control/STOP (terminal for new Supervisor calls)
+# 3) enable the already-configured ZCode Scheduled Automation, then start the Orchestrator
+.\START_AGENT_SYSTEM.ps1
 ```
 
-Instance isolation is per runtime root: one runtime root runs at most one Orchestrator
-(enforced by `control/.orchestrator.lock` + pid verification, fail closed), while
-several independent runtime roots on the same machine can run in parallel.
+After launch, no manual Supervisor/Executor handoff is required. The Supervisor publishes
+Executor tasks when needed, and the already-enabled Scheduled Automation picks them up on
+a later wake. A wake by itself never authorizes work: the Executor may execute a stage
+only after the canonical claim flow returns `CLAIM_ACQUIRED` / exit code 0.
+
+There is intentionally **no** first-run instruction to create
+`control\project_state.json`, root `RESEARCH_STATE.md`, or
+`ZCODE_LAST_PROCESSED.txt`. Those are legacy/runtime artifacts, not fresh-clone
+prerequisites.
+
+Instance isolation is per Runtime Root: one Runtime Root runs at most one Orchestrator,
+while separate Runtime Roots can run independently.
 
 ## Human review (HUMAN_REVIEW)
 
 When a stage requires input only a human can provide — ambiguous objectives, physical
 actions, credentials, or acceptance of irreversible risk — the Supervisor sets the
-project to `HUMAN_REVIEW` instead of guessing. The Orchestrator surfaces a terminal
-notification and stops dispatching. The human decides offline, then applies the decision
-with the audited wrapper:
+project to `HUMAN_REVIEW` instead of guessing. The Orchestrator stops dispatching and
+surfaces the reason.
+
+The human decides offline, then uses the audited wrapper:
 
 ```powershell
-.\RESUME_HUMAN_REVIEW.ps1 -Mode Prepare -ProjectId demo-001 -DecisionFile decision.json -ReceiptFile receipt.json
+.\RESUME_HUMAN_REVIEW.ps1 -Mode Prepare -ProjectId demo-001 `
+  -DecisionFile decision.json -ReceiptFile receipt.json
+
 # inspect the hash-bound receipt, then:
 .\RESUME_HUMAN_REVIEW.ps1 -Mode Apply -ReceiptFile receipt.json
 ```
 
-A consumed receipt can never silently return to pending or regain authorization
-semantics; the ledger is validated on every later startup.
+Never edit `ACTIVE_PROJECT.json`, `project_state.json`, Goal Anchor bindings, completion
+ledgers, or other live control state by hand.
 
 ## Final Verification
 
 `COMPLETE` is never a Supervisor opinion alone. Each profile ships a declarative Final
 Verification policy (`profiles/<type>/FINAL_VERIFICATION_POLICY.json`) that the
-Orchestrator enforces mechanically: before a terminal `COMPLETE` is accepted, the
-project must produce independently re-runnable evidence (fresh execution runs, receipts,
-claim counts) that satisfies the policy's claims — otherwise the gate blocks the
-completion attempt and records the block reason.
+Orchestrator enforces mechanically. Decision-critical claims must be backed by the
+required independent evidence; a malformed or insufficient verification receipt is
+rejected rather than treated as "close enough."
+
+Destructive verification belongs in an isolated external sandbox, not in the live
+Runtime. See [docs/FV_SANDBOX_ISOLATION_V1.md](docs/FV_SANDBOX_ISOLATION_V1.md).
 
 ## Console output (optional Rich)
 
-The Orchestrator renders its console output through a presentation-only view
-layer. With the optional [`rich`](https://github.com/Textualize/rich) package
-installed and an interactive terminal, you get concise Supervisor decision
-panels, color-highlighted claim/completion lifecycle events (dispatch
-published, completion consumed, sealed, rejected, timeout), a live
-WAITING_EXECUTOR spinner that refreshes in place (no polling-line spam), and
-distinct terminal / HUMAN_REVIEW / unrecoverable-error panels.
+The Orchestrator renders console output through a presentation-only layer. With the
+optional [`rich`](https://github.com/Textualize/rich) package installed and an
+interactive terminal, you get concise Supervisor decision panels, lifecycle events, a
+non-spamming `WAITING_EXECUTOR` spinner, and distinct terminal / `HUMAN_REVIEW` /
+unrecoverable-error panels.
 
-Without Rich — or on a pipe, a non-interactive session, or any console error —
-the Runtime automatically falls back to plain, understandable text with no ANSI
-control sequences and no TTY requirement, so Windows PowerShell and scheduled
-(non-interactive) runs are always safe. The layer is strictly presentation:
-durable event logging stays in `logs/orchestrator.jsonl` regardless of console
-mode, and a rendering failure (including a forced Rich import failure) can
-never crash orchestration or change a protocol outcome — the regression suite
-covers this explicitly.
+Without Rich — or on a pipe/non-interactive session — the Runtime falls back to plain
+text. Durable event logging remains in `logs/orchestrator.jsonl`, and presentation
+failures cannot change a protocol outcome.
 
-Set `ORCHESTRATOR_CONSOLE` to control the mode: `auto` (default: Rich when
-available and stdout is interactive), `rich`, `plain`, or `off` (no
-interactive rendering; durable logging unchanged).
+Set `ORCHESTRATOR_CONSOLE` to `auto` (default), `rich`, `plain`, or `off`.
 
 ## Project goal anchoring (GOAL-ANCHOR-V1)
 
-Every isolated project mechanically binds its canonical goal at bootstrap:
-`scripts/start_project.py` persists `project_state.goal_anchor` containing the
-canonical goal path and the byte-exact SHA-256 of `PROJECT_GOAL.md`
-(`provenance: bootstrap`). Before every Supervisor turn — and again after the
-turn, before any Executor dispatch is authorized — the Orchestrator re-reads
-`PROJECT_GOAL.md` from disk, recomputes its SHA-256, and compares it with the
-binding. A second, Runtime-owned copy of the bound hash in
-`control/orchestrator_runtime.json` makes a silent, self-consistent rewrite of
-the binding mechanically detectable.
+Every isolated project binds its canonical Goal at bootstrap:
+`scripts/start_project.py` persists `project_state.goal_anchor` with the canonical Goal
+path and byte-exact SHA-256 of `PROJECT_GOAL.md`. Before every Supervisor turn — and
+again before any dispatch is authorized — the Orchestrator re-reads the Goal and checks
+the binding. A second Runtime-owned binding in `control/orchestrator_runtime.json`
+detects silent self-consistent rewrites.
 
-A missing, unreadable, malformed, path-escaping, legacy-unbound, or
-hash-mismatched goal fails the project closed into `HUMAN_REVIEW` with
-`current_task = null`: no prompt is built, no decision is made, and no dispatch
-is authorized. The binding is never silently rebound or upgraded; the only
-sanctioned recovery for a pre-binding (legacy) project is the explicit
-exactly-once migration tool `scripts/migrate_goal_anchor.py`, which binds the
-current bytes with `provenance: migration` and pauses for the normal
-HUMAN_REVIEW resume flow.
-
-Every committed Supervisor decision also carries a concise structured
-`goal_alignment` record (original objective, unmet criteria, latest result
-relative to the goal, next-action alignment, scope drift, and a
-continue/revise/redirect/abandon method judgment), and recent local Executor
-success alone can never justify `FINAL_VERIFICATION`, `FINAL_ACCEPTANCE`, or
-`COMPLETE`. Legacy single-project runtimes (no active-project pointer) keep
-their exact prior behavior. See `docs/GOAL_ANCHOR_V1.md`.
+A missing, unreadable, malformed, path-escaping, unbound, or hash-mismatched Goal fails
+closed into `HUMAN_REVIEW` with no authorized Executor task. The Runtime never silently
+rebinds the Goal. See [docs/GOAL_ANCHOR_V1.md](docs/GOAL_ANCHOR_V1.md).
 
 ## Safety boundaries
 
-- The Executor works only inside the active project root; the Orchestrator validates
-  every path against the runtime's own `projects` directory.
-- No GUI automation, no browser control, no Computer Use, no headless agent CLI is part
-  of the protocol — only shared files and shell invocation.
-- Terminal and error states are surfaced to the human via the console and
-  `control/USER_ATTENTION.json`; unattended operation never auto-starts a new project.
-- Multiple runtime roots on one machine are isolated from each other (locks, state,
-  stop flags, and claims are all root-scoped).
-- Runtime state, project data, logs, and claims are gitignored: a repository checkout
-  never contains execution history (see [docs/SECURITY.md](docs/SECURITY.md)).
+- The Executor must never operate outside its configured Runtime Root.
+- Normal project work is scoped to the active project. A Runtime-core modification is
+  allowed only when the current mechanically authorized task explicitly permits that
+  narrow Runtime-root scope; otherwise Runtime Core is out of scope.
+- Seeing `TO_ZCODE.md` never authorizes work; successful claim acquisition does.
+- The Executor never directly writes authoritative root completion artifacts.
+- Terminal and error states are surfaced to the human; unattended operation never
+  auto-starts a new project.
+- Runtime state, project data, logs, claims, Human Review receipts, and wire files are
+  gitignored: a repository checkout does not contain prior execution history.
+- Multiple Runtime Roots are isolated from one another. One Automation must not inspect
+  or modify sibling Runtime installations.
+
+See [docs/SECURITY.md](docs/SECURITY.md) for the threat model and isolation rules.
 
 ## Requirements
 
-- Windows (PowerShell 5+), Python 3.12+
-- A Supervisor backend CLI on `PATH` (current default: Codex CLI)
-- ZCode Desktop Scheduled Automation (or equivalent) configured to wake on this runtime
-  root and execute the inbox task with an Executor-capable model
+- Windows with PowerShell 5+
+- Python 3.12+ on `PATH`
+- Codex CLI on `PATH` (required by the current Supervisor implementation)
+- ZCode Desktop Scheduled Automation (or an equivalent Executor implementation that conforms to the Runtime protocol)
+- optional: Python package `rich` for enhanced interactive console rendering
 
 ## Documentation
 
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) — bootstrap, first project, automation setup
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — first project, first run, normal lifecycle
+- [docs/ZCODE_SETUP.md](docs/ZCODE_SETUP.md) — canonical ZCode Scheduled Automation setup
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, wire format, identity model
 - [docs/SECURITY.md](docs/SECURITY.md) — threat model, isolation, what never gets committed
+- [docs/GOAL_ANCHOR_V1.md](docs/GOAL_ANCHOR_V1.md) — immutable Goal binding
+- [docs/FV_SANDBOX_ISOLATION_V1.md](docs/FV_SANDBOX_ISOLATION_V1.md) — safe destructive verification
 
 ## Status
 
-`v0.1` open-source release of a runtime that has been operating unattended on real
-projects. The protocol and reliability mechanisms are frozen; see the regression suite
-under `scripts/test_*.py` (run with `python -m unittest discover -s scripts -p "test_*.py"`,
-from the runtime root).
+Release candidate for the first public open-source release. The Runtime has been
+validated with the regression suite and with a clean-clone onboarding smoke path:
+
+```text
+clean clone -> START_PROJECT.ps1 -> preflight -> PREFLIGHT: OK (Mode: isolated)
+```
+
+Run the full regression suite from the Runtime Root with:
+
+```powershell
+python -m unittest discover -s scripts -p "test_*.py"
+```
 
 ## License
 
