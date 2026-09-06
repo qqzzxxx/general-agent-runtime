@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 import re
 import sys
@@ -110,8 +110,12 @@ if state and not errors:
             fv = state.get("final_verification")
             if not isinstance(fv, dict) or fv.get("required") is not True:
                 errors.append("isolated project requires final_verification.required=true")
+            # IN_PROGRESS is the Runtime-owned marker for an authorized
+            # Final Verification task in flight (dispatch -> receipt consumption);
+            # this read-only check accepting it neither authorizes work nor weakens
+            # any lifecycle gate.
             elif str(fv.get("status") or "").upper() not in \
-                    {"NOT_STARTED", "PENDING", "REVERIFY", "PASS", "FAIL"}:
+                    {"NOT_STARTED", "PENDING", "REVERIFY", "IN_PROGRESS", "PASS", "FAIL"}:
                 errors.append(f"unexpected final_verification.status: {fv.get('status')!r}")
         else:
             # legacy single-project mode: preserve the historical V1.5 checks verbatim

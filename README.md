@@ -170,6 +170,35 @@ Set `ORCHESTRATOR_CONSOLE` to control the mode: `auto` (default: Rich when
 available and stdout is interactive), `rich`, `plain`, or `off` (no
 interactive rendering; durable logging unchanged).
 
+## Project goal anchoring (GOAL-ANCHOR-V1)
+
+Every isolated project mechanically binds its canonical goal at bootstrap:
+`scripts/start_project.py` persists `project_state.goal_anchor` containing the
+canonical goal path and the byte-exact SHA-256 of `PROJECT_GOAL.md`
+(`provenance: bootstrap`). Before every Supervisor turn — and again after the
+turn, before any Executor dispatch is authorized — the Orchestrator re-reads
+`PROJECT_GOAL.md` from disk, recomputes its SHA-256, and compares it with the
+binding. A second, Runtime-owned copy of the bound hash in
+`control/orchestrator_runtime.json` makes a silent, self-consistent rewrite of
+the binding mechanically detectable.
+
+A missing, unreadable, malformed, path-escaping, legacy-unbound, or
+hash-mismatched goal fails the project closed into `HUMAN_REVIEW` with
+`current_task = null`: no prompt is built, no decision is made, and no dispatch
+is authorized. The binding is never silently rebound or upgraded; the only
+sanctioned recovery for a pre-binding (legacy) project is the explicit
+exactly-once migration tool `scripts/migrate_goal_anchor.py`, which binds the
+current bytes with `provenance: migration` and pauses for the normal
+HUMAN_REVIEW resume flow.
+
+Every committed Supervisor decision also carries a concise structured
+`goal_alignment` record (original objective, unmet criteria, latest result
+relative to the goal, next-action alignment, scope drift, and a
+continue/revise/redirect/abandon method judgment), and recent local Executor
+success alone can never justify `FINAL_VERIFICATION`, `FINAL_ACCEPTANCE`, or
+`COMPLETE`. Legacy single-project runtimes (no active-project pointer) keep
+their exact prior behavior. See `docs/GOAL_ANCHOR_V1.md`.
+
 ## Safety boundaries
 
 - The Executor works only inside the active project root; the Orchestrator validates

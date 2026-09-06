@@ -70,6 +70,34 @@ ACTIVE_PROJECT_FILE = CONTROL / "ACTIVE_PROJECT.json"
 ACTIVE_PROJECT = None  # set by activate_project_scope()
 PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
+# GOAL-ANCHOR-V1: every isolated project binds its canonical PROJECT_GOAL.md at
+# bootstrap (path + byte-exact SHA-256, persisted in project_state.goal_anchor).
+# The Runtime re-reads and re-verifies the canonical goal bytes before every
+# Supervisor turn and before any dispatch (re)authorization, and fails closed
+# into HUMAN_REVIEW (current_task null, no new dispatch/authorization) on any
+# missing, unreadable, malformed, path-escaping, legacy-unbound, or
+# hash-mismatched goal state. A second, Runtime-owned copy of the bound hash in
+# control/orchestrator_runtime.json makes a silent self-consistent rebind of
+# project_state.goal_anchor mechanically detectable. Legacy single-project mode
+# (no ACTIVE_PROJECT pointer) keeps its exact prior behavior — goal anchoring is
+# defined per isolated project only. Presentation/console output is never goal
+# authority; only the binding records below are.
+GOAL_ANCHOR_SCHEMA_VERSION = 1
+GOAL_ANCHOR_REQUIRED_KEYS = {
+    "schema_version", "goal_path", "goal_sha256", "bound_at", "provenance",
+}
+GOAL_ANCHOR_PROVENANCES = {"bootstrap", "migration"}
+GOAL_ANCHOR_CANONICAL_PATH = "PROJECT_GOAL.md"
+GOAL_ALIGNMENT_FIELDS = (
+    "original_objective",
+    "unmet_criteria",
+    "latest_result",
+    "next_action_alignment",
+    "scope_drift",
+    "method",
+)
+GOAL_ALIGNMENT_VALUE_MAX = 2000
+
 # G4: declarative Final Verification policies. The Core understands field/op/value
 # rules only; it has no knowledge of what any claim_type means. Operators are a
 # fixed, tiny set — unknown operators fail closed at load time.
@@ -202,6 +230,10 @@ HUMAN_DECISION_SUPERVISOR_RESULT_KEYS = {
     "project_state_patch",
     "executor_task",
 }
+# GOAL-ANCHOR-V1: supervisor_decision additionally carries the required concise
+# structured goal_alignment record (validate_goal_alignment). New Human Decision
+# commits require it; pre-existing consumed ledger entries are revalidated by
+# their own hash/history identity, not by this schema, so history stays valid.
 HUMAN_DECISION_SUPERVISOR_DECISION_KEYS = {
     "decision",
     "at",
@@ -210,6 +242,7 @@ HUMAN_DECISION_SUPERVISOR_DECISION_KEYS = {
     "message_id",
     "task_id",
     "stage_id",
+    "goal_alignment",
 }
 HUMAN_DECISION_ALLOWED_DECISIONS = {
     "CONTINUE",
@@ -1979,6 +2012,11 @@ def load_runtime() -> dict:
         "dispatch_validation_repair_used": 0,
         "last_dispatch_validation_error": None,
         "last_quarantined_dispatch": None,
+        # GOAL-ANCHOR-V1: Runtime-owned cross-check copy of the active project's
+        # bound canonical goal hash; recorded on first verified turn.
+        "goal_anchor_binding": None,
+        "goal_anchor_failures": 0,
+        "last_goal_anchor_failure": None,
         "status": "RUNNING",
     }
 
@@ -2330,6 +2368,279 @@ def _active_project_root() -> Path:
     return ACTIVE_PROJECT["project_root"] if ACTIVE_PROJECT else ROOT
 
 
+# ===========================================================================
+# GOAL-ANCHOR-V1: canonical project-goal binding, per-turn verification, and
+# fail-closed enforcement. Protocol state lives ONLY in project_state.goal_anchor
+# and the Runtime-owned cross-check copy in orchestrator_runtime.json; prompt
+# text and console rendering are never goal authority.
+# ===========================================================================
+
+class GoalAnchorError(RuntimeError):
+    """Raised when the canonical project goal fails mechanical verification."""
+
+    def __init__(self, reason: str, detail: str = ""):
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail or reason
+
+
+def build_goal_anchor_binding(
+    project_root: Path,
+    goal_path: str = GOAL_ANCHOR_CANONICAL_PATH,
+    *,
+    provenance: str,
+    bound_at: str | None = None,
+) -> dict:
+    """Build a goal_anchor binding from the exact current bytes of the goal file.
+
+    Only bootstrap (start_project) and the bounded migration tool may create a
+    binding; both go through this helper so the hash is always computed over the
+    real file bytes.
+    """
+    if provenance not in GOAL_ANCHOR_PROVENANCES:
+        raise RuntimeError(f"invalid goal anchor provenance: {provenance!r}")
+    resolved = (Path(project_root) / goal_path).resolve()
+    try:
+        resolved.relative_to(Path(project_root).resolve())
+    except Exception:
+        raise GoalAnchorError("GOAL_ANCHOR_PATH_ESCAPE", f"goal path escapes the project root: {goal_path!r}")
+    if not resolved.is_file():
+        raise GoalAnchorError("GOAL_ANCHOR_FILE_MISSING", f"canonical goal file is missing: {goal_path!r}")
+    digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    return {
+        "schema_version": GOAL_ANCHOR_SCHEMA_VERSION,
+        "goal_path": Path(goal_path).as_posix(),
+        "goal_sha256": digest,
+        "bound_at": bound_at or stamp(),
+        "provenance": provenance,
+    }
+
+
+def validate_goal_anchor_binding(binding) -> dict:
+    """Strict schema/path validation of a project_state.goal_anchor record."""
+    if not isinstance(binding, dict):
+        raise GoalAnchorError("GOAL_ANCHOR_MISSING", "project_state.goal_anchor is absent (legacy-unbound project)")
+    unknown = sorted(set(binding) - GOAL_ANCHOR_REQUIRED_KEYS)
+    missing = sorted(GOAL_ANCHOR_REQUIRED_KEYS - set(binding))
+    if unknown or missing:
+        raise GoalAnchorError(
+            "GOAL_ANCHOR_MALFORMED",
+            f"goal_anchor schema mismatch (missing={missing}, unknown={unknown})")
+    if binding.get("schema_version") != GOAL_ANCHOR_SCHEMA_VERSION:
+        raise GoalAnchorError("GOAL_ANCHOR_MALFORMED", "goal_anchor.schema_version must be 1")
+    if binding.get("provenance") not in GOAL_ANCHOR_PROVENANCES:
+        raise GoalAnchorError("GOAL_ANCHOR_MALFORMED", "goal_anchor.provenance is invalid")
+    goal_path = binding.get("goal_path")
+    if not isinstance(goal_path, str) or not goal_path.strip():
+        raise GoalAnchorError("GOAL_ANCHOR_MALFORMED", "goal_anchor.goal_path must be a non-empty string")
+    if Path(goal_path).is_absolute() or (":" in goal_path) or Path(goal_path).as_posix() != goal_path:
+        raise GoalAnchorError("GOAL_ANCHOR_PATH_ESCAPE", f"goal_anchor.goal_path must be a relative posix path: {goal_path!r}")
+    goal_sha = binding.get("goal_sha256")
+    if not isinstance(goal_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", goal_sha):
+        raise GoalAnchorError("GOAL_ANCHOR_MALFORMED", "goal_anchor.goal_sha256 must be lowercase SHA-256 hex")
+    try:
+        _strict_timezone_timestamp(binding.get("bound_at"), "goal_anchor.bound_at")
+    except RuntimeError as exc:
+        raise GoalAnchorError("GOAL_ANCHOR_MALFORMED", str(exc)) from exc
+    return binding
+
+
+def verify_goal_anchor(state: dict) -> dict | None:
+    """Re-read the canonical goal from disk and verify it against the binding.
+
+    Returns {"goal_path": Path, "goal_sha256": str, "binding": dict} on success,
+    None when goal anchoring is not enforced (legacy single-project mode), and
+    raises GoalAnchorError on any missing, unreadable, malformed, path-escaping,
+    legacy-unbound, or hash-mismatched goal state. Never mutates any binding.
+    """
+    if ACTIVE_PROJECT is None:
+        return None
+    project_root = _active_project_root().resolve()
+    binding = validate_goal_anchor_binding(state.get("goal_anchor"))
+    goal_path = binding["goal_path"]
+    goal_file = (project_root / goal_path)
+    try:
+        resolved = goal_file.resolve()
+        resolved.relative_to(project_root)
+    except Exception:
+        raise GoalAnchorError("GOAL_ANCHOR_PATH_ESCAPE", f"goal path escapes the project root: {goal_path!r}")
+    goal_file_raw = state.get("goal_file")
+    expected_rel = Path(goal_file_raw).as_posix() if isinstance(goal_file_raw, str) and goal_file_raw.strip() else GOAL_ANCHOR_CANONICAL_PATH
+    if goal_path != expected_rel:
+        raise GoalAnchorError(
+            "GOAL_ANCHOR_MALFORMED",
+            f"goal_anchor.goal_path {goal_path!r} does not match the project's canonical goal path {expected_rel!r}")
+    if not resolved.is_file():
+        raise GoalAnchorError("GOAL_ANCHOR_FILE_MISSING", f"canonical goal file is missing: {goal_path!r}")
+    try:
+        actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise GoalAnchorError("GOAL_ANCHOR_UNREADABLE", f"canonical goal file is unreadable: {exc}") from exc
+    if not hmac.compare_digest(actual, binding["goal_sha256"]):
+        raise GoalAnchorError(
+            "GOAL_ANCHOR_HASH_MISMATCH",
+            f"canonical goal SHA-256 changed after binding: bound={binding['goal_sha256']}, actual={actual}")
+    return {"goal_path": resolved, "goal_sha256": actual, "binding": binding}
+
+
+def verify_goal_anchor_with_runtime(runtime: dict, state: dict) -> dict | None:
+    """verify_goal_anchor plus the Runtime-owned cross-check binding.
+
+    The first successful verification of a project records its binding in
+    control/orchestrator_runtime.json (Runtime-owned). Any later disagreement —
+    including a self-consistent rewrite of project_state.goal_anchor together
+    with the goal file — is a rejected silent rebind.
+    """
+    verified = verify_goal_anchor(state)
+    if verified is None:
+        return None
+    binding = verified["binding"]
+    record = runtime.get("goal_anchor_binding")
+    if isinstance(record, dict) and record.get("project_id") == _active_project_id():
+        if record.get("goal_path") != binding["goal_path"] or str(record.get("goal_sha256") or "") != binding["goal_sha256"]:
+            raise GoalAnchorError(
+                "GOAL_ANCHOR_REBIND_REJECTED",
+                "project_state.goal_anchor disagrees with the Runtime-owned goal binding "
+                f"(recorded goal_sha256={record.get('goal_sha256')}); silent rebind rejected")
+        return verified
+    runtime["goal_anchor_binding"] = {
+        "schema_version": GOAL_ANCHOR_SCHEMA_VERSION,
+        "project_id": _active_project_id(),
+        "goal_path": binding["goal_path"],
+        "goal_sha256": binding["goal_sha256"],
+        "provenance": binding["provenance"],
+        "recorded_at": stamp(),
+    }
+    save_runtime(runtime)
+    log(
+        "Goal anchor binding registered in Runtime-owned state",
+        project_id=_active_project_id(),
+        goal_path=binding["goal_path"],
+        goal_sha256=binding["goal_sha256"],
+        provenance=binding["provenance"],
+    )
+    return verified
+
+
+def enter_goal_anchor_human_review(runtime: dict, state: dict, error: GoalAnchorError) -> None:
+    """Bounded fail-closed transition: HUMAN_REVIEW, current_task null, no dispatch.
+
+    Never mutates or rebinds goal_anchor; the failure record is diagnostic only.
+    """
+    state["status"] = "HUMAN_REVIEW"
+    state["current_task"] = None
+    state["blocked_reason"] = f"GOAL-ANCHOR-V1 fail-closed: {error.reason}"
+    state["goal_anchor_failure"] = {
+        "schema_version": GOAL_ANCHOR_SCHEMA_VERSION,
+        "reason": error.reason,
+        "detail": str(error.detail)[:800],
+        "at": stamp(),
+    }
+    state["updated_at"] = stamp()
+    atomic_json(PROJECT_STATE, state)
+    runtime["status"] = "HUMAN_REVIEW"
+    runtime["goal_anchor_failures"] = int(runtime.get("goal_anchor_failures", 0)) + 1
+    runtime["last_goal_anchor_failure"] = {
+        "reason": error.reason,
+        "detail": str(error.detail)[:800],
+        "at": stamp(),
+    }
+    save_runtime(runtime)
+    log("Goal anchor verification failed; fail-closed into HUMAN_REVIEW",
+        reason=error.reason, detail=str(error.detail)[:400])
+    _view().lifecycle_event("GOAL_ANCHOR_FAIL_CLOSED", reason=error.reason)
+    # The notification reason mirrors blocked_reason so the deterministic key matches
+    # the lifecycle loop's HUMAN_REVIEW emission and the user is notified exactly once.
+    emit_user_notification(runtime, "HUMAN_REVIEW", state, {"error": state["blocked_reason"]})
+
+
+def goal_anchor_gate(runtime: dict, state: dict) -> bool:
+    """Verify the canonical goal before a Supervisor turn / dispatch authorization.
+
+    Returns True when the turn may proceed (verified, or legacy mode where goal
+    anchoring is not enforced). On any GoalAnchorError the project transitions to
+    the bounded HUMAN_REVIEW state and False is returned; the caller must not
+    build a prompt, make a decision, or authorize a dispatch.
+    """
+    if ACTIVE_PROJECT is None:
+        return True
+    try:
+        return verify_goal_anchor_with_runtime(runtime, state) is not None
+    except GoalAnchorError as exc:
+        enter_goal_anchor_human_review(runtime, state, exc)
+        return False
+
+
+def validate_goal_alignment(value) -> dict:
+    """Validate one concise structured goal-alignment record (six bounded fields)."""
+    if not isinstance(value, dict):
+        raise RuntimeError("goal_alignment must be a JSON object")
+    unknown = sorted(set(value) - set(GOAL_ALIGNMENT_FIELDS))
+    missing = sorted(set(GOAL_ALIGNMENT_FIELDS) - set(value))
+    if unknown or missing:
+        raise RuntimeError(
+            f"goal_alignment schema mismatch (missing={missing}, unknown={unknown})")
+    for field in GOAL_ALIGNMENT_FIELDS:
+        item = value[field]
+        if not isinstance(item, str) or not item.strip():
+            raise RuntimeError(f"goal_alignment.{field} must be a non-empty string")
+        if len(item) > GOAL_ALIGNMENT_VALUE_MAX:
+            raise RuntimeError(f"goal_alignment.{field} exceeds {GOAL_ALIGNMENT_VALUE_MAX} chars")
+    return value
+
+
+def render_goal_anchor_block(goal_state: dict) -> str:
+    """Supervisor prompt block: verified goal identity + alignment contract.
+
+    Empty string in legacy mode keeps the historical prompt byte-equality. When
+    verification fails here (only reachable on direct/off-loop calls — the gate
+    halts invoke_codex before prompt construction), the block states the failure
+    and forbids dispatch; it never silently presents an unverified goal.
+    """
+    if ACTIVE_PROJECT is None:
+        return ""
+    try:
+        verified = verify_goal_anchor(goal_state)
+    except GoalAnchorError as exc:
+        return (
+            "\n\n=== GOAL ANCHOR (GOAL-ANCHOR-V1) ===\n"
+            "GOAL ANCHOR VERIFICATION FAILED — no decision or dispatch is permitted.\n"
+            f"Reason: {exc.reason}: {exc.detail}\n"
+            "The Runtime will fail this turn closed; do not dispatch any Executor task.\n"
+            "=== END GOAL ANCHOR ==="
+        )
+    binding = verified["binding"]
+    lines = [
+        "",
+        "=== GOAL ANCHOR (GOAL-ANCHOR-V1) ===",
+        f"Canonical goal: {binding['goal_path']}",
+        f"Bound SHA-256: {binding['goal_sha256']}",
+        f"Binding: provenance={binding['provenance']}, bound_at={binding['bound_at']}",
+        "The Runtime re-read the canonical goal bytes from disk and verified this",
+        "SHA-256 immediately before constructing this prompt. If the goal bytes",
+        "changed after bootstrap, the Runtime fails closed instead of continuing.",
+        "Never edit the canonical PROJECT_GOAL.md or the goal_anchor binding.",
+        "",
+        "GOAL ALIGNMENT CONTRACT — every decision you record this turn in",
+        "last_supervisor_decision and every new decision_history entry MUST include",
+        "a concise structured \"goal_alignment\" object with exactly these six",
+        "non-empty string fields:",
+        '  "original_objective": what the project goal actually requires;',
+        '  "unmet_criteria": which goal success/completion criteria remain unmet;',
+        '  "latest_result": what the latest Executor result accomplished relative to the goal;',
+        '  "next_action_alignment": how the proposed next action advances the original goal;',
+        '  "scope_drift": whether scope drift is occurring (and what is being done about it);',
+        '  "method": continue/revise/redirect/abandon judgment for the current method.',
+        "CONTINUE, REVISE, REDIRECT, CHANGE_METHOD, FINAL_VERIFICATION, FINAL_ACCEPTANCE,",
+        "COMPLETE, HUMAN_REVIEW, and STOP decisions are all goal-alignment-checked.",
+        "Recent local Executor success alone can never justify FINAL_VERIFICATION,",
+        "FINAL_ACCEPTANCE, or COMPLETE: re-evaluate the original success criteria first.",
+        "Keep each field concise and auditable; do not duplicate the whole goal file.",
+        "=== END GOAL ANCHOR ===",
+    ]
+    return "\n".join(lines)
+
+
 def _load_verified_human_decision_receipt(state: dict, meta: dict) -> dict:
     """Verify one pending/consumed lifecycle record against its immutable receipt."""
     if ACTIVE_PROJECT is None:
@@ -2583,10 +2894,13 @@ def _normalized_human_supervisor_decision(value: dict) -> dict:
             not isinstance(item, str) or not item.strip() or len(item) > 512
         ):
             raise RuntimeError(f"supervisor_decision.{key} must be null or a non-empty bounded string")
+    # GOAL-ANCHOR-V1: every committed decision carries the structured alignment record.
+    validate_goal_alignment(value.get("goal_alignment"))
     entry = {
         "at": value["at"],
         "decision": decision,
         "reason": reason,
+        "goal_alignment": value["goal_alignment"],
     }
     for key in ("scope", "message_id", "task_id", "stage_id"):
         if value.get(key) is not None:
@@ -2867,8 +3181,14 @@ def build_codex_prompt(
             "receipt_sha256, previous_project_state_sha256, supervisor_decision, "
             "resulting_lifecycle_state, project_state_patch, executor_task.\n"
             "supervisor_decision must contain exactly: decision, at, reason, scope, "
-            "message_id, task_id, stage_id. Use null for optional identities. decision must be "
-            "CONTINUE, REDIRECT, CHANGE_METHOD, REVISE, STOP, or HUMAN_REVIEW.\n"
+            "message_id, task_id, stage_id, goal_alignment. Use null for optional identities. "
+            "decision must be CONTINUE, REDIRECT, CHANGE_METHOD, REVISE, STOP, or HUMAN_REVIEW.\n"
+            "goal_alignment is required and must be a concise JSON object with exactly these "
+            "six non-empty string fields: original_objective, unmet_criteria, latest_result, "
+            "next_action_alignment, scope_drift, method. It records how this decision stays "
+            "aligned with the canonical project goal (re-read and hash-verified by the "
+            "Runtime this turn); recent local Executor success alone never satisfies "
+            "FINAL_VERIFICATION, FINAL_ACCEPTANCE, or COMPLETE.\n"
             "project_state_patch is a top-level merge patch and must include status, "
             "current_task, and next_message_id. Never include Runtime-owned identity/history "
             "fields: schema_version, project_id, project_type, profile, created_at, started_at, "
@@ -2882,6 +3202,8 @@ def build_codex_prompt(
             "=== END HUMAN DECISION TRANSACTION OUTPUT CONTRACT ==="
         )
     goal_text = safe_read_text(goal_path, 12000) if goal_path.exists() else "[NO PROJECT GOAL FILE]"
+    # GOAL-ANCHOR-V1: verified goal identity + alignment contract (empty in legacy mode).
+    goal_anchor_block = render_goal_anchor_block(goal_state)
     brief_text = "[NO EXECUTOR BRIEF FOR THIS TURN]"
     if reason in {"EXECUTOR_RESULT_READY", "MALFORMED_EXECUTOR_RECEIPT", "MALFORMED_EXECUTOR_SIGNAL"}:
         # COMPLETION-SEAL-V1: the Supervisor must review the committed receipt, not
@@ -3033,7 +3355,7 @@ to update state/publish a task or to inspect one precise evidence artifact when 
 
 === PROJECT GOAL ===
 {goal_text}
-=== END PROJECT GOAL ==={profile_block}{scope_block}{human_decision_block}
+=== END PROJECT GOAL ==={goal_anchor_block}{profile_block}{scope_block}{human_decision_block}
 
 === CURRENT EXECUTOR BRIEF ===
 {brief_text}
@@ -3059,8 +3381,13 @@ def find_codex() -> str:
 
 
 def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
-    codex = find_codex()
     state_before = read_project_state()
+    # GOAL-ANCHOR-V1: every Supervisor invocation path re-reads the canonical goal
+    # from disk and verifies its bound SHA-256 before prompt construction; an
+    # unverified goal state halts the turn with no prompt, decision, or dispatch.
+    if not goal_anchor_gate(runtime, state_before):
+        return
+    codex = find_codex()
     human_decision_turn = reason == "HUMAN_DECISION_RESUME"
     try:
         state_sha_before = sha256(PROJECT_STATE)
@@ -3128,6 +3455,15 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         raise RuntimeError(f"Codex exited with code {result.returncode}")
 
     if human_decision_turn:
+        # GOAL-ANCHOR-V1: re-verify the goal after the read-only turn and before the
+        # durable decision commit; on failure the Human Decision receipt stays
+        # pending and nothing is committed or dispatched.
+        if not goal_anchor_gate(runtime, state_before):
+            log(
+                "Human Decision Supervisor result discarded uncommitted; goal verification failed after the turn",
+                receipt_id=str((event or {}).get("receipt_id")),
+            )
+            return
         structured_result = read_human_decision_supervisor_result(output_path)
         state = commit_human_decision_supervisor_result(
             runtime,
@@ -3160,6 +3496,11 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         save_runtime(runtime)
 
     if state.get("status") == "WAITING_EXECUTOR":
+        # GOAL-ANCHOR-V1: no Executor dispatch may be authorized from an unverified
+        # goal state — re-check after the Supervisor turn (a fresh state re-read also
+        # detects any in-turn goal/binding tampering via the Runtime-owned cross-check).
+        if not goal_anchor_gate(runtime, state):
+            return
         try:
             task = register_dispatched_task(runtime, state, allow_same_identity=False)
         except RuntimeError as exc:
@@ -3823,6 +4164,10 @@ def main() -> int:
                 )
                 invoke_codex(runtime, "EXECUTOR_RESULT_READY", event)
             else:
+                # GOAL-ANCHOR-V1: re-authorizing a pending wait requires a verified goal;
+                # a changed/unbound/broken goal halts instead of re-authorizing.
+                if not goal_anchor_gate(runtime, state):
+                    return 3
                 try:
                     task = register_dispatched_task(runtime, state, allow_same_identity=True)
                     log(

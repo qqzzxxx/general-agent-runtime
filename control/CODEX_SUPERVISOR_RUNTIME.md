@@ -20,6 +20,8 @@ Default inputs are already injected by Python: the project state, the project me
 Use exactly one semantic decision per turn: `CONTINUE`, `REDIRECT`/`CHANGE_METHOD`, `REVISE`, `STOP`, or `HUMAN_REVIEW`.
 Record it compactly in `last_supervisor_decision` and `decision_history`.
 
+Every recorded decision MUST include a concise structured `goal_alignment` object with exactly these six non-empty string fields: `original_objective`, `unmet_criteria`, `latest_result`, `next_action_alignment`, `scope_drift`, `method` (see the GOAL ANCHOR block injected into each turn). Keep each field short and auditable; never duplicate the whole goal file.
+
 A nonterminal turn that dispatches work must end with project `status: WAITING_EXECUTOR`, publish one fresh task, then exit. Never wait for GLM.
 
 ## Task dispatch
@@ -104,7 +106,9 @@ Do not expand sample size or scope unless it changes a decision. Stop when evide
 
 A project's objective and completion criteria live in that project's goal file (`PROJECT_GOAL.md`, bound via `project_state.goal_file`). All work stays inside the active project root under `projects```.
 
-When the goal's completion criteria are satisfied, write a high-level final report under the active project's `reports``` directory, set project `status: COMPLETE`, clear `current_task`, and stop. Do not start a new project automatically.
+GOAL-ANCHOR-V1 (mechanical): each isolated project binds its canonical `PROJECT_GOAL.md` at bootstrap (`project_state.goal_anchor`: canonical path + byte-exact SHA-256, provenance `bootstrap`). Before every Supervisor turn the Runtime re-reads the canonical goal from disk and re-verifies that SHA-256; it also keeps its own Runtime-owned copy of the bound hash and rejects any silent rebind. A missing, unreadable, malformed, path-escaping, legacy-unbound, or hash-mismatched goal fails the project closed into `HUMAN_REVIEW` with `current_task=null` and no new dispatch or authorization. You must never edit the canonical `PROJECT_GOAL.md` or the `goal_anchor` binding; intentional goal changes require the human-owned recovery/migration path, never a silent adoption.
+
+When the goal's completion criteria are satisfied, write a high-level final report under the active project's `reports``` directory, set project `status: COMPLETE`, clear `current_task`, and stop. Do not start a new project automatically. Recent local Executor success alone never justifies `FINAL_VERIFICATION`, `FINAL_ACCEPTANCE`, or `COMPLETE`: re-evaluate the original goal's success criteria (via the required `goal_alignment` record) first.
 
 ## Fixed Supervisor model policy
 

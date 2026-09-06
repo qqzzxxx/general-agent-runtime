@@ -47,6 +47,10 @@ class HumanReviewResumeTests(unittest.TestCase):
         (self.project_root / "PROJECT_GOAL.md").write_text("# Fixture goal\n", encoding="utf-8")
         (self.project_root / "RESEARCH_STATE.md").write_text("# Fixture memory\n", encoding="utf-8")
         self.m.atomic_write(self.m.SUPERVISOR_RULES, "# Fixture supervisor rules\n")
+        # GOAL-ANCHOR-V1: the fixture models a post-GOAL-ANCHOR isolated project, so
+        # project_state carries the binding for the exact canonical goal bytes.
+        self.goal_sha256 = hashlib.sha256(
+            (self.project_root / "PROJECT_GOAL.md").read_bytes()).hexdigest()
 
         self.base_state = {
             "schema_version": 4,
@@ -57,6 +61,13 @@ class HumanReviewResumeTests(unittest.TestCase):
             "phase": "GENERAL",
             "updated_at": self.m.stamp(),
             "goal_file": "PROJECT_GOAL.md",
+            "goal_anchor": {
+                "schema_version": 1,
+                "goal_path": "PROJECT_GOAL.md",
+                "goal_sha256": self.goal_sha256,
+                "bound_at": self.m.stamp(),
+                "provenance": "bootstrap",
+            },
             "current_task": None,
             "next_message_id": 700100,
             "final_verification": {
@@ -196,6 +207,17 @@ class HumanReviewResumeTests(unittest.TestCase):
         self.m.activate_project_scope()
         return self.m.read_project_state()
 
+    def _fixture_goal_alignment(self, method_text):
+        # GOAL-ANCHOR-V1: committed decisions carry the six-field alignment record.
+        return {
+            "original_objective": "fixture goal",
+            "unmet_criteria": "fixture criteria pending",
+            "latest_result": "fixture human decision received",
+            "next_action_alignment": f"{method_text} advances the fixture goal",
+            "scope_drift": "none",
+            "method": method_text,
+        }
+
     def _supervisor_result(self, state=None, *, terminal_human_review=False):
         state = state or self.m.read_project_state()
         meta = state["human_review_resume"]
@@ -208,6 +230,7 @@ class HumanReviewResumeTests(unittest.TestCase):
                 "message_id": None,
                 "task_id": None,
                 "stage_id": None,
+                "goal_alignment": self._fixture_goal_alignment("HUMAN_REVIEW"),
             }
             return {
                 "schema_version": self.m.HUMAN_DECISION_SUPERVISOR_RESULT_SCHEMA_VERSION,
@@ -250,6 +273,7 @@ class HumanReviewResumeTests(unittest.TestCase):
             "message_id": message_id,
             "task_id": task["TASK_ID"],
             "stage_id": task["STAGE_ID"],
+            "goal_alignment": self._fixture_goal_alignment("CONTINUE"),
         }
         return {
             "schema_version": self.m.HUMAN_DECISION_SUPERVISOR_RESULT_SCHEMA_VERSION,

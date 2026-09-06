@@ -13,6 +13,7 @@ runtime has ever consumed/dispatched/recorded.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -164,7 +165,16 @@ def main() -> int:
             (staging / sub).mkdir()
         goal_doc = (f"<!-- PROJECT_ID: {project_id} | PROJECT_TYPE: {project_type} | "
                     f"CREATED_AT: {now_iso()} -->\n\n{goal_text.strip()}\n")
-        (staging / "PROJECT_GOAL.md").write_text(goal_doc, encoding="utf-8")
+        goal_file_path = staging / "PROJECT_GOAL.md"
+        goal_file_path.write_text(goal_doc, encoding="utf-8")
+        # GOAL-ANCHOR-V1: bind the canonical goal at bootstrap. The hash is computed
+        # over the exact staged bytes (read back from disk) and persisted in
+        # project_state.goal_anchor; the Runtime re-verifies it before every
+        # Supervisor turn and rejects any silent rebind.
+        goal_binding = m.build_goal_anchor_binding(
+            staging, "PROJECT_GOAL.md", provenance="bootstrap")
+        if hashlib.sha256(goal_file_path.read_bytes()).hexdigest() != goal_binding["goal_sha256"]:
+            raise RuntimeError("goal anchor hash does not match the staged PROJECT_GOAL.md bytes")
         (staging / "RESEARCH_STATE.md").write_text(
             "# Project Memory\n\nNo Supervisor decisions yet.\n", encoding="utf-8")
         state = {
@@ -178,6 +188,7 @@ def main() -> int:
             "started_at": now_iso(),
             "updated_at": now_iso(),
             "goal_file": "PROJECT_GOAL.md",
+            "goal_anchor": goal_binding,
             "current_task": None,
             "next_message_id": next_message_id,
             "final_verification": {
@@ -233,6 +244,7 @@ def main() -> int:
         "profile_policy_id": policy["policy_id"],
         "next_message_id": next_message_id,
         "message_id_seed_basis": known,
+        "goal_sha256": goal_binding["goal_sha256"],
         "status": "SUPERVISOR_TURN",
     }, ensure_ascii=False))
     return EXIT_OK
