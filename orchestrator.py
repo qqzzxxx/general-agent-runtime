@@ -130,6 +130,15 @@ FINAL_VERIFICATION_POLICY_VERSION = 1
 FINAL_VERIFICATION_CLAIM_MIN = 3
 FINAL_VERIFICATION_CLAIM_MAX = 8
 FINAL_VERIFICATION_TASK_KIND = "FINAL_VERIFICATION"
+# FV-SANDBOX-ISOLATION-V1: machine-auditable execution modes. The gate may pin
+# the mode (optional; absent = LIVE_READ_ONLY for backward compatibility).
+# SANDBOX_DESTRUCTIVE receipts must carry an auditable sandbox block, and any
+# receipt with ISOLATION_INCIDENT mechanically fails regardless of OVERALL_STATUS.
+FINAL_VERIFICATION_EXECUTION_MODES = ("LIVE_READ_ONLY", "SANDBOX_DESTRUCTIVE")
+FINAL_VERIFICATION_SANDBOX_GUARD_STATUSES = (
+    "FV_GUARD_PASSED",
+    "FV_GUARD_REJECTED_UNSAFE_CANDIDATE",
+)
 FINAL_VERIFICATION_ALLOWED_RESULT_STATUSES = {
     "SUPPORTED",
     "PARTIALLY_SUPPORTED",
@@ -1601,6 +1610,13 @@ def validate_final_verification_dispatch(state: dict, task: dict) -> None:
         raise RuntimeError("FINAL_VERIFICATION task missing FINAL_VERIFICATION_GATE")
     if int(gate.get("POLICY_VERSION") or 0) != FINAL_VERIFICATION_POLICY_VERSION:
         raise RuntimeError("FINAL_VERIFICATION_GATE policy version mismatch")
+    # FV-SANDBOX-ISOLATION-V1: optional execution-mode pinning. Absent keeps the
+    # pre-existing LIVE_READ_ONLY semantics; an unknown value fails closed.
+    gate_mode = str(gate.get("EXECUTION_MODE") or "LIVE_READ_ONLY").upper()
+    if gate_mode not in FINAL_VERIFICATION_EXECUTION_MODES:
+        raise RuntimeError(
+            "FINAL_VERIFICATION_GATE EXECUTION_MODE must be one of "
+            f"{list(FINAL_VERIFICATION_EXECUTION_MODES)}")
 
     fv = state.get("final_verification")
     if not isinstance(fv, dict) or fv.get("required") is not True:
@@ -1704,6 +1720,41 @@ def evaluate_final_verification_receipt(current_task: dict, brief: dict, policy:
     result["overall_status"] = overall
     if overall not in {"PASS", "FAIL", "INCONCLUSIVE"}:
         result["issues"].append("OVERALL_STATUS must be PASS, FAIL, or INCONCLUSIVE")
+
+    # FV-SANDBOX-ISOLATION-V1: execution-mode binding, isolation incidents and
+    # the auditable sandbox block. Checked before the CLAIM_RESULTS early
+    # return so they hold on every path to mechanical_pass.
+    gate_mode = str(gate.get("EXECUTION_MODE") or "LIVE_READ_ONLY").upper()
+    receipt_mode = str(payload.get("EXECUTION_MODE") or "LIVE_READ_ONLY").upper()
+    if receipt_mode not in FINAL_VERIFICATION_EXECUTION_MODES:
+        result["issues"].append(
+            f"Receipt EXECUTION_MODE {receipt_mode!r} is not an accepted execution mode")
+    elif receipt_mode != gate_mode:
+        result["issues"].append(
+            "Receipt EXECUTION_MODE "
+            f"{receipt_mode!r} does not match the dispatched gate mode {gate_mode!r}")
+    if payload.get("ISOLATION_INCIDENT"):
+        result["issues"].append(
+            "Receipt declares ISOLATION_INCIDENT: a same-attempt isolation "
+            "incident permanently invalidates the attempt and can never be "
+            "packaged as PASS")
+    if gate_mode == "SANDBOX_DESTRUCTIVE":
+        sandbox = payload.get("SANDBOX")
+        if not isinstance(sandbox, dict):
+            result["issues"].append(
+                "SANDBOX_DESTRUCTIVE receipt is missing the auditable SANDBOX object")
+        else:
+            if not str(sandbox.get("SANDBOX_ROOT") or "").strip():
+                result["issues"].append("SANDBOX.SANDBOX_ROOT must identify the sandbox root")
+            if sandbox.get("OUTSIDE_LIVE_RUNTIME") is not True:
+                result["issues"].append("SANDBOX.OUTSIDE_LIVE_RUNTIME must be true")
+            if str(sandbox.get("GUARD_STATUS") or "") not in FINAL_VERIFICATION_SANDBOX_GUARD_STATUSES:
+                result["issues"].append(
+                    "SANDBOX.GUARD_STATUS must be one of "
+                    f"{list(FINAL_VERIFICATION_SANDBOX_GUARD_STATUSES)}")
+            if str(sandbox.get("LIVE_MANIFEST_STATUS") or "") != "UNCHANGED":
+                result["issues"].append(
+                    "SANDBOX.LIVE_MANIFEST_STATUS must be UNCHANGED for the audited probe window")
 
     rows = payload.get("CLAIM_RESULTS")
     if not isinstance(rows, list):
