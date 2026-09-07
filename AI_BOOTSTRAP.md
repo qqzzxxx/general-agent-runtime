@@ -1,6 +1,6 @@
-# General Agent Runtime — AI Bootstrap
+# General Agent Runtime 鈥?AI Bootstrap
 
-> Status: maintainer knowledge pack draft for the post-v1.0.0 repository.
+> Status: maintainer knowledge pack for General Agent Runtime V1.x.
 > Purpose: give any capable new AI enough context to assist with this Runtime without relying on a previous chat.
 
 ## 1. What this file is
@@ -182,7 +182,7 @@ Do not use `RESEARCH_STATE.md` as a transcript. Keep it compressed.
 A useful user-feedback pattern is:
 
 ```markdown
-# USER_FEEDBACK_00N — concise title
+# USER_FEEDBACK_00N 鈥?concise title
 
 Priority:
 - newer than previous quality baseline
