@@ -256,6 +256,21 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the threat model and isolation rule
 
 ## Documentation
 
+### AI / Maintainer context
+
+If you are an AI assistant or maintainer helping operate, debug, recover, or extend
+this Runtime, start with:
+
+- [AI_BOOTSTRAP.md](AI_BOOTSTRAP.md) — context router and source-of-truth rules
+- [docs/RUNTIME_SYSTEM_HANDBOOK.md](docs/RUNTIME_SYSTEM_HANDBOOK.md) — deep system mental model
+- [docs/OPERATOR_PLAYBOOK.md](docs/OPERATOR_PLAYBOOK.md) — normal human operation and steering
+- [docs/INCIDENT_RUNBOOK.md](docs/INCIDENT_RUNBOOK.md) — failure recovery and incident procedures
+- [docs/CHANGE_POLICY.md](docs/CHANGE_POLICY.md) — Runtime Core change and release discipline
+
+The goal of this Maintainer Knowledge Pack is to make repository context sufficient for
+a capable new AI to assist with the Runtime without depending on a particular historical
+chat conversation.
+
 - [docs/QUICKSTART.md](docs/QUICKSTART.md) — first project, first run, normal lifecycle
 - [docs/ZCODE_SETUP.md](docs/ZCODE_SETUP.md) — canonical ZCode Scheduled Automation setup
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, wire format, identity model
@@ -265,7 +280,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the threat model and isolation rule
 
 ## Status
 
-Release candidate for the first public open-source release. The Runtime has been
+General Agent Runtime **v1.0.0** has been publicly released. The Runtime was
 validated with the regression suite and with a clean-clone onboarding smoke path:
 
 ```text
