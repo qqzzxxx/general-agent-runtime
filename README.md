@@ -332,7 +332,7 @@ chat conversation.
 
 ## Status
 
-General Agent Runtime **v1.1.1** is the current public and recommended release. It is a
+General Agent Runtime **v1.1.2** is the current public and recommended release. It is a
 documentation/onboarding patch over **v1.1.0**, which introduced stale-worker fencing,
 and uses the same validated Runtime Core. The Runtime was validated with the regression
 suite and with a clean-clone onboarding smoke path:
