@@ -82,12 +82,46 @@ The permanent Automation prompt normally stays unchanged across projects.
 
 ## 4. Executor Model
 
-Configure ZCode to use the intended Executor-capable model available in your environment.
+Current V1.1 dispatches identify the Executor protocol family as `GLM-5.3`. In ZCode,
+select a compatible concrete model variant in that family. The maintainer's current
+concrete selection, `GLM-5.3-Flash`, is explicitly acceptable under the current contract.
+
+The concrete UI variant is an operator choice, not a permanent Runtime or Project
+setting, and it may be changed in ZCode. Do not treat an arbitrary unrelated model family
+as a validated drop-in replacement merely because it is capable; another family or
+backend may be adaptable in principle, but requires its own compatibility validation.
+
+Whatever compatible variant is selected must continue to obey the canonical Executor
+protocol: retain the exact task identity and winning claim token; use the atomic claim,
+`executor_fence.py prepare/check`, attempt-local workspace, and fenced canonical
+publication; commit completion with the claim token; stay within the exact stage scope;
+exit immediately after `COMPLETION_COMMITTED`; and never choose the next stage. The
+canonical prompt installed in section 3 contains the complete rules.
 
 The Executor performs mechanically authorized stages. It is not the Supervisor: it must
 not choose the next stage, Final Acceptance, or project completion.
 
-## 5. Keep the Automation Paused During Setup
+## 5. Choose the Recurrence / Cadence
+
+General Agent Runtime does **not** mandate one fixed numeric recurrence. Recurrence only
+controls how quickly a newly published `WAITING_EXECUTOR` task is noticed; it is never
+execution authorization. Every wake must still pass the exact claim and fencing flow,
+and overlapping or duplicate wakes safely stop through claim semantics when they do not
+own the attempt.
+
+Choose the shortest recurrence that provides the pickup latency you want and that ZCode
+makes available. A shorter recurrence reduces dispatch pickup latency; a longer one can
+leave the Runtime in `WAITING_EXECUTOR` until the next wake. Current Runtime deadline
+calculation reserves at least one hour of scheduler grace because ZCode may offer only an
+hourly wake. When hourly is ZCode's shortest available recurrence, use hourly. Do not
+choose a recurrence longer than the effective scheduler-grace window unless the task
+policy has explicitly allowed enough `SCHEDULER_GRACE_SECONDS` for that cadence.
+
+The one-hour minimum grace is a Runtime watchdog allowance for a possible ZCode
+application constraint, not a requirement that every Executor implementation use an
+hourly schedule.
+
+## 6. Keep the Automation Paused During Setup
 
 Keep the Scheduled Automation paused while:
 
@@ -106,7 +140,7 @@ automatically for the active project. The human does not wait for
 `EXECUTOR_TASK_PUBLISHED` and does not relay tasks manually. After a terminal project
 state, the Automation can be paused again.
 
-## 6. Authorization Rule
+## 7. Authorization Rule
 
 Seeing `TO_ZCODE.md` does **not** authorize execution.
 
@@ -120,14 +154,24 @@ CLAIM_ACQUIRED
 exit code 0
 ```
 
-authorizes stage execution.
+allows the winning wake to begin the fenced attempt protocol. For a current fenced
+dispatch, acquisition returns a claim token that the owner must retain. The permanent
+claim is acquisition history, not lasting write authority.
 
 Exit code 10 (`CLAIM_EXISTS`) or 11 (`ALREADY_PROCESSED`) means this wake exits quietly.
 Any other claim-helper failure follows the fail-closed rules in the canonical prompt.
 
 Never delete a claim directory to "retry" a task.
 
-## 7. Execution Scope
+After acquisition, the owner must run `executor_fence.py prepare`, do all candidate work
+in the returned attempt-local workspace, run `executor_fence.py check` at the required
+checkpoints, and publish supported canonical outputs only through
+`executor_fence.py publish`. A successful earlier check never authorizes a later direct
+canonical write. See [Stale worker fencing](STALE_WORKER_FENCING.md) for exact commands,
+supported paths, and failure semantics; the installed canonical prompt remains the
+Executor's complete instruction set.
+
+## 8. Execution Scope
 
 The Automation must never operate outside its configured Runtime Root.
 
@@ -144,16 +188,19 @@ Within that Runtime:
 A visible path or file is not permission. The current authorized task defines the
 Executor's stage scope.
 
-## 8. Completion Rule
+## 9. Completion Rule
 
 The Executor must not directly publish authoritative completion.
 
 Legal path:
 
 ```text
-stage outputs
+claim winner retains claim token
+-> executor_fence.py prepare
+-> attempt-local candidate work + executor_fence.py check checkpoints
+-> executor_fence.py publish canonical outputs
 -> completion staging
--> scripts/executor_completion.py commit
+-> scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<claim token>"
 -> COMPLETION_COMMITTED
 -> immediate Executor exit
 ```
@@ -164,7 +211,7 @@ The Runtime owns the authoritative completion state and the
 On a successful completion commit, the Executor stops that wake immediately. It does not
 wait for the Supervisor, poll for consumption, or choose the next stage.
 
-## 9. Root Compatibility Files
+## 10. Root Compatibility Files
 
 The Executor must never directly create, repair, overwrite, or republish:
 
@@ -179,36 +226,50 @@ These are Runtime-generated compatibility artifacts, not Executor-owned truth.
 On a fresh Runtime, `ZCODE_LAST_PROCESSED.txt` may be absent. That is valid and means no
 Executor message has been processed yet.
 
-## 10. Fresh-Clone First Run
+## 11. Fresh-Clone First Run
 
 Recommended first-run sequence:
 
 ```text
-1. clone/download Runtime
-2. configure this Automation (Workspace = Runtime Root, canonical prompt installed)
-3. keep Automation paused during setup
-4. prepare a project Goal
-5. run START_PROJECT.ps1
-6. optionally run python scripts\preflight.py
+0. obtain/create a clean Runtime Root
+1. keep this Automation absent or paused during setup
+2. use AI_BOOTSTRAP.md + PROJECT_GOAL_WORKSHOP.md to design the project
+3. approve an external Goal file
+4. run START_PROJECT.ps1 with that Goal file
+5. configure this Automation if this Runtime has not been configured before
+6. run python scripts\preflight.py
 7. enable this Automation
 8. run START_AGENT_SYSTEM.ps1
-9. let the Runtime loop autonomously
+9. stop relaying tasks and let the Runtime loop autonomously
 ```
+
+The Goal-design and end-to-end context lives in
+[Start a New Project from an Idea](NEW_PROJECT_WORKFLOW.md). Automation setup is not
+repeated for each Project in the same Runtime.
+
+For a later sequential Project in an already-configured Runtime, keep the existing
+Automation paused while preparing and activating the new Project. Reuse its Workspace,
+prompt, model choice, and cadence; run preflight, enable it, and start the Runtime. Do not
+create a second Automation for that Project.
 
 Do not manually create legacy root bootstrap files.
 
-## 11. Normal Lifecycle
+## 12. Normal Lifecycle
 
 ```text
 User creates/activates project
 -> Orchestrator runs Supervisor
--> Supervisor proposes next stage
--> Runtime validates + authorizes + publishes Executor task
+-> Supervisor atomically publishes a candidate TO_ZCODE.md task
+-> Runtime validates it and registers exact identity/hash authorization
 -> ZCode Scheduled Automation wakes
--> claim
--> execute exactly one authorized stage
+-> claim; winner receives claim token
+-> executor_fence.py prepare
+-> execute exactly one authorized stage in the attempt workspace
+-> executor_fence.py check at required checkpoints
+-> executor_fence.py publish canonical outputs
 -> completion staging
--> completion commit
+-> executor_completion.py commit with --claim-token
+-> COMPLETION_COMMITTED
 -> Executor exits
 -> Orchestrator consumes + seals completion
 -> Supervisor reviews
@@ -218,7 +279,7 @@ User creates/activates project
 
 The human is not the Supervisor/Executor message bus.
 
-## 12. Terminal and Human-Attention States
+## 13. Terminal and Human-Attention States
 
 When the project reaches a terminal/attention state, follow the Runtime console and
 `control\USER_ATTENTION.json`.

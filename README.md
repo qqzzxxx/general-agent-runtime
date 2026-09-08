@@ -38,13 +38,22 @@ cannot be audited. General Agent Runtime separates the concerns instead:
 All coordination happens through files in the Runtime Root. Every handoff has an
 auditable identity and authorization trail.
 
-## Before you start: write a good Goal
+## Start a new project from an idea
 
 The Runtime is autonomous **after** a project starts, but it cannot infer the project you
 meant to ask for. The quality of the canonical `PROJECT_GOAL.md` is therefore a major
 upper bound on the quality of the resulting work.
 
-A practical workflow is:
+A capable web AI can guide the design phase without becoming part of the Runtime loop.
+Start with [Start a New Project from an Idea](docs/NEW_PROJECT_WORKFLOW.md) and use the
+[Project Goal Workshop](docs/PROJECT_GOAL_WORKSHOP.md) to turn the rough idea into an
+approved external Goal file. A useful opening prompt is:
+
+```text
+Read AI_BOOTSTRAP.md. I want to start a new project.
+```
+
+The short path is:
 
 1. discuss the project with a strong reasoning model until the objective and constraints
    are clear;
@@ -62,25 +71,32 @@ rules of the project; let the Supervisor choose and revise the route.
 project creation: changing its bytes later fails closed instead of silently changing the
 project constitution.
 
+The web AI is only the pre-launch design/setup assistant. After launch, the Codex
+Supervisor, ZCode Executor, and Python Orchestrator use their own canonical context; the
+human does not explain the protocol to each role or relay their messages.
+
 ## How one stage flows
 
 ```text
 Python Orchestrator
   -> invokes Supervisor CLI with a compressed context prompt
-  -> Supervisor proposes the next dispatch
-  -> Orchestrator mechanically validates and publishes TO_ZCODE.md
-  -> Orchestrator binds authorization to the exact task identity + inbox SHA-256
+  -> Supervisor atomically publishes a candidate TO_ZCODE.md dispatch
+  -> Orchestrator mechanically validates the candidate
+  -> Orchestrator registers authorization bound to the exact task identity + inbox SHA-256
   -> Executor automation wakes
   -> Executor claims via scripts/executor_claim.py
-     (CLAIM_ACQUIRED / exit 0 is the only permission to start work)
-  -> Executor performs exactly the authorized stage
+     (the winner receives and retains its claim token)
+  -> Executor runs executor_fence.py prepare
+  -> Executor performs exactly the authorized stage in its attempt-local workspace
+     with executor_fence.py check checkpoints
      - normal project work stays inside the active project
      - Runtime-core maintenance is allowed only when the current authorized task
        explicitly permits the exact Runtime-root scope
-  -> Executor writes durable deliverables + evidence
+  -> Executor publishes canonical outputs only through executor_fence.py publish
   -> Executor stages a candidate completion and commits it via
-     scripts/executor_completion.py
+     scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<claim token>"
      (COMPLETION_COMMITTED / exit 0 is the only legal completion publication)
+  -> Executor immediately exits
   -> Runtime records the authoritative completion in handoff/completion_ledger/
   -> Runtime generates SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, ZCODE_DONE.flag
   -> Orchestrator consumes the ledger-backed completion exactly once and seals it
@@ -99,11 +115,15 @@ The operating contracts live in:
 
 Three failure classes motivated the design, and all are enforced mechanically:
 
-1. **At-most-once execution.** A scheduled automation may wake twice for the same inbox,
+1. **Acquisition history and fenced authority.** A scheduled automation may wake twice
+   for the same inbox,
    or two Executor instances may race. `executor_claim.py` takes a permanent,
    filesystem-guaranteed claim on the exact `MESSAGE_ID + NONCE` under
    `handoff/executor_claims/`; the second contender exits quietly (exit 10 = claim
-   exists, exit 11 = already processed). Replays and stale re-issues are rejected.
+   exists, exit 11 = already processed). The winning worker receives a claim token, but
+   the permanent claim is acquisition history—not indefinite write authority. Live
+   authority is rechecked by `executor_fence.py`, and canonical outputs are published
+   only through that helper. Replays, expired attempts, and stale workers are rejected.
 2. **No unauthorized dispatch.** Seeing `TO_ZCODE.md` is not authorization. The claim
    helper validates the exact authorized task identity and inbox snapshot. A visible but
    unauthorized, stale, or modified inbox fails closed.
@@ -120,12 +140,17 @@ for provably dead owners, Goal Anchor checks before every Supervisor turn and di
 Final Verification gating before `COMPLETE`, bounded retries/budgets, fail-closed unknown
 states, and hard stop conditions.
 
-## Project / Profile / Runtime
+## Source checkout / Runtime / Project / Goal / Profile
 
-- **Runtime** — one installation of this repository. It owns the control plane, wire
+- **Source / maintainer checkout** — the repository used to develop and release the
+  Runtime. It is a source template, not the preferred location for ordinary projects.
+- **Runtime Root** — one clean installation of this repository. It owns the control plane, wire
   files, claims, completion ledger, logs, and exactly one active Orchestrator process.
 - **Project** — one isolated directory under `projects/<project-id>/` containing its
   canonical Goal, state, workspace, evidence, and reports.
+- **External Goal file** — the human-approved project constitution supplied to
+  `START_PROJECT.ps1`; it is imported as the canonical, Goal-Anchor-bound
+  `PROJECT_GOAL.md`.
 - **Active Project** — one Runtime may contain many projects, but V1 activates exactly
   one at a time through `control/ACTIVE_PROJECT.json`.
 - **Profile** — a project template in `profiles/`: `GENERAL`,
@@ -135,9 +160,18 @@ states, and hard stop conditions.
 The ZCode Automation is **Runtime-level**, not Project-level: its Workspace remains the
 Runtime Root and its permanent prompt does not change when you switch projects.
 
+A public user may use a clean clone/download as the Runtime Root. For stronger isolation,
+especially in maintainer work, use a fresh Runtime Root per substantial independent
+project. Projects inside one Runtime reuse its Automation; each separate Runtime Root
+requires its own Automation. See the
+[new-project workflow](docs/NEW_PROJECT_WORKFLOW.md) for the recommended release-worktree
+pattern and alternatives.
+
 ## Quick start
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full walkthrough and
+If you have only an idea, start with
+[docs/NEW_PROJECT_WORKFLOW.md](docs/NEW_PROJECT_WORKFLOW.md). See
+[docs/QUICKSTART.md](docs/QUICKSTART.md) for the command-focused walkthrough and
 [docs/ZCODE_SETUP.md](docs/ZCODE_SETUP.md) for the Executor setup.
 
 A fresh clone needs **no manual bootstrap state files**.
@@ -160,8 +194,9 @@ python .\scripts\preflight.py
 
 After launch, no manual Supervisor/Executor handoff is required. The Supervisor publishes
 Executor tasks when needed, and the already-enabled Scheduled Automation picks them up on
-a later wake. A wake by itself never authorizes work: the Executor may execute a stage
-only after the canonical claim flow returns `CLAIM_ACQUIRED` / exit code 0.
+a later wake. A wake by itself never authorizes work: `CLAIM_ACQUIRED` / exit code 0 is
+necessary to begin, and the returned token plus successful fence checks govern continuing
+work and publication.
 
 There is intentionally **no** first-run instruction to create
 `control\project_state.json`, root `RESEARCH_STATE.md`, or
@@ -235,7 +270,9 @@ rebinds the Goal. See [docs/GOAL_ANCHOR_V1.md](docs/GOAL_ANCHOR_V1.md).
 - Normal project work is scoped to the active project. A Runtime-core modification is
   allowed only when the current mechanically authorized task explicitly permits that
   narrow Runtime-root scope; otherwise Runtime Core is out of scope.
-- Seeing `TO_ZCODE.md` never authorizes work; successful claim acquisition does.
+- Seeing `TO_ZCODE.md` never authorizes work. Successful claim acquisition is necessary
+  to begin, but continuing work and canonical publication require the returned token and
+  current `executor_fence.py` authorization.
 - The Executor never directly writes authoritative root completion artifacts.
 - Terminal and error states are surfaced to the human; unattended operation never
   auto-starts a new project.
@@ -262,6 +299,8 @@ If you are an AI assistant or maintainer helping operate, debug, recover, or ext
 this Runtime, start with:
 
 - [AI_BOOTSTRAP.md](AI_BOOTSTRAP.md) — context router and source-of-truth rules
+- [docs/NEW_PROJECT_WORKFLOW.md](docs/NEW_PROJECT_WORKFLOW.md) — idea-to-running-project onboarding
+- [docs/PROJECT_GOAL_WORKSHOP.md](docs/PROJECT_GOAL_WORKSHOP.md) — human + web AI Goal design
 - [docs/RUNTIME_SYSTEM_HANDBOOK.md](docs/RUNTIME_SYSTEM_HANDBOOK.md) — deep system mental model
 - [docs/OPERATOR_PLAYBOOK.md](docs/OPERATOR_PLAYBOOK.md) — normal human operation and steering
 - [docs/INCIDENT_RUNBOOK.md](docs/INCIDENT_RUNBOOK.md) — failure recovery and incident procedures
@@ -280,7 +319,7 @@ chat conversation.
 
 ## Status
 
-General Agent Runtime **v1.0.0** has been publicly released. The Runtime was
+General Agent Runtime **v1.1.0** is the current public release. The Runtime was
 validated with the regression suite and with a clean-clone onboarding smoke path:
 
 ```text

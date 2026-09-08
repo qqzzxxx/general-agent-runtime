@@ -3,6 +3,9 @@
 > Normal human operating procedures for General Agent Runtime.
 >
 > This document covers ordinary use and controlled steering. For failures and repair, use `INCIDENT_RUNBOOK.md`.
+> If you are starting with only an idea, begin with
+> [Start a New Project from an Idea](NEW_PROJECT_WORKFLOW.md) and the
+> [Project Goal Workshop](PROJECT_GOAL_WORKSHOP.md).
 
 ## 1. Operator philosophy
 
@@ -31,43 +34,27 @@ The human should **not**:
 
 ### 2.1 Clone/download the Runtime
 
-Use a clean Runtime Root.
+Use a clean Runtime Root. A clean clone/download may serve as the Runtime for a public
+user. Do not run ordinary projects in the maintainer/source checkout. A separate Runtime
+Root per substantial independent project is recommended for stronger isolation and
+archival, especially for maintainers, although one Runtime can technically retain
+multiple projects sequentially because V1 activates only one at a time.
 
-### 2.2 Configure ZCode Scheduled Automation once
+Each separate Runtime Root needs its own Automation. Multiple projects in the same
+Runtime reuse that Runtime's existing Automation.
 
-Workspace:
+### 2.2 Keep Automation absent or paused
 
-```text
-<Runtime Root>
-```
-
-Not:
-
-```text
-<Runtime Root>\projects\<project-id>
-```
-
-Prompt:
-
-```text
-control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md
-```
-
-Bind `<RUNTIME_ROOT>` to the absolute path as required by the prompt.
-
-Keep Automation paused during setup.
-
-For EXECUTOR-FENCE-V1 upgrades, stop existing Executor sessions and child writers
-before replacing the Runtime code and installed Automation prompt together.
-New claims return an owner token; workers use attempt workspaces and Runtime-owned
-file publication. A lost token, expired attempt or `ATTEMPT_FENCED` result means
-stop, preserve artifacts and recover through a fresh Supervisor attempt. Never
-delete/reacquire the claim or resume a legacy direct-write session. Read
-[Stale worker fencing](STALE_WORKER_FENCING.md) before upgrading an existing Runtime.
+During Goal preparation and Project creation, keep this Runtime Root's ZCode Automation
+absent or paused. Configuring it earlier is mechanically safe while it remains paused,
+but the canonical first-run sequence below configures it after `START_PROJECT.ps1`.
 
 ---
 
 ## 3. Prepare the project Goal
+
+Use the [Project Goal Workshop](PROJECT_GOAL_WORKSHOP.md) when turning a rough idea into
+an approved external Goal file.
 
 A useful Goal states:
 
@@ -97,7 +84,53 @@ Example:
   -GoalFile "C:\goals\demo.md"
 ```
 
-Then verify:
+After creation, treat:
+
+```text
+projects\demo-001\PROJECT_GOAL.md
+```
+
+as immutable.
+
+---
+
+## 5. Configure ZCode Scheduled Automation once
+
+Workspace:
+
+```text
+<Runtime Root>
+```
+
+Not:
+
+```text
+<Runtime Root>\projects\<project-id>
+```
+
+Copy the permanent prompt from:
+
+```text
+control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md
+```
+
+Bind `<RUNTIME_ROOT>` to the absolute path and follow
+[ZCode Scheduled Automation Setup](ZCODE_SETUP.md) for the compatible model choice and
+cadence. Keep the Automation paused.
+
+For EXECUTOR-FENCE-V1 upgrades, stop existing Executor sessions and child writers before
+replacing the Runtime code and installed Automation prompt together. A lost token,
+expired attempt, or `ATTEMPT_FENCED` result means stop, preserve artifacts, and recover
+through a fresh Supervisor attempt. Never delete/reacquire the claim or resume a legacy
+direct-write session. Read [Stale worker fencing](STALE_WORKER_FENCING.md) before
+upgrading an existing Runtime.
+
+For later Projects in this same Runtime, reuse this Automation rather than creating
+another one.
+
+---
+
+## 6. Run preflight
 
 ```powershell
 python .\scripts\preflight.py
@@ -111,17 +144,9 @@ Mode: isolated
 Project ID: demo-001
 ```
 
-After creation, treat:
-
-```text
-projects\demo-001\PROJECT_GOAL.md
-```
-
-as immutable.
-
 ---
 
-## 5. Start normal autonomous execution
+## 7. Start normal autonomous execution
 
 Enable the Runtime's ZCode Automation, then:
 
@@ -135,9 +160,11 @@ Normal sequence:
 Supervisor
 -> task published
 -> Executor wake
--> claim
--> one stage
--> completion commit
+-> claim; winner retains claim token
+-> fenced attempt workspace + checkpoints
+-> Runtime-fenced canonical publication
+-> completion commit with claim token
+-> Executor exits on COMPLETION_COMMITTED
 -> Orchestrator consume/seal
 -> Supervisor
 -> ...
@@ -147,7 +174,7 @@ The user does not relay messages.
 
 ---
 
-## 6. What to watch in the console
+## 8. What to watch in the console
 
 Useful lifecycle events:
 
@@ -170,7 +197,7 @@ A Scheduled Automation wake that exits because of `CLAIM_EXISTS` can also be nor
 
 ---
 
-## 7. Safe inspection during a long project
+## 9. Safe inspection during a long project
 
 You may inspect:
 
@@ -188,7 +215,7 @@ If you find a quality problem, use steering feedback rather than rewriting Goal 
 
 ---
 
-## 8. Adding user steering feedback
+## 10. Adding user steering feedback
 
 Use the active project's:
 
@@ -226,7 +253,7 @@ Unfinished deliverables should use this rule immediately.
 
 ---
 
-## 9. Timing of feedback
+## 11. Timing of feedback
 
 ### Case A — Executor has not claimed the task yet
 
@@ -260,7 +287,7 @@ Do not:
 
 ---
 
-## 10. Pausing vs stopping
+## 12. Pausing vs stopping
 
 ### Pause ZCode Automation
 
@@ -282,7 +309,7 @@ It is not the normal way to inject temporary feedback.
 
 ---
 
-## 11. HUMAN_REVIEW
+## 13. HUMAN_REVIEW
 
 When the Runtime enters `HUMAN_REVIEW`, automation stops by design.
 
@@ -308,7 +335,7 @@ Do not hand-edit the Human Review flag or lifecycle state.
 
 ---
 
-## 12. Completion
+## 14. Completion
 
 When project status becomes `COMPLETE`:
 
@@ -321,7 +348,7 @@ Do not expect the Runtime to silently start another project.
 
 ---
 
-## 13. New project in the same Runtime
+## 15. New project in the same Runtime
 
 The same Runtime can store multiple projects.
 
@@ -335,9 +362,18 @@ Workspace = Runtime Root
 
 A different Runtime Root should get a different Automation.
 
+For a later sequential Project, pause the existing Automation while preparing the Goal
+and running `START_PROJECT.ps1`. Then run preflight, enable that same Automation, and
+start the Runtime. Do not create a second Automation for the Project.
+
+For a substantial independent objective, consider a separate Runtime Root even though a
+same-Runtime Project is mechanically supported. This creates a clearer isolation and
+archival boundary. Follow [Start a New Project from an Idea](NEW_PROJECT_WORKFLOW.md) to
+choose the pattern; Automation setup is reused only within the same Runtime Root.
+
 ---
 
-## 14. Starting a new AI support conversation
+## 16. Starting a new AI support conversation
 
 Use the Runtime itself as the context package.
 
@@ -351,7 +387,7 @@ This removes dependency on a historical ChatGPT conversation.
 
 ---
 
-## 15. Routine read-only diagnostic commands
+## 17. Routine read-only diagnostic commands
 
 ### Current project
 
@@ -389,7 +425,7 @@ These are diagnostics, not permission to mutate state.
 
 ---
 
-## 16. Operator decision table
+## 18. Operator decision table
 
 | Situation | Preferred action |
 |---|---|

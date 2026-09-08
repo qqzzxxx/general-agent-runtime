@@ -80,10 +80,10 @@ Python Orchestrator
 Codex Supervisor turn
         |
         v
-candidate dispatch -> Runtime validation/authorization
+atomically published candidate TO_ZCODE.md
         |
         v
-TO_ZCODE.md
+Runtime validation + exact identity/hash authorization
         |
         v
 ZCode Scheduled Automation wake
@@ -165,11 +165,13 @@ The Executor:
 - wakes from a Runtime-level Scheduled Automation;
 - reads the current Runtime-root inbox;
 - acquires the exact permanent claim;
-- works only after successful claim;
+- retains the winning claim token and prepares an attempt-local workspace;
+- works only while current fence checkpoints authorize the attempt;
 - completes exactly the authorized stage;
-- writes durable outputs and evidence;
+- creates durable candidate outputs and publishes supported canonical files only through
+  `executor_fence.py`;
 - creates project-local completion staging;
-- commits completion through the Runtime helper;
+- commits completion through the Runtime helper with the claim token;
 - exits immediately after successful commit.
 
 The Executor must not:
@@ -355,8 +357,9 @@ Legal flow:
 
 ```text
 Executor stage work
+-> Runtime-fenced canonical publication
 -> candidate completion staging
--> executor_completion.py commit
+-> executor_completion.py commit with claim token
 -> one Runtime-owned ledger entry
 -> COMPLETION_COMMITTED
 -> Orchestrator consume

@@ -1,11 +1,12 @@
 # General Agent Runtime — AI Bootstrap
 
 > Status: maintainer knowledge pack for General Agent Runtime V1.x.
-> Purpose: give any capable new AI enough context to assist with this Runtime without relying on a previous chat.
+> Purpose: give any capable new AI enough context to design, start, operate, debug, maintain, or extend a project without relying on a previous chat.
 
 ## 1. What this file is
 
-This file is the **entry point for an AI that is helping operate, debug, maintain, or extend General Agent Runtime**.
+This file is the **entry point for an AI that is helping design a new project or operate,
+debug, maintain, or extend General Agent Runtime**.
 
 Do not infer this system from generic "multi-agent" experience.
 Do not guess protocol behavior from memory.
@@ -58,26 +59,37 @@ Never treat a visible `TO_ZCODE.md`, `SUPERVISOR_BRIEF.md`, or `ZCODE_DONE.flag`
 
 ## 3. First read
 
-For any Runtime question, first read:
+Route by question type. Read the deep handbook when the route below calls for it; a
+person who only has an idea should not need the full maintainer manual before beginning.
 
-1. `docs/RUNTIME_SYSTEM_HANDBOOK.md`
-
-Then route by question type.
-
-### A. Normal operation / starting / monitoring a project
+### A. "I have an idea" / start a new project
 
 Read:
 
+- `docs/NEW_PROJECT_WORKFLOW.md`
+- `docs/PROJECT_GOAL_WORKSHOP.md`
+
+Help the human clarify the idea and approve an **external** Goal file before running
+`START_PROJECT.ps1`. Do not over-design a fixed stage plan: the Runtime Supervisor owns
+decomposition and adaptive routing. Do not start the Runtime until the human approves
+the Goal and setup is ready.
+
+### B. Normal operation / starting / monitoring an existing project
+
+Read:
+
+- `docs/RUNTIME_SYSTEM_HANDBOOK.md`
 - `docs/OPERATOR_PLAYBOOK.md`
 - current project's `PROJECT_GOAL.md`
 - current project's `RESEARCH_STATE.md`
 - current project's `project_state.json` when live-state detail matters
 
-### B. Failure / interruption / stuck task / bad output / recovery
+### C. Failure / interruption / stuck task / bad output / recovery
 
 Read:
 
 - `docs/INCIDENT_RUNBOOK.md`
+- `docs/RUNTIME_SYSTEM_HANDBOOK.md`
 - current project's `PROJECT_GOAL.md`
 - current project's `RESEARCH_STATE.md`
 - current project's `project_state.json`
@@ -95,7 +107,7 @@ Typical triggers:
 - current task was issued before new user feedback
 - user wants to revise already-generated deliverables
 
-### C. Runtime Core or protocol change
+### D. Runtime Core or protocol change
 
 Read:
 
@@ -117,10 +129,13 @@ Python Orchestrator
 -> Codex CLI / GPT-5.6 Sol / high reasoning
 -> TO_ZCODE.md
 -> ZCode Desktop Scheduled Automation / GLM Executor
--> permanent claim
--> exactly one authorized stage
+-> permanent claim; winner retains its claim token
+-> executor_fence.py prepare + attempt-local candidate workspace
+-> executor_fence.py check checkpoints
+-> executor_fence.py publish canonical outputs
 -> completion staging
--> Runtime-owned completion commit
+-> executor_completion.py commit with claim token
+-> COMPLETION_COMMITTED; Executor exits immediately
 -> completion ledger
 -> Orchestrator consume + seal
 -> Codex Supervisor review
@@ -243,8 +258,20 @@ When acting as a Runtime maintainer AI:
 
 ## 9. Recommended opening prompt for a new AI conversation
 
-The human may use:
+For a new project, the human may use:
+
+> You are helping me start a new project with General Agent Runtime. First read
+> `AI_BOOTSTRAP.md` and follow its routing rules. Also read
+> `docs/PROJECT_GOAL_WORKSHOP.md`. Do not start the Runtime yet. First help me turn my
+> project idea into a deliberate external Goal file. Do not pre-script every execution
+> stage; the Runtime Supervisor will choose and revise the route.
+
+For an existing Runtime support conversation, the human may use:
 
 > You are helping me operate and maintain General Agent Runtime. First read `AI_BOOTSTRAP.md` from the Runtime Root and follow its routing rules. Do not guess this Runtime from generic agent experience. Use the repository's current protocol and current active project as authority. After loading the necessary context, help me with the issue I describe.
 
-That should be enough to replace reliance on a specific historical chat.
+These routes replace reliance on a specific historical chat. The web AI is a design and
+setup assistant outside the autonomous loop. Codex receives the canonical Supervisor
+policy from the Runtime, ZCode receives the canonical permanent Executor prompt through
+its Runtime-level Automation, and Python coordinates them mechanically. The human does
+not re-explain or manually relay the dual-Agent protocol for each Project.

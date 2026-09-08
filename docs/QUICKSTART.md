@@ -1,6 +1,10 @@
 # QUICKSTART
 
-This walkthrough is the normal path for a **fresh clone** of General Agent Runtime V1.
+This is the command-focused path for a clean General Agent Runtime V1.1 Runtime Root.
+If you have only a rough idea, begin with
+[Start a New Project from an Idea](NEW_PROJECT_WORKFLOW.md) and the
+[Project Goal Workshop](PROJECT_GOAL_WORKSHOP.md), then return here with an approved
+external Goal file.
 
 A fresh checkout intentionally contains **no live Runtime state**. Do not manually create
 legacy root state files before your first project.
@@ -22,7 +26,14 @@ child writers first; helpers cannot intercept their direct writes. Read
 
 Optional: install the Python package `rich` for enhanced interactive console output.
 
-## 1. Open the Runtime Root
+## 1. Obtain and Open a Clean Runtime Root
+
+A public user may use a clean clone or download as the Runtime Root. Do not use a
+maintainer/source checkout for ordinary project work. For substantial independent work,
+especially as a maintainer, a fresh Runtime Root derived from a stable release is the
+recommended isolation and archival pattern. See the
+[new-project workflow](NEW_PROJECT_WORKFLOW.md) for the maintainer worktree example and
+the distinction between source checkout, Runtime, Project, and Goal.
 
 Run commands from the repository root — the directory containing files such as:
 
@@ -49,29 +60,16 @@ SUPERVISOR_BRIEF.md
 Do not create them to "bootstrap" the Runtime. The isolated-project flow creates or
 generates the state it actually needs.
 
-## 2. Configure the Executor Automation Once
+Keep the Runtime's ZCode Scheduled Automation absent or paused throughout setup. If this
+is a new Runtime Root, configure its Automation after project creation and before
+preflight. If it is already configured, keep it paused and reuse it; do not create
+another Automation for the next Project.
 
-Create one ZCode Scheduled Automation for this Runtime installation.
+## 2. Prepare and Approve the External Goal
 
-- Workspace: the **Runtime Root**, not `projects\<project-id>\`
-- Prompt: copy the full contents of
-  `control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`
-- Replace every literal `<RUNTIME_ROOT>` in that prompt with this installation's absolute
-  Runtime Root
-- Keep the Automation **paused during setup**
-
-The Automation is Runtime-level. You do not create a new Automation when you create a
-new project in the same Runtime, and you do not change its Workspace between projects.
-
-See [ZCODE_SETUP.md](ZCODE_SETUP.md) for the complete setup contract.
-
-## 3. Prepare a Good Goal
-
-Before starting the Runtime, make the project objective explicit.
-
-For substantial research, engineering, or business work, it is often useful to discuss
-the idea with a strong reasoning model first and turn that discussion into a deliberate
-Goal document.
+Before starting the Runtime, make the project objective explicit. A capable web AI can
+follow [Project Goal Workshop](PROJECT_GOAL_WORKSHOP.md) to turn a natural idea into a
+deliberate Goal document.
 
 A good Goal usually states:
 
@@ -84,34 +82,26 @@ A good Goal usually states:
 - important forbidden actions or risk boundaries.
 
 Do not pre-script every stage. The Supervisor is responsible for decomposing the project
-and revising the method as evidence arrives.
+and revising the method as evidence arrives. The external Goal filename and Markdown
+headings are not a mechanically required schema.
 
-The external Goal filename is arbitrary. `START_PROJECT.ps1` imports it into the project
-as the canonical `PROJECT_GOAL.md` and binds its SHA-256. Treat that canonical Goal as
-immutable after project creation.
+Revise the external file freely during design. Only continue after the human approves
+it. `START_PROJECT.ps1` will import it as the canonical `PROJECT_GOAL.md` and bind its
+SHA-256; treat that imported copy as immutable.
 
-## 4. Create and Activate the Project
+## 3. Create and Activate the Project
 
 `START_PROJECT.ps1` is mechanical only: it validates the input, creates the project in a
 staging directory, verifies it, atomically publishes the project directory, then
-activates `control\ACTIVE_PROJECT.json`. It does **not** call a model.
+activates `control\ACTIVE_PROJECT.json`. It does **not** call a model or start the Runtime.
 
-Using a Goal file:
+Using the approved external Goal file:
 
 ```powershell
 .\START_PROJECT.ps1 `
   -ProjectId "demo-001" `
   -ProjectType "SOFTWARE_ENGINEERING" `
   -GoalFile "C:\goals\demo.md"
-```
-
-Or using inline Goal text:
-
-```powershell
-.\START_PROJECT.ps1 `
-  -ProjectId "demo-001" `
-  -ProjectType "GENERAL" `
-  -Goal "Analyze X and produce a decision report"
 ```
 
 Valid `-ProjectType` values are exactly:
@@ -124,6 +114,28 @@ BUSINESS_RESEARCH
 ```
 
 One Runtime can store many projects, but V1 has exactly **one active project at a time**.
+
+## 4. Configure the Executor Automation Once per Runtime
+
+If this Runtime Root has not been configured before, create one ZCode Scheduled
+Automation for it. Otherwise reuse the existing Automation.
+
+- Workspace: the **Runtime Root**, not `projects\<project-id>\`
+- Prompt: copy the full contents of
+  `control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`
+- Replace every literal `<RUNTIME_ROOT>` in that prompt with this installation's absolute
+  Runtime Root
+- Keep the Automation **paused during setup**
+
+The Automation is Runtime-level. You do not create a new Automation when you create a
+new project in the same Runtime, and you do not change its Workspace between projects.
+A different Runtime Root needs a different Automation.
+
+For a later sequential Project, keep the existing Automation paused while preparing and
+activating the Project, run preflight, then enable the Automation and start the Runtime
+as below.
+
+See [ZCODE_SETUP.md](ZCODE_SETUP.md) for the complete setup contract.
 
 ## 5. Verify the Fresh Project
 
@@ -171,7 +183,8 @@ already-enabled Automation picks up a task on a later scheduled wake.
 
 Do not manually copy a task into ZCode and do not treat `TO_ZCODE.md` as permission to
 work. The Automation reads the Runtime-root inbox and may execute a stage only after the
-canonical claim flow returns `CLAIM_ACQUIRED` / exit code 0.
+canonical claim flow returns `CLAIM_ACQUIRED` / exit code 0; continuing work and
+canonical publication also require the returned token and current fence authorization.
 
 ## 7. Let the Runtime Loop
 
@@ -181,10 +194,14 @@ Normal lifecycle:
 Supervisor
 -> authorized Executor task
 -> ZCode wake
--> claim
--> execute exactly one stage
+-> claim; winner retains claim token
+-> executor_fence.py prepare
+-> execute exactly one stage in the attempt-local workspace
+-> executor_fence.py check at required checkpoints
+-> executor_fence.py publish canonical outputs
 -> completion staging
--> completion commit
+-> executor_completion.py commit with claim token
+-> COMPLETION_COMMITTED
 -> Executor exits
 -> Orchestrator consumes + seals
 -> Supervisor reviews
@@ -211,6 +228,12 @@ exit code 0
 
 authorizes stage execution.
 
+For current fenced dispatches, the claim is permanent acquisition history, not lasting
+write authority. The winner must retain the returned claim token, prepare an attempt-local
+workspace, pass `executor_fence.py check` checkpoints, and publish supported canonical
+outputs only through `executor_fence.py publish`. See
+[Stale worker fencing](STALE_WORKER_FENCING.md) for the exact commands and failure rules.
+
 Exit code 10 (`CLAIM_EXISTS`) or 11 (`ALREADY_PROCESSED`) means the wake should exit
 quietly. Other claim errors fail closed according to the canonical Executor prompt.
 
@@ -229,9 +252,10 @@ The Executor does not directly publish authoritative completion.
 Legal path:
 
 ```text
-durable stage outputs
+attempt-local candidate outputs
+-> executor_fence.py publish
 -> project completion_staging\
--> python scripts\executor_completion.py commit --staging-dir <dir>
+-> python scripts\executor_completion.py commit --staging-dir <dir> --claim-token "<claim token>"
 -> COMPLETION_COMMITTED
 -> immediate Executor exit
 ```
