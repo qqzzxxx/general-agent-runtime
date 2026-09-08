@@ -40,10 +40,10 @@ may make a clean clone or download and use that clean checkout as the Runtime Ro
 maintainer or anyone wanting stronger isolation should derive a fresh Runtime Root from
 a stable release or tag for each substantial independent project.
 
-For example, a Windows maintainer can create a detached worktree from the V1.1.0 tag:
+For example, a Windows maintainer can create a detached worktree from the V1.1.1 tag:
 
 ```powershell
-git worktree add --detach "C:\general-agent-runtime-research-001" v1.1.0
+git worktree add --detach "C:\general-agent-runtime-research-001" v1.1.1
 ```
 
 That worktree pattern is recommended for maintainers, not required for public users. A
