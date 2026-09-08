@@ -155,6 +155,8 @@ class BootstrapBindingTests(GoalAnchorFixture):
         self.root = Path(self.temp.name)
         shutil.copy(RUNTIME_ROOT / "orchestrator.py", self.root / "orchestrator.py")
         (self.root / "scripts").mkdir()
+        shutil.copy(RUNTIME_ROOT / "scripts" / "executor_completion.py",
+                    self.root / "scripts" / "executor_completion.py")
         shutil.copy(RUNTIME_ROOT / "scripts" / "start_project.py", self.root / "scripts" / "start_project.py")
         shutil.copytree(RUNTIME_ROOT / "profiles", self.root / "profiles")
 
@@ -489,6 +491,9 @@ class MigrationToolTests(GoalAnchorFixture):
         self.temp = tempfile.TemporaryDirectory(prefix="goal-anchor-migrate-")
         self.root = Path(self.temp.name)
         shutil.copy(RUNTIME_ROOT / "orchestrator.py", self.root / "orchestrator.py")
+        (self.root / "scripts").mkdir()
+        shutil.copy(RUNTIME_ROOT / "scripts" / "executor_completion.py",
+                    self.root / "scripts" / "executor_completion.py")
         shutil.copytree(RUNTIME_ROOT / "profiles", self.root / "profiles")
         for relative in ("control", "logs", "handoff/archive", "reports"):
             (self.root / relative).mkdir(parents=True, exist_ok=True)

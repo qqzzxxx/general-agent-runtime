@@ -63,6 +63,8 @@ class G5ABase(unittest.TestCase):
         (self.root / "control").mkdir(parents=True)
         (self.root / "scripts").mkdir(parents=True)
         shutil.copy(CANDIDATE / "orchestrator.py", self.root / "orchestrator.py")
+        shutil.copy(CANDIDATE / "scripts" / "executor_completion.py",
+                    self.root / "scripts" / "executor_completion.py")
         shutil.copytree(CANDIDATE / "profiles", self.root / "profiles")
         shutil.copy(CANDIDATE / "scripts" / "start_project.py",
                     self.root / "scripts" / "start_project.py")

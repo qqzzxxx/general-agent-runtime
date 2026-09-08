@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 CANDIDATE = Path(__file__).resolve().parents[1]
-LAB = CANDIDATE.parent
+LAB = CANDIDATE  # Optional audit fixtures must never be loaded from a sibling tree.
 PRE_G2 = LAB / "audit" / "implementation_g2" / "pre_g2_orchestrator.py"  # the G1 build
 PROFILES_SRC = CANDIDATE / "profiles"
 

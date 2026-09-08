@@ -51,9 +51,13 @@ Orchestrator has validated and registered the exact task identity and inbox SHA-
     "On any other claim-helper failure, fail closed and stop without touching stage outputs; watchdog/Supervisor owns recovery.",
     "Never delete the claim. A retry must use a fresh MESSAGE_ID and NONCE.",
     "Complete the whole stage internally before returning to the Supervisor.",
-    "Write deliverables/evidence first.",
+    "Retain the claim_token returned only to the successful claim owner. It is required by fencing and completion helpers; never put it in deliverables or receipts.",
+    "Run python scripts/executor_fence.py prepare with the original five identity arguments and --claim-token <token>. All stage writes and subprocess output belong in its returned attempt_workspace; canonical files are read-only inputs.",
+    "Run python scripts/executor_fence.py check with the original identity and token after claim, on every resume, before each work batch or mutation-capable command, and before publication/completion. Only ATTEMPT_AUTHORIZED / exit 0 permits candidate work; otherwise stop. Never switch to a newer inbox identity.",
+    "Publish candidates only with python scripts/executor_fence.py publish using the original identity/token, --path <project-relative path> and --sha256 <candidate hash>. Supported outputs are workspace/, evidence/, reports/ files (excluding reports/USER_STATUS.md), at most 64 MiB each. Only PUBLICATION_COMMITTED / exit 0 means canonical publication; otherwise stop.",
+    "Never directly write canonical outputs, RESEARCH_STATE.md, or publication records. Suggest memory updates in the receipt. See docs/STALE_WORKER_FENCING.md.",
     "Build a completion staging directory under the active Project Root's completion_staging\\ folder: one staging.json (COMPLETION_STAGING_SCHEMA_VERSION 1) containing the exact MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, NONCE, PROJECT_ID, STATUS=STAGING_READY, a timezone-aware CREATED_AT, and the full receipt payload as RECEIPT (identity fields must match the staging identity exactly).",
-    "Then run: python scripts/executor_completion.py commit --staging-dir \"<staging dir>\".",
+    "Then run: python scripts/executor_completion.py commit --staging-dir \"<staging dir>\" --claim-token \"<token>\".",
     "Proceed only on COMPLETION_COMMITTED / exit code 0: the Runtime then generates SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, and ZCODE_DONE.flag itself. Stop immediately; never create, edit, repair, or republish those root files.",
     "On completion-helper exit codes 10/11/12/13/14 (ALREADY_COMMITTED / COMPLETION_SEALED / COMPLETION_NOT_AUTHORIZED / COMPLETION_CLAIM_MISMATCH / INVALID_COMPLETION_STAGING), fail closed and stop without publishing anything.",
     "Stop after the stage; never create the next TO_ZCODE task."
@@ -110,3 +114,9 @@ The Executor must add the `FINAL_VERIFICATION` receipt object defined in
 `control/FINAL_VERIFICATION_POLICY.md`.
 
 This task is bounded adversarial verification. Do not restart broad market research.
+
+Post-claim authority is revocable. New Runtime registrations bind project and expiry;
+timeout/supersession permanently retire the old identity. Claims remain permanent.
+Publication is serialized with retirement and completion. Checkpoints alone cannot
+protect a subsequent direct write. See [EXECUTOR-FENCE-V1](../docs/STALE_WORKER_FENCING.md)
+for the supported publication boundary and required rollout precautions.

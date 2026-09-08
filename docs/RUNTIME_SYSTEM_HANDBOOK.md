@@ -94,10 +94,10 @@ executor_claim.py acquire
         +-- not acquired -> quiet/fail-closed exit
         |
         v
-Executor performs exactly one stage
+Executor checks live fence and performs one stage in its attempt workspace
         |
         v
-durable project outputs + evidence
+candidate outputs -> Runtime-fenced canonical file publication
         |
         v
 project-local completion staging
@@ -317,7 +317,16 @@ CLAIM_ACQUIRED
 exit code 0
 ```
 
-permits project-specific work.
+is necessary for project-specific work. New dispatches also require the returned
+claim-owner token and `executor_fence.py` checkpoints. All stage writes go to an
+attempt-local candidate workspace; canonical outputs pass through Runtime-owned
+publication, which rechecks live authorization while serialized with retirement.
+Timeout/supersession ends authority permanently without deleting the claim.
+
+See [Stale worker fencing](STALE_WORKER_FENCING.md) for exact commands, supported
+paths, per-file publication/crash semantics, and rollout. Current ZCode filesystem
+access is not sandboxed: the Runtime cannot intercept an old session's arbitrary
+direct writes. Existing legacy sessions must be stopped before deployment.
 
 Expected non-owner outcomes include:
 

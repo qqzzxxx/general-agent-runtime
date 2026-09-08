@@ -177,6 +177,36 @@ def _completion_helper():
 def _active_project_id():
     return ACTIVE_PROJECT.get("project_id") if isinstance(ACTIVE_PROJECT, dict) else None
 
+
+def _fence_helper():
+    scripts = str(Path(__file__).resolve().parent / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import executor_fence
+    return executor_fence
+
+
+def executor_serialized(function):
+    @functools.wraps(function)
+    def wrapped(*args, **kwargs):
+        with _fence_helper().runtime_lock(ROOT):
+            return function(*args, **kwargs)
+    return wrapped
+
+
+def retire_executor(runtime: dict, identity: dict, reason: str, *, superseded_by=None):
+    """Caller holds fence lock and saves before yielding to any other actor."""
+    message_id = task_value(identity, "MESSAGE_ID")
+    if message_id is None:
+        return
+    retired = runtime.setdefault("retired_message_ids", [])
+    if message_id not in retired:
+        retired.append(message_id)
+        runtime.setdefault("executor_retirements", []).append({
+            **{key: task_value(identity, key) for key in IDENTITY_KEYS},
+            "RETIRED_AT": stamp(), "REASON": reason, "SUPERSEDED_BY": superseded_by,
+        })
+
 # Human-review resume is a separate, human-originated control-plane receipt. It is
 # deliberately not an Executor dispatch and contains no MESSAGE_ID/NONCE.
 HUMAN_DECISION_RECEIPT_SCHEMA_VERSION = 1
@@ -387,6 +417,8 @@ def validate_dispatch_payload(
     retired = runtime.get("retired_message_ids") or []
     if msg_id in {int(value) for value in retired}:
         raise RuntimeError(f"Codex attempted permanently retired MESSAGE_ID={msg_id}")
+    if runtime.get("timeout_notified_for_nonce") == task["NONCE"]:
+        raise RuntimeError(f"Codex attempted timed-out MESSAGE_ID={msg_id}")
 
     validate_final_verification_dispatch(state, task)
 
@@ -449,6 +481,7 @@ def validate_dispatch_payload(
     return task
 
 
+@executor_serialized
 def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity: bool = False) -> dict:
     """Validate and atomically authorize the exact published Executor dispatch.
 
@@ -472,12 +505,34 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
     if published_task != task:
         raise RuntimeError("TO_ZCODE.md changed during mechanical dispatch validation")
 
+    previous = runtime.get("authorized_dispatch") or {}
+    same = task_identity_matches(previous, task)
+    if same and previous.get("FENCE_VERSION") != 1:
+        completion = _completion_helper()
+        _, claim_path = completion.load_claim(ROOT, task)
+        if allow_same_identity and any(
+            entry["STATUS"] == completion.STATUS_COMMITTED and task_identity_matches(entry, task)
+            for entry in completion.lookup_entries(ROOT, msg_id)
+        ):
+            # Already completed legacy work needs consumption, not a new execution
+            # capability. Preserve its historical authorization for ledger recovery.
+            return task
+        if claim_path.exists():
+            raise RuntimeError("Legacy claimed attempt cannot be upgraded in flight; stop its worker and recover with a fresh identity")
+    if previous and not same:
+        retire_executor(runtime, previous, "SUPERSEDED", superseded_by=msg_id)
+    registered_at = (runtime.get("dispatch_registered_at") if same else None) or stamp()
+    timing_runtime = {**runtime, "dispatch_registered_at": registered_at}
+    deadline, _, _, _ = executor_deadline(timing_runtime, state, task)
     authorized = {
         "schema_version": AUTHORIZED_DISPATCH_SCHEMA_VERSION,
         **{key: task[key] for key in IDENTITY_KEYS},
         "TO_ZCODE_SHA256": hashlib.sha256(dispatch_bytes).hexdigest(),
         "AUTHORIZED_AT": stamp(),
         "IS_FINAL_VERIFICATION": is_final_verification_task(task),
+        "FENCE_VERSION": 1,
+        "PROJECT_ID": _active_project_id(),
+        "EXPIRES_AT": previous["EXPIRES_AT"] if same and previous.get("EXPIRES_AT") else deadline.isoformat(),
     }
     if authorized["IS_FINAL_VERIFICATION"]:
         # FV-IDENTITY-BINDING-V1: the Runtime's own validated authorization record is
@@ -489,8 +544,9 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
     runtime["last_dispatched_message_id"] = msg_id
     runtime["last_dispatched_nonce"] = task["NONCE"]
     runtime["timeout_notified_for_nonce"] = None
+    runtime["pending_executor_timeout"] = None
     # FIX-F03: watchdog fallback timestamp owned by the orchestrator itself.
-    runtime["dispatch_registered_at"] = stamp()
+    runtime["dispatch_registered_at"] = registered_at
     runtime["dispatch_validation_repair_used"] = 0
     if isinstance(state.get("dispatch_repair"), dict):
         state.pop("dispatch_repair", None)
@@ -2384,7 +2440,9 @@ def load_active_project() -> dict | None:
         raise RuntimeError(
             "ACTIVE_PROJECT.project_root must be exactly "
             f"'projects/{project_id}' (got {project_root_raw!r})")
-    project_root = (ROOT / project_root_raw).resolve()
+    project_path = ROOT / project_root_raw
+    _completion_helper().reject_project_reparse_ancestry(project_path)
+    project_root = project_path.resolve()
     try:
         project_root.relative_to((ROOT / "projects").resolve())
     except Exception:
@@ -3433,6 +3491,14 @@ def find_codex() -> str:
 
 def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     state_before = read_project_state()
+    # A Supervisor turn may replace current_task or change lifecycle state. Fence
+    # any unfinished Executor before that external writer starts; never hold the
+    # publication lock across a model invocation.
+    with _fence_helper().runtime_lock(ROOT):
+        authorized = runtime.get("authorized_dispatch")
+        if isinstance(authorized, dict):
+            retire_executor(runtime, authorized, "SUPERVISOR_TURN")
+            save_runtime(runtime)
     # GOAL-ANCHOR-V1: every Supervisor invocation path re-reads the canonical goal
     # from disk and verifies its bound SHA-256 before prompt construction; an
     # unverified goal state halts the turn with no prompt, decision, or dispatch.
@@ -3736,8 +3802,14 @@ def seal_completions(runtime: dict, state: dict) -> int:
     return sealed
 
 
+@executor_serialized
 def reconcile_completion_ledger(runtime: dict, state: dict) -> None:
-    """Startup repair of derived state from the authoritative completion ledger.
+    """Repair while serialized with a commit's compatibility publication tail."""
+    _reconcile_completion_ledger_locked(runtime, state)
+
+
+def _reconcile_completion_ledger_locked(runtime: dict, state: dict) -> None:
+    """Repair derived state from the authoritative completion ledger; caller holds fence.
 
     Restores runtime consume pointers from a CONSUMED entry whose bookkeeping
     write was interrupted, aligns the ledger when bookkeeping already advanced,
@@ -3840,6 +3912,7 @@ def reconcile_completion_ledger(runtime: dict, state: dict) -> None:
         save_runtime(runtime)
 
 
+@executor_serialized
 def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
     """Consume an Executor completion EXCLUSIVELY through the authoritative ledger.
 
@@ -3850,9 +3923,24 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
     late republish of an already consumed/sealed identity — is quarantined and
     audited: it is never consumed and never drives a Supervisor lifecycle decision.
     """
-    if not ZCODE_DONE.exists():
-        return False, None
     completion = _completion_helper()
+    if not ZCODE_DONE.exists():
+        if not completion.ledger_dir(ROOT).is_dir():
+            return False, None
+        state = read_project_state()
+        current = state.get("current_task") or {}
+        message_id = task_value(current, "MESSAGE_ID")
+        if state.get("status") == "WAITING_EXECUTOR" and message_id is not None and any(
+            entry["STATUS"] == completion.STATUS_COMMITTED
+            and entry.get("PROJECT_ID") == _active_project_id()
+            and task_identity_matches(entry, current)
+            for entry in completion.lookup_entries(ROOT, message_id)
+        ):
+            # Live recovery, not just startup: DONE is a derived hint. Holding the
+            # fence also prevents consuming before a live commit's final hint write.
+            _reconcile_completion_ledger_locked(runtime, state)
+        if not ZCODE_DONE.exists():
+            return False, None
     active_pid = _active_project_id()
     report = completion.classify_raw_completion(
         ROOT,
@@ -4018,14 +4106,9 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
     return True, event
 
 
-def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
-    if state.get("status") != "WAITING_EXECUTOR":
-        return None
+def executor_deadline(runtime: dict, state: dict, payload: dict | None = None):
+    """One timing calculation for watchdog and Runtime-bound fencing expiry."""
     task = state.get("current_task") or {}
-    nonce = task_value(task, "NONCE")
-    if not nonce or runtime.get("timeout_notified_for_nonce") == nonce:
-        return None
-
     # Recover timing metadata from the validated root task when Supervisor state is compact.
     issued_raw = task_value(task, "ISSUED_AT") or task_value(task, "DISPATCHED_AT")
     max_raw = task_value(task, "MAX_TIME")
@@ -4033,7 +4116,7 @@ def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
 
     if issued_raw is None or max_raw is None or grace_raw is None:
         try:
-            payload = parse_json_fence(TO_ZCODE)
+            payload = payload if payload is not None else parse_json_fence(TO_ZCODE)
             if task_identity_matches(payload, task):
                 if issued_raw is None:
                     issued_raw = payload.get("ISSUED_AT") or payload.get("DISPATCHED_AT")
@@ -4054,7 +4137,7 @@ def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
                 raw_value=str(issued_raw),
             )
     if not issued:
-        return None
+        return None, None, None, None
 
     max_seconds = parse_duration_seconds(max_raw, DEFAULT_EXECUTOR_TIMEOUT_SECONDS)
     grace_seconds = parse_duration_seconds(grace_raw, MIN_SCHEDULER_GRACE_SECONDS)
@@ -4062,11 +4145,41 @@ def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
     grace = max(grace_seconds, MIN_SCHEDULER_GRACE_SECONDS)
 
     deadline = issued + timedelta(seconds=max_seconds + grace)
+    return deadline, issued, max_seconds, grace
+
+
+def pending_timeout_event(runtime: dict, state: dict) -> dict | None:
+    event = runtime.get("pending_executor_timeout")
+    if (state.get("status") == "WAITING_EXECUTOR" and isinstance(event, dict)
+            and all(event.get(key.lower()) == task_value(state.get("current_task"), key)
+                    for key in IDENTITY_KEYS)):
+        return event
+    return None
+
+
+@executor_serialized
+def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
+    if state.get("status") != "WAITING_EXECUTOR":
+        return None
+    task = state.get("current_task") or {}
+    nonce = task_value(task, "NONCE")
+    if not nonce or runtime.get("timeout_notified_for_nonce") == nonce:
+        return None
+    # A completion that won the lock is authoritative even if its wake hint was
+    # lost. Never retire it in the poll-to-timeout race.
+    if _completion_helper().lookup_entries(ROOT, task_value(task, "MESSAGE_ID")):
+        return None
+    deadline, issued, max_seconds, grace = executor_deadline(runtime, state)
+    if deadline is None:
+        return None
+    auth = runtime.get("authorized_dispatch") or {}
+    if task_identity_matches(auth, task) and auth.get("EXPIRES_AT"):
+        deadline = parse_time(auth["EXPIRES_AT"])
     if utc_now() < deadline:
         return None
     runtime["timeout_notified_for_nonce"] = nonce
-    save_runtime(runtime)
-    return {
+    retire_executor(runtime, task, "EXECUTOR_TIMEOUT")
+    event = {
         "type": "EXECUTOR_TIMEOUT",
         "task_id": task_value(task, "TASK_ID"),
         "stage_id": task_value(task, "STAGE_ID"),
@@ -4078,6 +4191,9 @@ def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
         "scheduler_grace_seconds": grace,
         "deadline": deadline.isoformat(),
     }
+    runtime["pending_executor_timeout"] = event
+    save_runtime(runtime)
+    return event
 
 
 def hard_runtime_deadline(state: dict) -> bool:
@@ -4148,14 +4264,20 @@ def replay_consumed_receipt_event(runtime: dict, current: dict, state: dict | No
 
 
 def main() -> int:
-    runtime = load_runtime()
-    activate_project_scope()  # G3: legacy mode or validated isolated project
     acquire_lock()
-    runtime["status"] = "RUNNING"
-    save_runtime(runtime)
-    log("Orchestrator v2 started")
+    try:
+        # Ownership precedes every mutable startup snapshot. A delayed starter
+        # must not overwrite the former owner's retirement or pending timeout.
+        runtime = load_runtime()
+        activate_project_scope()  # G3: validated scope read under ownership too
+    except BaseException:
+        release_lock()
+        raise
 
     try:
+        runtime["status"] = "RUNNING"
+        save_runtime(runtime)
+        log("Orchestrator v2 started")
         # Honor hard pause/stop conditions before any model invocation.
         state = read_project_state()
         if STOP_FLAG.exists():
@@ -4198,7 +4320,10 @@ def main() -> int:
                 invoke_codex(runtime, "ORCHESTRATOR_START", {"runtime": "v2", "shared_file_executor": True})
         elif state.get("status") == "WAITING_EXECUTOR":
             resume_msg = task_value((state.get("current_task") or {}), "MESSAGE_ID")
-            if resume_msg is not None and int(resume_msg) <= int(runtime.get("last_consumed_message_id", 0) or 0):
+            timeout_replay = pending_timeout_event(runtime, state)
+            if timeout_replay is not None:
+                invoke_codex(runtime, "EXECUTOR_TIMEOUT", timeout_replay)
+            elif resume_msg is not None and int(resume_msg) <= int(runtime.get("last_consumed_message_id", 0) or 0):
                 # FIX-F17: crash window between the consume-mark and the end of the
                 # Supervisor turn. Replay the archived receipt instead of failing with
                 # a misleading "stale/reused MESSAGE_ID" protocol error.

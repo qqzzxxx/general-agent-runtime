@@ -13,6 +13,8 @@ All fixtures run in temporary directories with synthetic identities.
 """
 
 import hashlib
+import contextlib
+import io
 import importlib.util
 import json
 import shutil
@@ -221,14 +223,18 @@ class FVIdentityBindingTests(unittest.TestCase):
         Orchestrator records as last_final_verification_receipt_sha256.
         """
         identity = {key: task[key] for key in o.IDENTITY_KEYS}
-        self.assertEqual(
-            claim_helper.acquire(
+        claim_output = io.StringIO()
+        with contextlib.redirect_stdout(claim_output):
+            code = claim_helper.acquire(
                 o.ROOT,
                 identity["MESSAGE_ID"], identity["TASK_ID"], identity["STAGE_ID"],
                 identity["ATTEMPT"], identity["NONCE"],
-            ),
-            claim_helper.EXIT_ACQUIRED,
-        )
+            )
+        self.assertEqual(code, claim_helper.EXIT_ACQUIRED)
+        # One test deliberately exercises a historical unfenced authorization.
+        claim_token = None
+        if "FENCE_VERSION" in self.runtime["authorized_dispatch"]:
+            claim_token = claim_output.getvalue().split("claim_token=")[1].strip()
         staging_dir = o.ROOT / "completion_staging" / f"stage-{task['MESSAGE_ID']}"
         staging_dir.mkdir(parents=True)
         staging = {
@@ -242,7 +248,7 @@ class FVIdentityBindingTests(unittest.TestCase):
         (staging_dir / "staging.json").write_text(
             json.dumps(staging, ensure_ascii=False, indent=2), encoding="utf-8")
         self.assertEqual(
-            completion_helper.commit(o.ROOT, staging_dir), completion_helper.EXIT_COMMITTED)
+            completion_helper.commit(o.ROOT, staging_dir, claim_token=claim_token), completion_helper.EXIT_COMMITTED)
         entry = completion_helper.load_entry_file(
             completion_helper.entry_path(o.ROOT, completion_helper.commit_id_for(
                 identity["MESSAGE_ID"], identity["NONCE"]))

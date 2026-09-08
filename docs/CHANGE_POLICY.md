@@ -105,6 +105,15 @@ Permanent claims must never become a casual mutable lease.
 
 A claimed attempt is never rerun under the same MESSAGE_ID/NONCE.
 
+### 4.3a Post-claim fencing
+
+A permanent claim is not permanent write authority. Preserve durable retirement,
+claim-owner token binding, attempt-local candidate writes, and Runtime-controlled
+canonical publication serialized with retirement. Tests must include an acquired
+worker that pauses, times out, and resumes after a fresh retry starts. A checkpoint
+or completion rejection alone does not prove canonical write safety. State the
+same-user direct-write bypass limit explicitly; see `STALE_WORKER_FENCING.md`.
+
 ### 4.4 At-most-once completion
 
 Authoritative completion remains Runtime-owned.

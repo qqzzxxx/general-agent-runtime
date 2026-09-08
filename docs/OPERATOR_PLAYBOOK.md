@@ -57,6 +57,14 @@ Bind `<RUNTIME_ROOT>` to the absolute path as required by the prompt.
 
 Keep Automation paused during setup.
 
+For EXECUTOR-FENCE-V1 upgrades, stop existing Executor sessions and child writers
+before replacing the Runtime code and installed Automation prompt together.
+New claims return an owner token; workers use attempt workspaces and Runtime-owned
+file publication. A lost token, expired attempt or `ATTEMPT_FENCED` result means
+stop, preserve artifacts and recover through a fresh Supervisor attempt. Never
+delete/reacquire the claim or resume a legacy direct-write session. Read
+[Stale worker fencing](STALE_WORKER_FENCING.md) before upgrading an existing Runtime.
+
 ---
 
 ## 3. Prepare the project Goal

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import socket
 import sys
 import tempfile
@@ -135,6 +136,8 @@ def verify_authorized_dispatch(
         return False, "retired_message_ids_malformed"
     if message_id in retired:
         return False, "message_id_retired"
+    if runtime.get("timeout_notified_for_nonce") == nonce:
+        return False, "attempt_timed_out"
 
     authorization = runtime.get("authorized_dispatch")
     if not isinstance(authorization, dict):
@@ -175,6 +178,21 @@ def verify_authorized_dispatch(
 
 
 def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str) -> int:
+    # Even legacy acquisition must serialize with registration: inspecting the
+    # version before taking the lock can create a tokenless claim for a new fence.
+    scripts = str(Path(__file__).resolve().parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import executor_fence as fence
+    try:
+        with fence.runtime_lock(root):
+            return _acquire(root, message_id, task_id, stage_id, attempt, nonce, fence=fence)
+    except (fence.FenceError, OSError) as exc:
+        return authorization_error(message_id, str(exc))
+
+
+def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str, *, fence) -> int:
+    """Caller holds the fence mutex through authorization, metadata and success."""
     root = root.resolve()
     try:
         last = read_last_processed(root)["MESSAGE_ID"]
@@ -193,6 +211,16 @@ def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: i
     )
     if not authorized:
         return authorization_error(message_id, reason)
+
+    token = None
+    runtime = fence.completion_module().read_runtime_state(root)
+    if runtime is None:
+        return authorization_error(message_id, "runtime_state_unavailable")
+    auth = runtime.get("authorized_dispatch")
+    if isinstance(auth, dict) and "FENCE_VERSION" in auth:
+        identity = dict(zip(IDENTITY_KEYS, (message_id, task_id, stage_id, attempt, nonce)))
+        fence.check_locked(root, identity, require_claim=False)
+        token = secrets.token_urlsafe(32)
 
     parent = root / "handoff" / "executor_claims"
     path = claim_dir(root, message_id, nonce)
@@ -226,6 +254,8 @@ def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: i
         "HOSTNAME": socket.gethostname(),
         "SEMANTICS": "permanent at-most-once claim for this MESSAGE_ID/NONCE; do not delete",
     }
+    if token is not None:
+        claim["CLAIM_TOKEN_SHA256"] = hashlib.sha256(token.encode()).hexdigest()
     try:
         tmp = path / "claim.json.tmp"
         tmp.write_text(json.dumps(claim, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -235,7 +265,8 @@ def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: i
         print(f"CLAIM_METADATA_ERROR message_id={message_id} claim={path} error={exc!r}", file=sys.stderr)
         return EXIT_ERROR
 
-    print(f"CLAIM_ACQUIRED message_id={message_id} claim={path}")
+    suffix = f" claim_token={token}" if token is not None else ""
+    print(f"CLAIM_ACQUIRED message_id={message_id} claim={path}{suffix}")
     return EXIT_ACQUIRED
 
 

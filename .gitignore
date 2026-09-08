@@ -13,6 +13,7 @@ orchestrator.log
 
 # --- Control-plane live state (ship examples instead: control/project_state.example.json) ---
 control/.orchestrator.lock
+control/.executor-fence.lock
 control/orchestrator_runtime.json
 control/ACTIVE_PROJECT.json
 control/project_state.json
@@ -21,6 +22,9 @@ control/USER_ATTENTION.json
 
 # --- Handoff / claim / archive state ---
 handoff/executor_claims/*
+handoff/executor_publications/
+attempt_workspaces/
+.test-tmp/
 !handoff/executor_claims/.gitkeep
 handoff/archive/*
 !handoff/archive/.gitkeep

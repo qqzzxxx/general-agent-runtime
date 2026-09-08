@@ -100,6 +100,7 @@ Typical triggers:
 Read:
 
 - `docs/CHANGE_POLICY.md`
+- `docs/STALE_WORKER_FENCING.md` for post-claim execution/publication changes
 - `docs/RUNTIME_SYSTEM_HANDBOOK.md`
 - the exact implementation files and tests affected by the proposed change
 
@@ -142,7 +143,7 @@ Before advising any action, preserve these invariants:
 
 1. `PROJECT_GOAL.md` is Goal-Anchor bound after project creation; do not casually edit it.
 2. Seeing `TO_ZCODE.md` is not authorization.
-3. Only `CLAIM_ACQUIRED` / exit code 0 authorizes Executor stage work.
+3. `CLAIM_ACQUIRED` / exit 0 is necessary but not lasting write authority. New attempts must retain the returned claim token, pass `executor_fence.py` checkpoints, work in attempt-local candidate directories, and publish canonical outputs only through that helper. See `docs/STALE_WORKER_FENCING.md`.
 4. Never delete a permanent claim to "retry".
 5. A retry of a claimed attempt requires a fresh `MESSAGE_ID` and fresh `NONCE`.
 6. The Executor must not directly manufacture authoritative completion.

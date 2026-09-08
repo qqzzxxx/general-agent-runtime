@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 CANDIDATE = Path(__file__).resolve().parents[1]
-LAB = CANDIDATE.parent
+LAB = CANDIDATE  # Optional audit fixtures must never be loaded from a sibling tree.
 SCRIPTS = Path(__file__).resolve().parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))

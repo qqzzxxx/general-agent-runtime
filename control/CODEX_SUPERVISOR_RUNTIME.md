@@ -63,10 +63,24 @@ Executor protocol must require GLM to use an **atomic at-most-once claim before 
 4. Any other claim-helper failure: fail closed and stop without touching stage outputs; let the Python watchdog/Supervisor decide recovery.
 5. Never delete a claim directory. If a claimed attempt crashes, it is not rerun under the same MESSAGE_ID/NONCE; a Supervisor retry must use a fresh MESSAGE_ID and NONCE.
 
-Only after claim acquisition may GLM complete the whole stage internally; write evidence/deliverables first, then finish through the Runtime-owned completion commit:
+After claim acquisition, GLM must retain the returned claim token and run
+`executor_fence.py prepare` with the exact identity and token. All stage mutations
+and subprocess outputs belong in that attempt workspace; canonical inputs are
+read-only. Require `executor_fence.py check` on resume and before each work batch,
+mutation-capable command, publication and completion. A successful checkpoint is
+not a reusable write grant. Require `executor_fence.py publish` for canonical
+workspace/evidence/reports files, using the same identity/token, relative path and
+candidate SHA-256. No direct canonical output or project memory writes are allowed;
+incorporate proposed memory changes from the receipt during Supervisor review.
+
+Timeout/supersession retires old identities before recovery. Never continue a
+retired identity or transfer a claim/token to a retry. New attempts need fresh IDs
+and nonces. Follow [EXECUTOR-FENCE-V1](../docs/STALE_WORKER_FENCING.md), including
+supported paths, file-size limits and the lack of an OS sandbox against bypass.
+Then finish through Runtime-owned completion commit:
 
 1. Build a completion staging directory under the active project's `completion_staging\` containing one `staging.json` (schema `COMPLETION_STAGING_SCHEMA_VERSION: 1`) with the exact stable identity, `PROJECT_ID`, `STATUS: STAGING_READY`, a timezone-aware `CREATED_AT`, and the full receipt payload (`RECEIPT`, whose identity must match the staging identity exactly).
-2. Run: `python scripts/executor_completion.py commit --staging-dir "<staging dir>"`.
+2. Run: `python scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<claim token>"`.
 3. Exit code `0` / `COMPLETION_COMMITTED`: the Runtime has durably committed the authoritative completion and generated the root `SUPERVISOR_BRIEF.md`, `ZCODE_LAST_PROCESSED.txt`, and `ZCODE_DONE.flag` itself. Stop immediately — never edit, repair, or republish those root files.
 4. Exit code `10` / `ALREADY_COMMITTED`, `11` / `COMPLETION_SEALED`, `12` / `COMPLETION_NOT_AUTHORIZED`, `13` / `COMPLETION_CLAIM_MISMATCH`, or `14` / `INVALID_COMPLETION_STAGING`: fail closed, stop, and publish nothing. A consumed/sealed identity can never commit again; a Supervisor retry requires a fresh MESSAGE_ID and NONCE.
 

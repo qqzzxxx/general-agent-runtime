@@ -64,6 +64,23 @@ identity field before work starts. Consequences:
   runtime roots (different directories) never share locks, state, stop flags, or claims,
   and can run in parallel on the same machine.
 
+## Post-claim publication fencing (EXECUTOR-FENCE-V1)
+
+Permanent claim acquisition is not lasting write authority. New dispatches bind
+project and expiry. The claim winner receives an opaque token (only its hash is
+stored), uses `executor_fence.py prepare/check`, and writes into a separate attempt
+workspace. Only `executor_fence.py publish` replaces canonical project outputs.
+Timeout/supersession persist retirement before recovery; restart replays the timeout
+without reauthorizing the attempt. Publication, retirement, dispatch and completion
+share an OS-backed mutex, including file IO and hashing. A successful earlier
+checkpoint cannot authorize a later stale publication. Published files are copies,
+not shared candidate inodes.
+
+See [Stale worker fencing](STALE_WORKER_FENCING.md) for the contract and boundaries:
+publication is per file; arbitrary direct writes by the independently running
+same-user ZCode process are not intercepted. Hard isolation requires an OS sandbox
+or tool write broker. Update the installed prompt and stop legacy workers at rollout.
+
 ## Completion lifecycle (COMPLETION-SEAL-V1)
 
 A claim proves at-most-once *execution*; it does not by itself prove at-most-once
@@ -107,6 +124,8 @@ executors no longer write it. Crash recovery derives missing runtime pointers,
 missing compatibility artifacts, and replay events from the ledger, so a completion
 is consumed exactly once and triggers at most one Supervisor lifecycle decision even
 across restarts.
+Live polling also repairs a missing DONE hint for the current committed completion;
+helper death after ledger commit does not require an Orchestrator restart.
 
 ## Profiles and Final Verification
 

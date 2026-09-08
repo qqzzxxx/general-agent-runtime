@@ -114,6 +114,10 @@ exit code 0
 
 means this Scheduled Automation run owns the attempt and may continue.
 
+For a fenced dispatch, retain the returned `claim_token` in this session. Never
+copy it into deliverables or receipts. A claim is permanent acquisition history;
+it does not remain execution authority after timeout, retirement, or supersession.
+
 If the helper returns:
 
 CLAIM_EXISTS
@@ -177,6 +181,22 @@ control\ACTIVE_PROJECT.json
 Operate only inside the active project and any Runtime paths explicitly authorized by the task/protocol.
 
 Project-specific outputs, evidence, scripts, temporary files, and completion staging must remain inside the active Project Root unless the Runtime protocol explicitly specifies another Runtime-owned path.
+
+Before any work, run `python scripts/executor_fence.py prepare` with the five
+original claimed identity arguments and `--claim-token "<returned token>"`.
+Use the returned `attempt_workspace` for all candidate work, scratch files and
+subprocess outputs. Canonical project files are read-only inputs for the Executor.
+Copy required inputs into the attempt workspace; never use hard links.
+
+Run `python scripts/executor_fence.py check` with those same arguments immediately
+after claim, on every resume/continuation, before each work batch or
+mutation-capable tool/command, and before publication/completion. Only
+`ATTEMPT_AUTHORIZED` / exit 0 permits candidate work. Any nonzero result means stop
+immediately, retaining claims/candidates. Never adopt a newer inbox identity or
+another attempt's token. Lost token means fail closed, not claim recovery.
+
+Use absolute Runtime helper paths when working from the attempt directory.
+Read `docs/STALE_WORKER_FENCING.md` for the exact helper contract.
 
 Do not inspect or modify any other project.
 
@@ -278,7 +298,18 @@ Final Acceptance and COMPLETE belong only to the Codex Supervisor plus the Runti
 
 Before attempting completion commit:
 
-Finish and durably write all authorized stage deliverables and evidence.
+Finish and durably write all authorized stage candidates inside the returned
+attempt workspace. Never directly modify canonical deliverables, evidence, or
+RESEARCH_STATE.md. Put suggested memory updates in the completion receipt.
+
+Publish each candidate through `python scripts/executor_fence.py publish` with the
+original identity/token, `--path "<project-relative path>"` and `--sha256 <hash>`.
+The relative path is identical beneath the attempt workspace and canonical project.
+Only files under workspace/, evidence/, reports/ are supported (excluding
+reports/USER_STATUS.md), up to 64 MiB each. Unsupported paths/deletions fail closed.
+Only `PUBLICATION_COMMITTED` / exit 0 means a canonical file was published.
+The helper independently rechecks authority; a prior checkpoint never authorizes
+direct writes. Stop on any failure. Do not repair publication records.
 
 Verify that required output files actually exist and, when relevant, recompute their hashes or other mechanical checks.
 
@@ -368,7 +399,7 @@ Creating staging does NOT mean the task is authoritatively completed.
 
 After staging is complete, run:
 
-python scripts/executor_completion.py commit --staging-dir "<staging dir>"
+python scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<returned token>"
 
 Only:
 
@@ -631,6 +662,10 @@ Python Runtime:
 mechanical authorization, claim, task transport, completion commit, authoritative ledger, consume, seal, recovery, Final Verification gate, and orchestration glue.
 
 The Executor may create candidate work and candidate completion staging.
+
+Canonical project outputs may be published only by executor_fence.py. Retired
+attempts cannot publish through it even when their permanent claim still exists.
+Never modify handoff/executor_publications/ or control/.executor-fence.lock.
 
 Only the Runtime can create authoritative completion.
 

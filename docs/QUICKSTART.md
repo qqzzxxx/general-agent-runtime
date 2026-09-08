@@ -5,6 +5,13 @@ This walkthrough is the normal path for a **fresh clone** of General Agent Runti
 A fresh checkout intentionally contains **no live Runtime state**. Do not manually create
 legacy root state files before your first project.
 
+New dispatches use EXECUTOR-FENCE-V1: the claim winner retains its returned token,
+works in an attempt-local candidate workspace, and publishes canonical files via
+`executor_fence.py`. Use the current Scheduled Automation prompt with the current
+code. For an existing Runtime upgrade, stop legacy Executor sessions and their
+child writers first; helpers cannot intercept their direct writes. Read
+[Stale worker fencing](STALE_WORKER_FENCING.md) for commands and recovery limits.
+
 ## Requirements
 
 - Windows with PowerShell 5+

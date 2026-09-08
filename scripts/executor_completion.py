@@ -338,6 +338,25 @@ def partial_identity_binds(identity: dict, raw: dict) -> bool:
 # Active project scope (same strict rules as the Orchestrator / preflight)
 # ---------------------------------------------------------------------------
 
+def reject_project_reparse_ancestry(project_path: Path) -> None:
+    """Inspect lexical ancestry before resolve() can hide a project junction.
+
+    This detects existing links; it is not protection from concurrent hostile
+    topology changes by a process with the same filesystem permissions.
+    """
+    import stat
+    path = Path(project_path).absolute()
+    for component in reversed([path, *path.parents]):
+        try:
+            info = component.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise CompletionError(EXIT_NOT_AUTHORIZED, f"project ancestry unavailable: {component}") from exc
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            raise CompletionError(EXIT_NOT_AUTHORIZED, f"project ancestry reparse/symlink not allowed: {component}")
+
+
 def resolve_active_project(root: Path) -> tuple:
     """Return (project_id | None, project_root). An invalid pointer fails closed."""
     root = Path(root)
@@ -355,7 +374,9 @@ def resolve_active_project(root: Path) -> tuple:
         raise CompletionError(EXIT_NOT_AUTHORIZED, f"unsafe ACTIVE_PROJECT project_id: {pid!r}")
     if proot != f"projects/{pid}":
         raise CompletionError(EXIT_NOT_AUTHORIZED, f"ACTIVE_PROJECT.project_root must be projects/{pid}")
-    project_root = (root / "projects" / pid).resolve()
+    project_path = root / "projects" / pid
+    reject_project_reparse_ancestry(project_path)
+    project_root = project_path.resolve()
     try:
         project_root.relative_to((root / "projects").resolve())
     except ValueError:
@@ -461,7 +482,10 @@ def load_and_validate_staging(staging_dir: Path, project_root: Path, expected_pr
     raw = staging_file.read_bytes()
     if len(raw) > STAGING_MAX_BYTES:
         raise CompletionError(EXIT_INVALID_STAGING, f"staging.json exceeds {STAGING_MAX_BYTES} bytes")
-    payload = _read_json_file(staging_file)
+    try:
+        payload = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeError, ValueError) as exc:
+        raise CompletionError(EXIT_INVALID_STAGING, "staging.json must contain valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
         raise CompletionError(EXIT_INVALID_STAGING, "staging.json must be a JSON object")
     unknown = sorted(set(payload) - STAGING_REQUIRED_KEYS - STAGING_OPTIONAL_KEYS)
@@ -522,14 +546,13 @@ def _check_authorization(runtime: dict, identity: dict) -> None:
         raise CompletionError(
             EXIT_NOT_AUTHORIZED, "authorized_dispatch identity does not match the staged completion"
         )
-    retired = runtime.get("retired_message_ids")
-    if isinstance(retired, list):
-        for value in retired:
-            try:
-                if int(value) == identity["MESSAGE_ID"]:
-                    raise CompletionError(EXIT_NOT_AUTHORIZED, "MESSAGE_ID is retired")
-            except (TypeError, ValueError):
-                continue
+    retired = runtime.get("retired_message_ids", [])
+    if not isinstance(retired, list) or any(type(value) is not int for value in retired):
+        raise CompletionError(EXIT_NOT_AUTHORIZED, "retired_message_ids malformed")
+    if identity["MESSAGE_ID"] in retired:
+        raise CompletionError(EXIT_NOT_AUTHORIZED, "MESSAGE_ID is retired")
+    if runtime.get("timeout_notified_for_nonce") == identity["NONCE"]:
+        raise CompletionError(EXIT_NOT_AUTHORIZED, "attempt timed out")
 
 
 def load_claim(root: Path, identity: dict):
@@ -667,8 +690,20 @@ def _check_live_lifecycle(root: Path, project_id, identity: dict) -> dict:
     return state
 
 
-def commit(root: Path, staging_dir: Path) -> int:
+def commit(root: Path, staging_dir: Path, *, claim_token=None) -> int:
     """Validate a staging directory and durably commit the authoritative completion."""
+    scripts = str(Path(__file__).resolve().parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import executor_fence as fence
+    try:
+        with fence.runtime_lock(root):
+            return _commit_locked(root, staging_dir, fence, claim_token)
+    except fence.FenceError as exc:
+        raise CompletionError(EXIT_NOT_AUTHORIZED, str(exc)) from exc
+
+
+def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
     root = Path(root).resolve()
     project_id, project_root = resolve_active_project(root)
     if project_id is None:
@@ -689,6 +724,10 @@ def commit(root: Path, staging_dir: Path) -> int:
     _check_ledger_absent(root, identity)
     _check_live_lifecycle(root, project_id, identity)
     claim = _check_claim(root, identity)
+
+    if "FENCE_VERSION" in runtime["authorized_dispatch"]:
+        fence.check_locked(root, identity, claim_token=claim_token)
+        fence.validate_publications(root, identity, staging)
 
     entry = build_entry(staging, project_id, claim, root)
     target = entry_path(root, entry["COMMIT_ID"])
@@ -831,7 +870,7 @@ def seal_predicate(entry: dict, state) -> bool:
 # ---------------------------------------------------------------------------
 
 def _cmd_commit(args) -> int:
-    return commit(Path(args.root).resolve(), Path(args.staging_dir).resolve())
+    return commit(Path(args.root).resolve(), Path(args.staging_dir).resolve(), claim_token=args.claim_token)
 
 
 def _cmd_status(args) -> int:
@@ -981,6 +1020,7 @@ def main() -> int:
     com = sub.add_parser("commit", help="Commit a completion staging directory (at-most-once).")
     com.add_argument("--root", default=str(DEFAULT_ROOT))
     com.add_argument("--staging-dir", required=True)
+    com.add_argument("--claim-token", help="Required for Runtime-fenced attempts; returned only to the claim winner.")
 
     stat = sub.add_parser("status", help="Show the authoritative completion record for a MESSAGE_ID.")
     stat.add_argument("--root", default=str(DEFAULT_ROOT))

@@ -94,6 +94,12 @@ The same identity must not be rerun.
 
 This is a **maintainer-level workaround**, not yet a first-class one-click Runtime feature.
 
+The legacy command example below predates EXECUTOR-FENCE-V1. A newly fenced
+attempt also requires its original claim-owner token via `--claim-token` at
+completion, and must still be live/unexpired/unretired. Without that token or
+after timeout, do not use this workaround; preserve the claim and let the timeout
+recovery path run. Do not weaken the helper or recover a token from claim metadata.
+
 Use only when:
 
 - the exact current task is still the live `WAITING_EXECUTOR` task;
@@ -356,6 +362,18 @@ Let the Orchestrator/Supervisor own recovery.
 
 A Supervisor retry must use a fresh MESSAGE_ID and NONCE.
 
+EXECUTOR-FENCE-V1: timeout now durably retires the old identity before Supervisor
+recovery. A resumed worker must pass `executor_fence.py check` with its original
+identity and claim token before doing any work; retirement/expiry rejects it.
+Candidate workspaces are attempt-local and canonical output publication is
+Runtime-owned. A stale check or publish rejection means stop, preserve the claim
+and candidates, and let Runtime recover. Restart replays a persisted timeout.
+Never obtain another attempt's token or switch to the latest inbox identity.
+
+An already running **legacy** direct-write session is not contained by these
+helpers. Stop that session and its child writers before deploying the new code and
+Scheduled Automation prompt. See [rollout and limits](STALE_WORKER_FENCING.md).
+
 ## DO NOT
 
 - do not delete the claim;
@@ -384,7 +402,9 @@ Check:
 
 Restart the Orchestrator normally if it is not running.
 
-The Runtime is designed to reconcile authoritative ledger state across restarts.
+The running Orchestrator repairs a missing DONE hint from the matching committed
+ledger during polling and consumes it without restart or manual reconciliation.
+Normal startup also reconciles ledger state and recovers interrupted consumption.
 
 ## DO NOT
 
