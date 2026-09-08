@@ -53,9 +53,31 @@ The canonical permanent Executor prompt is stored at:
 control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md
 ```
 
-Copy the **full contents** of that file into the ZCode Scheduled Automation prompt.
+The preferred first-time setup method is to run this from the Runtime Root after
+`START_PROJECT.ps1`:
 
-Replace every literal:
+```powershell
+.\PREPARE_ZCODE_AUTOMATION.ps1
+```
+
+The helper reads the canonical template without modifying it, validates and replaces
+all literal `<RUNTIME_ROOT>` placeholders with the absolute Runtime Root, and copies the
+fully rendered prompt to the clipboard. Set the ZCode Workspace to the Runtime Root it
+displays and paste the clipboard content into the Scheduled Automation prompt.
+
+The helper only generates and copies the bound prompt. It does not configure ZCode,
+choose a model or cadence, enable the Automation, start the Runtime, create or activate a
+Project, or edit Runtime state. Keep the Automation paused through preflight.
+
+For environments without clipboard support, `-NoClipboard` performs validation and
+rendering but skips the copy. The manual fallback is:
+
+1. Open `control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`.
+2. Copy its **full contents**.
+3. Replace every literal `<RUNTIME_ROOT>` with the absolute path of this Runtime Root.
+4. Paste the fully rendered prompt into ZCode.
+
+For example, this literal placeholder:
 
 ```text
 <RUNTIME_ROOT>
@@ -76,9 +98,12 @@ D:\general-agent-runtime\runtime
 ```
 
 Do not rewrite the protocol rules unless you are intentionally developing a new Runtime
-protocol.
+protocol, and never edit the canonical template merely to bind one installation path.
 
-The permanent Automation prompt normally stays unchanged across projects.
+The permanent Automation prompt normally stays unchanged across projects. For later
+sequential Projects in the same Runtime, reuse the existing Automation and do not rerun
+the helper unless you intentionally want to refresh or reinstall the prompt after a
+Runtime update.
 
 ## 4. Executor Model
 
@@ -236,11 +261,12 @@ Recommended first-run sequence:
 2. use AI_BOOTSTRAP.md + PROJECT_GOAL_WORKSHOP.md to design the project
 3. approve an external Goal file
 4. run START_PROJECT.ps1 with that Goal file
-5. configure this Automation if this Runtime has not been configured before
-6. run python scripts\preflight.py
-7. enable this Automation
-8. run START_AGENT_SYSTEM.ps1
-9. stop relaying tasks and let the Runtime loop autonomously
+5. if this Runtime has no Automation yet, run PREPARE_ZCODE_AUTOMATION.ps1
+6. set ZCode Workspace, paste the prepared prompt, and keep the Automation paused
+7. run python scripts\preflight.py
+8. enable this Automation
+9. run START_AGENT_SYSTEM.ps1
+10. stop relaying tasks and let the Runtime loop autonomously
 ```
 
 The Goal-design and end-to-end context lives in

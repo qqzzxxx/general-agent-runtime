@@ -61,7 +61,10 @@ The short path is:
    deliverables, constraints, success criteria, evidence expectations, and important
    forbidden actions;
 3. give that Goal file to `START_PROJECT.ps1`;
-4. let the Supervisor decide the stage plan and the Executor carry it out.
+4. for a Runtime's first Automation setup, run `PREPARE_ZCODE_AUTOMATION.ps1` and
+   paste the prepared Workspace and prompt into ZCode;
+5. run preflight, enable the Automation, and start `START_AGENT_SYSTEM.ps1` so the
+   Supervisor can decide the stage plan and the Executor can carry it out.
 
 Do **not** try to pre-script every stage in the Goal. Define the destination and the
 rules of the project; let the Supervisor choose and revise the route.
@@ -183,14 +186,24 @@ A fresh clone needs **no manual bootstrap state files**.
   -ProjectType "GENERAL" `
   -GoalFile "C:\goals\demo.md"
 
-# 2) optional explicit check (START_AGENT_SYSTEM also runs preflight)
+# 2) first Automation setup for this Runtime only: prepare its bound prompt
+.\PREPARE_ZCODE_AUTOMATION.ps1
+# Set ZCode Workspace to the displayed Runtime Root, paste the clipboard prompt,
+# select a compatible GLM-5.3 variant, and keep the Automation paused.
+
+# 3) optional explicit check (START_AGENT_SYSTEM also runs preflight)
 python .\scripts\preflight.py
 # -> PREFLIGHT: OK
 # -> Mode: isolated
 
-# 3) enable the already-configured ZCode Scheduled Automation, then start the Orchestrator
+# 4) enable the configured ZCode Scheduled Automation, then start the Orchestrator
 .\START_AGENT_SYSTEM.ps1
 ```
+
+`PREPARE_ZCODE_AUTOMATION.ps1` only validates and renders the canonical prompt and copies
+it to the clipboard; it does not configure ZCode or change Runtime state. For later
+sequential Projects in this Runtime, reuse the one existing Automation and skip the
+helper unless you intentionally want to refresh its prompt after a Runtime update.
 
 After launch, no manual Supervisor/Executor handoff is required. The Supervisor publishes
 Executor tasks when needed, and the already-enabled Scheduled Automation picks them up on

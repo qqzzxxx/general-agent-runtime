@@ -148,9 +148,11 @@ Use this normal sequence:
 2. Let a web AI read `AI_BOOTSTRAP.md` and the Goal Workshop.
 3. Discuss the idea and approve an external Goal file.
 4. Run `START_PROJECT.ps1` with that Goal file.
-5. If this Runtime has not been configured before, create its one ZCode Automation using
-   [ZCODE_SETUP](ZCODE_SETUP.md). Do not repeat this for every Project in the same Runtime.
-6. Run preflight:
+5. If this Runtime has not been configured before, run
+   `PREPARE_ZCODE_AUTOMATION.ps1`, then create its one ZCode Automation using the
+   displayed Workspace and clipboard prompt. The helper only prepares the bound prompt;
+   it does not configure ZCode or change Runtime state. See [ZCODE_SETUP](ZCODE_SETUP.md).
+6. Keep the Automation paused and run preflight:
 
    ```powershell
    python .\scripts\preflight.py
@@ -175,8 +177,9 @@ before automation is enabled.
 
 For a later sequential Project in an already-configured Runtime, reuse the existing
 Automation. Keep it paused while preparing and activating the new Project, run preflight,
-then enable it and run `START_AGENT_SYSTEM.ps1`. Do not create another Automation unless
-you create another Runtime Root.
+then enable it and run `START_AGENT_SYSTEM.ps1`. Do not create another Automation or
+rerun the helper unless you create another Runtime Root or intentionally refresh the
+installed prompt after a Runtime update.
 
 ## 7. What happens after launch
 

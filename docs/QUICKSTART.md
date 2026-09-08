@@ -39,6 +39,7 @@ Run commands from the repository root — the directory containing files such as
 
 ```text
 START_PROJECT.ps1
+PREPARE_ZCODE_AUTOMATION.ps1
 START_AGENT_SYSTEM.ps1
 orchestrator.py
 control\
@@ -120,11 +121,18 @@ One Runtime can store many projects, but V1 has exactly **one active project at 
 If this Runtime Root has not been configured before, create one ZCode Scheduled
 Automation for it. Otherwise reuse the existing Automation.
 
+For the first Automation setup in this Runtime, run:
+
+```powershell
+.\PREPARE_ZCODE_AUTOMATION.ps1
+```
+
+The helper validates and renders the canonical prompt with this absolute Runtime Root,
+then copies it to the clipboard. It does not configure ZCode, enable the Automation,
+start the Runtime, or edit Runtime state. In ZCode:
+
 - Workspace: the **Runtime Root**, not `projects\<project-id>\`
-- Prompt: copy the full contents of
-  `control\ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`
-- Replace every literal `<RUNTIME_ROOT>` in that prompt with this installation's absolute
-  Runtime Root
+- Prompt: paste the rendered prompt from the clipboard
 - Keep the Automation **paused during setup**
 
 The Automation is Runtime-level. You do not create a new Automation when you create a
@@ -133,7 +141,8 @@ A different Runtime Root needs a different Automation.
 
 For a later sequential Project, keep the existing Automation paused while preparing and
 activating the Project, run preflight, then enable the Automation and start the Runtime
-as below.
+as below. Do not rerun the helper unless you intentionally want to refresh or reinstall
+the Automation prompt after a Runtime update.
 
 See [ZCODE_SETUP.md](ZCODE_SETUP.md) for the complete setup contract.
 
@@ -305,6 +314,7 @@ resume itself.
 ```text
 orchestrator.py                         mechanical Orchestrator
 START_PROJECT.ps1                      create/activate isolated project
+PREPARE_ZCODE_AUTOMATION.ps1           copy a Runtime-bound Executor prompt
 START_AGENT_SYSTEM.ps1                 preflight + tests + start Orchestrator
 STOP_AGENT_SYSTEM.ps1                  hard stop
 RESUME_HUMAN_REVIEW.ps1                audited Human Review resume wrapper
