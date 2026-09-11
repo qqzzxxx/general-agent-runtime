@@ -289,9 +289,31 @@ Do not:
 
 ## 12. Pausing vs stopping
 
-### Pause ZCode Automation
+### `PAUSE_AGENT_SYSTEM.ps1`
 
-Use when you want to prevent the next Executor wake while inspecting/steering.
+Use the Runtime pause command when you want to prevent the next stage while
+inspecting or steering:
+
+```powershell
+.\PAUSE_AGENT_SYSTEM.ps1
+```
+
+Idle work pauses immediately. An authorized-but-unclaimed dispatch is permanently
+retired before pausing. An already-claimed attempt normally finishes; Runtime consumes
+its authoritative completion but does not start the next Supervisor turn. For explicit
+cooperative revocation at the next fence checkpoint:
+
+```powershell
+.\PAUSE_AGENT_SYSTEM.ps1 -InterruptCurrentTask
+```
+
+This is Runtime authority revocation, not an instantaneous operating-system kill.
+If an authoritative completion committed before the interrupt obtained the fence, the
+completion wins and is delivered; if retirement committed first, later publication or
+completion is rejected. Safe-pause completion is persisted as a deferred event and is
+replayed to one Supervisor turn after resume, including across restart.
+Resume with `RESUME_AGENT_SYSTEM.ps1`; it does not replay completed work or bypass
+HUMAN_REVIEW.
 
 This does not terminally stop the project.
 
@@ -306,6 +328,41 @@ It does not create the formal STOP signal.
 Use when you actually intend to stop the Runtime's automatic project progression.
 
 It is not the normal way to inject temporary feedback.
+
+### Steering, AUDIT, and history
+
+Use `REQUEST_SUPERVISOR_INTERVENTION.ps1`, not a manual `RESEARCH_STATE.md` edit:
+
+```powershell
+.\REQUEST_SUPERVISOR_INTERVENTION.ps1 -Text "Change direction after this stage."
+.\REQUEST_SUPERVISOR_INTERVENTION.ps1 -Mode AUDIT -TargetMessageId 700120 `
+  -Text "Audit this dispatch and materially dependent later work."
+```
+
+The original intervention bytes and delivery status remain auditable. Submission is
+recoverable across interruption; delivery becomes consumed only with a validated
+durable Supervisor decision receipt. A no-op, invalid, or stale turn leaves it pending
+for redelivery. A historical
+target never rewrites dispatches, completions, or decisions; corrections use new
+MESSAGE_IDs. Inspect the exact verified histories with:
+
+```powershell
+.\SHOW_SUPERVISOR_TASKS.ps1 -MessageId 700120
+.\SHOW_EXECUTOR_FEEDBACK.ps1 -MessageId 700120
+.\SHOW_AGENT_TIMELINE.ps1 -Json
+.\SHOW_SUPERVISOR_INTERVENTIONS.ps1 -Json
+```
+
+Task-history integrity is explicit: `AUTHORIZED_VALID`, `UNAUTHORIZED`, `INCOMPLETE`,
+or `CORRUPT`. The query refuses escaped paths and does not repair a broken record.
+All v1.2 `-Json` wrappers write exactly one ASCII-safe JSON document to stdout; ordinary
+status/start text is separate, so redirected output can be parsed under Windows
+PowerShell 5 and PowerShell 7.
+
+After upgrade, an archive-less authorization is not a new claim capability. Leave an
+already-running claimed attempt to the documented completion-only recovery path. An
+unclaimed legacy dispatch must be explicitly migrated/re-registered (or replaced by a
+fresh Supervisor decision) so the v1.2 archive and seal exist before execution.
 
 ---
 
@@ -431,11 +488,11 @@ These are diagnostics, not permission to mutate state.
 |---|---|
 | Normal stage running | Let it run |
 | Need to inspect output | Inspect project artifacts; do not touch protocol |
-| New quality feedback, current task nearly done | Append feedback; let task complete; inspect next Supervisor decision |
-| New feedback, current task would cause large waste | Pause future wakes; use controlled abort/steering runbook |
+| New quality feedback, current task nearly done | Submit `REQUEST_SUPERVISOR_INTERVENTION.ps1`; safe delivery follows the current stage |
+| New feedback, current task would cause large waste | Submit with `-InterruptCurrentTask`, or pause with that explicit option |
 | Duplicate Scheduled Automation wake | Let claim semantics handle it |
 | Goal Anchor mismatch | Stop editing; use incident runbook |
 | HUMAN_REVIEW | Prepare/apply audited decision receipt |
 | Need a materially different project objective | Create a new project/Goal |
-| Want temporary pause | Pause Automation / optionally Ctrl+C Orchestrator |
+| Want temporary pause | `PAUSE_AGENT_SYSTEM.ps1` |
 | Want true stop | `STOP_AGENT_SYSTEM.ps1` |

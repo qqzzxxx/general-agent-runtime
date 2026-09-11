@@ -23,6 +23,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import supervisor_control as supervisor_helper
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "orchestrator.py"
 spec = importlib.util.spec_from_file_location("orchestrator_console_view", MODULE_PATH)
@@ -32,6 +33,31 @@ spec.loader.exec_module(o)
 
 def wire(value):
     return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2) + "\n```\n"
+
+
+def archived_authorization(root, identity, data, project_id=None):
+    """Create a tokenless completion-test authorization with a real v1.2 archive."""
+    origin = {
+        "originating_control_revision": supervisor_helper.load_control(root)["revision"],
+        "supervisor_turn_id": f"fixture-{identity['MESSAGE_ID']}-{identity['NONCE']}",
+        "decision_receipt_sha256": hashlib.sha256(data + b"fixture-origin").hexdigest(),
+    }
+    binding = supervisor_helper.archive_dispatch(
+        root, project_id, identity, data, origin=origin)
+    authorization = {
+        "schema_version": 1, **identity,
+        "TO_ZCODE_SHA256": hashlib.sha256(data).hexdigest(),
+        "PROJECT_ID": project_id,
+        "AUTHORIZED_AT": o.stamp(),
+        "SUPERVISOR_CONTROL_ORIGIN": origin,
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            key: binding[key] for key in (
+                "schema_version", "metadata_file", "archive_file",
+                "authorization_file", "dispatch_sha256")
+        },
+    }
+    supervisor_helper.seal_dispatch_authorization(root, authorization)
+    return authorization
 
 
 class _RestrictedEncodingStream:
@@ -151,13 +177,9 @@ class ConsolePresentationTests(unittest.TestCase):
         """Drive the legal claim -> staging -> authoritative commit chain."""
         payload = {"PROTOCOL_VERSION": 2, **identity, "OBJECTIVE": "fixture", "OUTPUTS": []}
         o.atomic_write(o.TO_ZCODE, wire(payload))
+        authorization = archived_authorization(o.ROOT, identity, o.TO_ZCODE.read_bytes())
         o.atomic_json(o.RUNTIME_STATE, {
-            "authorized_dispatch": {
-                "schema_version": 1,
-                **identity,
-                "TO_ZCODE_SHA256": hashlib.sha256(o.TO_ZCODE.read_bytes()).hexdigest(),
-                "AUTHORIZED_AT": o.stamp(),
-            },
+            "authorized_dispatch": authorization,
             "retired_message_ids": [],
         })
         self._write_waiting_state(identity)
@@ -415,6 +437,10 @@ class ConsolePresentationTests(unittest.TestCase):
         identity = self.IDENTITY
         self._publish_dispatch_file(identity)
         self._write_waiting_state(identity)
+        # A v1.2 restart never authorizes provenance-free wire bytes. Model the
+        # explicit migration/re-registration that precedes recovery.
+        recovery_runtime = o.load_runtime()
+        o.register_dispatched_task(recovery_runtime, o.read_project_state())
         with patch.object(o, "_VIEW", self._broken_view()):
             with patch.object(o, "invoke_codex",
                               side_effect=AssertionError("Codex must not be called")):
@@ -432,13 +458,9 @@ class ConsolePresentationTests(unittest.TestCase):
     def _authorize_dispatch(self, identity):
         """Publish TO_ZCODE and bind the Runtime authorization record."""
         self._publish_dispatch_file(identity)
+        authorization = archived_authorization(o.ROOT, identity, o.TO_ZCODE.read_bytes())
         o.atomic_json(o.RUNTIME_STATE, {
-            "authorized_dispatch": {
-                "schema_version": 1,
-                **identity,
-                "TO_ZCODE_SHA256": hashlib.sha256(o.TO_ZCODE.read_bytes()).hexdigest(),
-                "AUTHORIZED_AT": o.stamp(),
-            },
+            "authorized_dispatch": authorization,
             "retired_message_ids": [],
         })
 
@@ -597,6 +619,8 @@ class ConsolePresentationTests(unittest.TestCase):
         identity = self.IDENTITY
         self._write_waiting_state(identity)
         self._publish_dispatch_file(identity)
+        recovery_runtime = o.load_runtime()
+        o.register_dispatched_task(recovery_runtime, o.read_project_state())
         polls = {"count": 0}
 
         def sleep_and_interrupt(_seconds):

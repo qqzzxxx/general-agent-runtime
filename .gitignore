@@ -28,6 +28,10 @@ attempt_workspaces/
 !handoff/executor_claims/.gitkeep
 handoff/archive/*
 !handoff/archive/.gitkeep
+handoff/supervisor_dispatch_archive/*
+!handoff/supervisor_dispatch_archive/.gitkeep
+handoff/supervisor_interventions/*
+!handoff/supervisor_interventions/.gitkeep
 handoff/quarantine/*
 !handoff/quarantine/.gitkeep
 handoff/completion_ledger/*
@@ -62,3 +66,4 @@ reports/USER_STATUS.md
 control/HUMAN_REVIEW
 control/HUMAN_DECISION_*.json
 control/HUMAN_REVIEW_RECEIPT_*.json
+control/supervisor_control.json

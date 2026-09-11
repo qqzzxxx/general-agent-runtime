@@ -18,6 +18,7 @@ from unittest.mock import patch
 import executor_claim as claim
 import executor_completion as completion
 import executor_fence as fence
+import supervisor_control as supervisor_control
 from test_completion_seal import load_orchestrator, wire
 
 
@@ -46,9 +47,20 @@ class ExecutorFenceTests(unittest.TestCase):
             task.pop("ISSUED_AT")
         elif issued_at != "current":
             task["ISSUED_AT"] = issued_at
-        self.state = {"project_id": "synthetic", "status": "WAITING_EXECUTOR", "current_task": task}
+        previous = getattr(self, "state", {})
+        history = list(previous.get("decision_history") or [])
+        self.state = {"project_id": "synthetic", "status": "SUPERVISOR_TURN",
+                      "current_task": None, "decision_history": history}
+        self.o.atomic_json(self.o.PROJECT_STATE, self.state)
+        turn = supervisor_control.begin_supervisor_turn(self.root, "synthetic")
+        decision = {"decision": "CONTINUE", "reason": f"dispatch {message}"}
+        self.state.update(status="WAITING_EXECUTOR", current_task=task,
+                          decision_history=[*history, decision],
+                          last_supervisor_decision=dict(decision))
         self.o.atomic_json(self.o.PROJECT_STATE, self.state)
         self.o.atomic_write(self.o.TO_ZCODE, wire(task))
+        self.assertFalse(supervisor_control.finish_supervisor_turn(
+            self.root, turn, processed=True))
         self.o.register_dispatched_task(self.runtime, self.state)
         return identity
 
@@ -192,18 +204,19 @@ class ExecutorFenceTests(unittest.TestCase):
         with self.assertRaises(completion.CompletionError):
             self.commit(identity, self.staging(identity))
 
-    def test_legacy_claim_cannot_be_upgraded_but_committed_result_can_recover(self):
+    def test_already_claimed_legacy_attempt_can_finish_without_new_acquisition(self):
         identity = self.dispatch()
-        # Synthetic pre-upgrade Runtime authorization.
-        for key in ("FENCE_VERSION", "EXPIRES_AT", "PROJECT_ID"):
+        self.assertEqual(self.acquire(identity), 0)
+        # Synthetic pre-upgrade archive-less authorization after its permanent
+        # claim already exists. This is completion recovery, not a new claim.
+        for key in ("SUPERVISOR_DISPATCH_ARCHIVE", "SUPERVISOR_CONTROL_ORIGIN"):
             self.runtime["authorized_dispatch"].pop(key)
         self.o.save_runtime(self.runtime)
-        self.assertEqual(claim.acquire(self.root, *[identity[k] for k in fence.IDENTITY_KEYS]), 0)
-        with self.assertRaisesRegex(RuntimeError, "Legacy claimed"):
-            self.o.register_dispatched_task(self.runtime, self.state, allow_same_identity=True)
-        self.assertEqual(completion.commit(self.root, self.staging(identity)), 0)
         self.o.register_dispatched_task(self.runtime, self.state, allow_same_identity=True)
-        self.assertNotIn("FENCE_VERSION", self.runtime["authorized_dispatch"])
+        self.assertEqual(self.runtime["legacy_running_recovery"]["policy"],
+                         "EXISTING_CLAIM_COMPLETION_ONLY")
+        self.assertEqual(self.commit(identity, self.staging(identity)), 0)
+        self.assertNotIn("SUPERVISOR_DISPATCH_ARCHIVE", self.runtime["authorized_dispatch"])
         self.o.reconcile_completion_ledger(self.runtime, self.state)
         self.assertTrue(self.o.ZCODE_DONE.exists())
 
@@ -273,7 +286,8 @@ class ExecutorFenceTests(unittest.TestCase):
              patch.object(self.o.time, "sleep", side_effect=KeyboardInterrupt):
             self.assertEqual(self.o.main(), 130)
         self.assertEqual(old_snapshot["retired_message_ids"], [])
-        self.assertEqual(observations, [True], "B must read R only after ownership")
+        self.assertTrue(observations and all(observations),
+                        "every refreshed Runtime read must occur only after ownership")
         persisted = load_runtime()
         self.assertIn(700110, persisted["retired_message_ids"])
         self.assertEqual(persisted["pending_executor_timeout"], retired["event"])
@@ -293,9 +307,9 @@ class ExecutorFenceTests(unittest.TestCase):
 
     def test_registration_races_first_claim_authorization_read(self):
         identity = self.dispatch()
-        self.runtime.pop("authorized_dispatch")
-        self.runtime.pop("last_dispatched_message_id")
-        self.runtime.pop("last_dispatched_nonce")
+        self.runtime["authorized_dispatch"] = None
+        self.runtime["last_dispatched_message_id"] = None
+        self.runtime["last_dispatched_nonce"] = None
         self.o.save_runtime(self.runtime)  # pre-registration R, as in the exploit
         entered, release = threading.Event(), threading.Event()
         claim_ready, registered = threading.Event(), threading.Event()
@@ -333,7 +347,9 @@ class ExecutorFenceTests(unittest.TestCase):
              patch.object(self.o, "save_runtime", side_effect=delayed_save), \
              patch.object(Path, "read_text", possible_unlocked_read), \
              patch.object(fence, "runtime_lock", observed_lock):
-            registration = pool.submit(self.o.register_dispatched_task, self.runtime, self.state)
+            registration = pool.submit(
+                self.o.register_dispatched_task, self.runtime, self.state,
+                allow_same_identity=True)
             self.assertTrue(entered.wait(5))
             acquisition = pool.submit(acquire)
             try:

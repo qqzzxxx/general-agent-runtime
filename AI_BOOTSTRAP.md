@@ -172,6 +172,13 @@ Before advising any action, preserve these invariants:
 13. A Supervisor opinion alone cannot bypass required Final Verification.
 14. Separate Runtime Roots are isolated. Never inspect or modify sibling Runtime trees from an Executor run.
 15. `STOP_AGENT_SYSTEM.ps1` is a real stop signal, not a temporary pause button.
+16. Use `PAUSE_AGENT_SYSTEM.ps1` / `RESUME_AGENT_SYSTEM.ps1` for a reversible pause;
+    `-InterruptCurrentTask` is explicit Runtime-level fence revocation, not an OS kill.
+17. Use `REQUEST_SUPERVISOR_INTERVENTION.ps1` instead of editing `RESEARCH_STATE.md`
+    for immediate steering, AUDIT, or historical MESSAGE_ID correction.
+18. Authorized Codex -> ZCode history is the exact-byte Runtime archive under
+    `handoff/supervisor_dispatch_archive/`; completion truth remains solely in
+    `handoff/completion_ledger/`.
 
 ---
 

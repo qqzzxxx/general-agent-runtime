@@ -104,6 +104,6 @@ try {
     }
 }
 catch {
-    Write-Error "PREPARE_ZCODE_AUTOMATION failed: $($_.Exception.Message)"
+    [Console]::Error.WriteLine("PREPARE_ZCODE_AUTOMATION failed: $($_.Exception.Message)")
     exit 1
 }

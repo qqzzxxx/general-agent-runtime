@@ -113,7 +113,9 @@ def authorization_error(message_id: int, reason: str) -> int:
 
 
 def verify_authorized_dispatch(
-    root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str
+    root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str,
+    *, allow_paused_running: bool = False,
+    allow_legacy_claimed_recovery: bool = False,
 ) -> tuple[bool, str]:
     """Bind a claim to Orchestrator state and the exact currently published inbox.
 
@@ -145,6 +147,20 @@ def verify_authorized_dispatch(
     if authorization.get("schema_version") != AUTHORIZED_DISPATCH_SCHEMA_VERSION:
         return False, "authorization_schema_mismatch"
 
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import supervisor_control
+    if supervisor_control.uncommitted_intervention_transactions(root):
+        return False, "intervention_transaction_recovery_required"
+    try:
+        control = supervisor_control.load_control(root)
+    except Exception as exc:
+        return False, f"supervisor_control_unavailable:{type(exc).__name__}"
+    pause = str((control.get("pause") or {}).get("status") or "RUNNING")
+    if pause != "RUNNING" and not allow_paused_running:
+        return False, "runtime_paused"
+
     requested = {
         "MESSAGE_ID": message_id,
         "TASK_ID": task_id,
@@ -152,6 +168,37 @@ def verify_authorized_dispatch(
         "ATTEMPT": attempt,
         "NONCE": nonce,
     }
+
+    # v1.2 acquisition invariant: no exact archive + authorization seal means no
+    # new claim. A pre-upgrade claim may finish through the separately fenced
+    # recovery path, but this verifier never turns it into a new acquisition.
+    has_archive = isinstance(authorization.get("SUPERVISOR_DISPATCH_ARCHIVE"), dict)
+    if not has_archive:
+        # Compatibility is completion-only: an already claimed pre-upgrade task
+        # may finish through the separately fenced recovery path, but an
+        # archive-less authorization is never a valid new acquisition.
+        if not allow_legacy_claimed_recovery:
+            return False, "dispatch_archive_binding_missing"
+        try:
+            legacy_claim = json.loads(
+                (claim_dir(root, message_id, nonce) / "claim.json").read_text(
+                    encoding="utf-8-sig"))
+            if (supervisor_control.normalize_identity(
+                    legacy_claim, "legacy claim identity")
+                    != supervisor_control.normalize_identity(
+                        requested, "requested legacy identity")):
+                return False, "legacy_claim_missing_or_invalid"
+        except Exception:
+            return False, "legacy_claim_missing_or_invalid"
+    else:
+        archive_ok, archive_reason = supervisor_control.verify_archive_binding(root, authorization)
+        if not archive_ok:
+            return False, archive_reason
+        origin = authorization.get("SUPERVISOR_CONTROL_ORIGIN") or {}
+        if (not allow_paused_running
+                and origin.get("originating_control_revision") != control.get("revision")):
+            return False, "supervisor_control_origin_stale"
+
     for key in IDENTITY_KEYS:
         if authorization.get(key) != requested[key]:
             return False, f"authorization_{key.lower()}_mismatch"
@@ -194,6 +241,11 @@ def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: i
 def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str, *, fence) -> int:
     """Caller holds the fence mutex through authorization, metadata and success."""
     root = root.resolve()
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import supervisor_control
+    supervisor_control.reconcile_control_transactions_locked(root)
     try:
         last = read_last_processed(root)["MESSAGE_ID"]
     except LastProcessedFormatError as exc:
@@ -290,14 +342,34 @@ def selftest() -> int:
         (root / "TO_ZCODE.md").write_text(wire, encoding="utf-8")
         (root / "control").mkdir()
         raw = (root / "TO_ZCODE.md").read_bytes()
+        import supervisor_control
+        origin = {"originating_control_revision": 0,
+                  "supervisor_turn_id": "selftest-turn-700006",
+                  "decision_receipt_sha256": "a" * 64}
+        binding = supervisor_control.archive_dispatch(root, None, task, raw, origin=origin)
         authorization = {
             "schema_version": AUTHORIZED_DISPATCH_SCHEMA_VERSION,
             **{key: task[key] for key in IDENTITY_KEYS},
             "TO_ZCODE_SHA256": hashlib.sha256(raw).hexdigest(),
             "AUTHORIZED_AT": now_iso(),
+            "PROJECT_ID": None,
+            "FENCE_VERSION": 1,
+            "EXPIRES_AT": "2099-01-01T00:00:00+00:00",
+            "SUPERVISOR_CONTROL_ORIGIN": origin,
+            "SUPERVISOR_DISPATCH_ARCHIVE": {
+                key: binding[key] for key in ("schema_version", "metadata_file",
+                                               "archive_file", "authorization_file",
+                                               "dispatch_sha256")
+            },
         }
+        supervisor_control.seal_dispatch_authorization(root, authorization)
+        (root / "control" / "project_state.json").write_text(json.dumps({
+            "status": "WAITING_EXECUTOR",
+            "current_task": {key: task[key] for key in IDENTITY_KEYS},
+        }), encoding="utf-8")
         (root / "control" / "orchestrator_runtime.json").write_text(
-            json.dumps({"authorized_dispatch": authorization, "retired_message_ids": []}),
+            json.dumps({"status": "RUNNING", "authorized_dispatch": authorization,
+                        "retired_message_ids": []}),
             encoding="utf-8",
         )
         first = acquire(**args)

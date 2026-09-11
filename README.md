@@ -239,6 +239,74 @@ The human decides offline, then uses the audited wrapper:
 Never edit `ACTIVE_PROJECT.json`, `project_state.json`, Goal Anchor bindings, completion
 ledgers, or other live control state by hand.
 
+## Supervisor history and live operator control (v1.2)
+
+v1.2 adds a backend control plane for auditable history and live operator direction.
+Every newly Runtime-authorized Codex -> ZCode dispatch is preserved byte-for-byte before
+authorization. Executor feedback queries read the existing authoritative completion
+ledger, never mutable root hints.
+
+Task queries classify each archive record as `AUTHORIZED_VALID`, `UNAUTHORIZED`,
+`INCOMPLETE`, or `CORRUPT` after checking path containment, schemas, project and task
+identity, hashes, the authorization seal, and exact bytes. Queries do not repair or
+otherwise mutate history.
+
+```powershell
+.\SHOW_AGENT_STATUS.ps1
+.\SHOW_SUPERVISOR_TASKS.ps1
+.\SHOW_SUPERVISOR_TASKS.ps1 -Last 5
+.\SHOW_SUPERVISOR_TASKS.ps1 -MessageId 700120
+.\SHOW_EXECUTOR_FEEDBACK.ps1 -MessageId 700120
+.\SHOW_AGENT_TIMELINE.ps1 -Json
+.\SHOW_SUPERVISOR_INTERVENTIONS.ps1 -Json
+```
+
+Steer or audit without editing project memory:
+
+```powershell
+.\REQUEST_SUPERVISOR_INTERVENTION.ps1 -Text "Re-evaluate the latest stage first."
+.\REQUEST_SUPERVISOR_INTERVENTION.ps1 -Mode AUDIT -TargetMessageId 700120 `
+  -Text "Audit this task and materially dependent downstream work."
+```
+
+The target is a correction anchor, not rollback by deletion: original dispatches,
+completions, and decisions remain immutable; repairs use fresh `MESSAGE_ID`s. An
+intervention arriving before claim retires the unseen candidate. During an
+already-claimed stage it waits until that stage completes unless
+`-InterruptCurrentTask` explicitly revokes Runtime authority at the next fence.
+An explicit intervention can reopen `COMPLETE` or `BLOCKED` for a new Supervisor
+decision without rewriting history; it never bypasses terminal STOP or HUMAN_REVIEW.
+Accepted interventions use a recovery journal that advances the control revision
+before any candidate can be authorized. Delivery is marked consumed only after one
+validated durable Supervisor decision receipt; a no-op, malformed decision, stale
+candidate, or crash leaves/requeues the intervention for another turn.
+
+Pause and resume are distinct from terminal STOP and audited HUMAN_REVIEW:
+
+```powershell
+.\PAUSE_AGENT_SYSTEM.ps1
+.\PAUSE_AGENT_SYSTEM.ps1 -InterruptCurrentTask
+.\RESUME_AGENT_SYSTEM.ps1
+```
+
+Safe pause retires authorized-but-unclaimed work. It lets an already-claimed valid
+stage finish, consumes its authoritative completion, and holds the next Supervisor
+decision until resume. Interrupt is cooperative Runtime-level fencing, not guaranteed
+instantaneous process termination. If completion commits before interrupt obtains the
+fence, completion wins and is delivered normally; if interrupt obtains the fence first,
+the identity is retired and its later commit is rejected. STOP remains terminal, and HUMAN_REVIEW still
+requires `RESUME_HUMAN_REVIEW.ps1`. Query and mutation commands support `-Json`.
+`scripts/supervisor_control.py` is the structured interface intended for the future
+v1.3 Web Console; no browser console is included here. JSON mode emits exactly one
+ASCII-safe JSON document on stdout, including for Unicode input; lifecycle/start text
+is kept off that stream.
+
+Upgrade policy is deliberately narrow: an archive-less legacy authorization cannot
+be newly claimed. A pre-upgrade attempt that already owns its permanent claim may use
+the fenced completion-only recovery path. Otherwise the exact dispatch must be
+explicitly migrated/re-registered so Runtime can create its v1.2 origin receipt,
+archive, and authorization seal before a claim is allowed.
+
 ## Final Verification
 
 `COMPLETE` is never a Supervisor opinion alone. Each profile ships a declarative Final
@@ -332,14 +400,25 @@ chat conversation.
 
 ## Status
 
-General Agent Runtime **v1.1.2** is the current public and recommended release. It is a
-documentation/onboarding patch over **v1.1.0**, which introduced stale-worker fencing,
-and uses the same validated Runtime Core. The Runtime was validated with the regression
-suite and with a clean-clone onboarding smoke path:
+General Agent Runtime **v1.2.0** is the current public and recommended release. It adds
+the permanent Supervisor dispatch archive, exact historical `MESSAGE_ID` lookup,
+authoritative Executor feedback history, a combined agent timeline, STEER and AUDIT
+interventions, reversible pause/resume, cooperative current-task interruption, and
+JSON-capable status/history/control interfaces for future UI clients.
 
-```text
-clean clone -> START_PROJECT.ps1 -> preflight -> PREFLIGHT: OK (Mode: isolated)
-```
+Historical dispatch and completion records remain append-only. New Executor acquisition
+fails closed without the required archive and authorization integrity, pending human
+input is enforced at Supervisor authorization boundaries, STOP remains terminal, and
+HUMAN_REVIEW and Final Verification guards remain intact.
+
+Release validation included a clean release-like black-box run and a real autonomous
+Codex <-> ZCode Desktop Automation smoke test through Final Verification and normal
+COMPLETE, in addition to the complete automated regression suite.
+
+Current-task interruption is cooperative Runtime/fence revocation, not an instantaneous
+operating-system process kill. A legacy attempt that already owns its permanent claim
+uses the documented completion-only recovery path. The planned v1.3 browser Web Console
+is not included in v1.2.0, and this release does not claim absolute bug-freedom.
 
 Run the full regression suite from the Runtime Root with:
 

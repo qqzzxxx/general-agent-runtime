@@ -127,6 +127,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
             "phase": "GENERAL",
             "infrastructure_status": "READY",
             "current_task": {key: task[key] for key in o.IDENTITY_KEYS},
+            "decision_history": [],
             "final_verification": {
                 "policy_id": "GENERAL_FV_V1",
                 "policy_version": 1,
@@ -436,11 +437,20 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         def run(cmd, **_kwargs):
             index = calls["n"]
             calls["n"] += 1
+            before = o.read_project_state()
+            history_before = list(before.get("decision_history") or [])
             output_path = Path(cmd[cmd.index("-o") + 1])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("", encoding="utf-8")
             if index < len(actions):
                 actions[index]()
+            # Model one valid Supervisor decision transaction. The tests below
+            # vary only the dispatch schema; process exit alone is not authority.
+            after = o.read_project_state()
+            decision = {"decision": "CONTINUE", "reason": "fixture dispatch decision"}
+            after["decision_history"] = history_before + [decision]
+            after["last_supervisor_decision"] = dict(decision)
+            o.atomic_json(o.PROJECT_STATE, after)
             return subprocess.CompletedProcess(cmd, 0)
 
         return run
@@ -485,7 +495,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         self.assertEqual(self.runtime["dispatch_validation_repair_used"], 0)
         self.assertIsNone(o.read_project_state().get("dispatch_repair"))
 
-    def test_invoke_codex_second_rejected_dispatch_is_terminal(self):
+    def test_invoke_codex_second_rejected_dispatch_enters_human_review(self):
         bad_claims = [self.uppercase_claim(cid) for cid in ("C1", "C2", "C3")]
         bad_task = self.fv_task(claims=bad_claims)
         bad_task["FINAL_VERIFICATION_GATE"]["CLAIMS_HASH"] = o.canonical_claims_hash(bad_claims)
@@ -509,16 +519,17 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
             with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
                 o.subprocess, "run", side_effect=self.fake_codex([bad_repair_action])
             ):
-                with self.assertRaisesRegex(RuntimeError, "Invalid FINAL_VERIFICATION critical claims"):
-                    o.invoke_codex(self.runtime, "SUPERVISOR_TURN", {"source": "project_state"})
+                o.invoke_codex(self.runtime, "SUPERVISOR_TURN", {"source": "project_state"})
         finally:
             o.release_lock()
 
         self.assertEqual(self.runtime["dispatch_validation_repair_used"], 1)
-        # The terminal path does not rewrite the Supervisor's last state; it matters
-        # that the inbox is clean (already asserted via quarantine above) so no
-        # Executor can ever claim the rejected dispatch afterwards.
-        self.assertEqual(o.read_project_state()["status"], "WAITING_EXECUTOR")
+        # The exhausted durable Supervisor budget wins over the repair handler's
+        # terminal exception in this same invocation.
+        self.assertEqual(o.read_project_state()["status"], "HUMAN_REVIEW")
+        self.assertTrue(self.runtime["pending_supervisor_event"]["retry_exhausted"])
+        self.assertEqual(self.runtime["pending_supervisor_event"]["decision_attempts"], 2)
+        self.assertFalse(o.TO_ZCODE.exists())
         self.assertIsNone(self.runtime["authorized_dispatch"])
 
     def claims_directories(self):

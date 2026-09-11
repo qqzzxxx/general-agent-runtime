@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import threading
 import time
 import uuid
 
@@ -28,10 +29,19 @@ class FenceError(RuntimeError):
     pass
 
 
+_LOCK_STATE = threading.local()
+
+
 @contextmanager
 def runtime_lock(root: Path):
     """Cross-process mutex; kernel releases it on crash. Never unlink it."""
-    path = Path(root) / "control" / ".executor-fence.lock"
+    root = Path(root).resolve()
+    key = str(root).casefold() if os.name == "nt" else str(root)
+    held = getattr(_LOCK_STATE, "held", set())
+    if key in held:
+        yield
+        return
+    path = root / "control" / ".executor-fence.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as handle:
         if path.stat().st_size == 0:
@@ -53,8 +63,11 @@ def runtime_lock(root: Path):
                     raise FenceError("runtime_fence_busy")
                 time.sleep(0.02)
         try:
+            held.add(key)
+            _LOCK_STATE.held = held
             yield
         finally:
+            held.discard(key)
             handle.seek(0)
             if os.name == "nt":
                 msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
@@ -74,6 +87,11 @@ def check_locked(root: Path, identity: dict, *, require_claim=True, claim_token=
     """Fresh check, never a reusable authorization token. Caller holds mutex."""
     c = completion_module()
     try:
+        scripts = str(Path(__file__).resolve().parent)
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        import supervisor_control
+        supervisor_control.reconcile_control_transactions_locked(Path(root).resolve())
         identity = c._validated_identity(identity, "fence")
         runtime = c.read_runtime_state(root)
         if runtime is None:
@@ -106,11 +124,15 @@ def check_locked(root: Path, identity: dict, *, require_claim=True, claim_token=
                 raise FenceError("claim_owner_token_mismatch")
         import executor_claim
         ok, reason = executor_claim.verify_authorized_dispatch(
-            root, *[identity[key] for key in IDENTITY_KEYS])
+            root, *[identity[key] for key in IDENTITY_KEYS],
+            allow_paused_running=require_claim,
+            allow_legacy_claimed_recovery=require_claim,
+        )
         if not ok:
             raise FenceError(reason)
         return pid, project
-    except (c.CompletionError, KeyError, TypeError, ValueError) as exc:
+    except (c.CompletionError, supervisor_control.ControlError,
+            KeyError, TypeError, ValueError) as exc:
         raise FenceError(str(exc)) from exc
 
 

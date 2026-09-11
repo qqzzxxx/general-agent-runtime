@@ -18,6 +18,14 @@ from pathlib import Path
 # G5A.5: Runtime Root is the installation location of the orchestrator itself —
 # stable, cwd-independent, no environment overrides.
 ROOT = Path(__file__).resolve().parent
+# Runtime helper modules intentionally remain executable scripts as well as
+# importable production helpers.  Direct ``python scripts\*.py`` execution puts
+# this directory on sys.path automatically; the public Orchestrator entry point
+# must establish the same install-relative policy itself.  Do this once, before
+# any lazily loaded helper can import a sibling by its top-level module name.
+RUNTIME_SCRIPTS = ROOT / "scripts"
+if str(RUNTIME_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(RUNTIME_SCRIPTS))
 CONTROL = ROOT / "control"
 LOGS = ROOT / "logs"
 HANDOFF_ARCHIVE = ROOT / "handoff" / "archive"
@@ -122,6 +130,10 @@ SUPERVISOR_TERMINAL = {"COMPLETE", "BLOCKED", "HUMAN_REVIEW", "STOPPED"}
 # many bounded Supervisor repair turns before the failure is terminal. Repair is a
 # Supervisor turn, never an Executor stage; the validator itself is never loosened.
 MAX_DISPATCH_VALIDATION_REPAIRS = 1
+# Invalid/no-op Supervisor outcomes use the same two-strike philosophy as the
+# existing no-progress guard, but the counter is attached to the durable event so
+# a process restart cannot reset it.
+MAX_SUPERVISOR_DECISION_ATTEMPTS = 2
 DESKTOP_NOTIFICATIONS_ENABLED = True
 USER_NOTIFICATION_CONSOLE_ENABLED = True
 
@@ -158,6 +170,7 @@ AUTHORIZED_DISPATCH_SCHEMA_VERSION = 1
 # / ZCODE_DONE.flag files are DEMOTED to derived compatibility artifacts and wake
 # hints; they are never completion truth on their own.
 _COMPLETION_HELPER = None
+_SUPERVISOR_CONTROL_HELPER = None
 
 
 def _completion_helper():
@@ -174,14 +187,25 @@ def _completion_helper():
     return _COMPLETION_HELPER
 
 
+def _supervisor_control_helper():
+    """Load the reusable v1.2 Supervisor control-plane implementation."""
+    global _SUPERVISOR_CONTROL_HELPER
+    if _SUPERVISOR_CONTROL_HELPER is None:
+        import importlib.util
+
+        path = Path(__file__).resolve().parent / "scripts" / "supervisor_control.py"
+        spec = importlib.util.spec_from_file_location("supervisor_control_runtime", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SUPERVISOR_CONTROL_HELPER = module
+    return _SUPERVISOR_CONTROL_HELPER
+
+
 def _active_project_id():
     return ACTIVE_PROJECT.get("project_id") if isinstance(ACTIVE_PROJECT, dict) else None
 
 
 def _fence_helper():
-    scripts = str(Path(__file__).resolve().parent / "scripts")
-    if scripts not in sys.path:
-        sys.path.insert(0, scripts)
     import executor_fence
     return executor_fence
 
@@ -482,7 +506,13 @@ def validate_dispatch_payload(
 
 
 @executor_serialized
-def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity: bool = False) -> dict:
+def register_dispatched_task(
+    runtime: dict,
+    state: dict,
+    *,
+    allow_same_identity: bool = False,
+    expected_control_revision: int | None = None,
+) -> dict:
     """Validate and atomically authorize the exact published Executor dispatch.
 
     TO_ZCODE is deliberately published before authorization. The Executor claim helper
@@ -490,6 +520,19 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
     crash before the final save leaves a visible task unclaimable, while a missing or
     changed inbox after the save is also unclaimable.
     """
+    control = _supervisor_control_helper()
+    legacy_direct_reregistration = not control.control_path(ROOT).exists()
+    control.reconcile_control_transactions_locked(ROOT)
+    # Preserve legitimate caller updates while merging against fresh monotonic
+    # control/retirement state under this same fence.
+    save_runtime(runtime)
+    fresh_runtime = load_runtime()
+    runtime.clear()
+    runtime.update(fresh_runtime)
+    state = read_project_state()
+    control_state = control.load_control(ROOT)
+    if (control_state.get("pause") or {}).get("status") != "RUNNING":
+        raise RuntimeError("Runtime is paused; new dispatch authorization is forbidden")
     task = load_or_promote_dispatch(state)
     validate_dispatch_payload(
         runtime,
@@ -507,8 +550,74 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
 
     previous = runtime.get("authorized_dispatch") or {}
     same = task_identity_matches(previous, task)
+    completion = _completion_helper()
+    _, prior_claim_path = completion.load_claim(ROOT, task)
+    prior_claim = completion._read_json_file(prior_claim_path / "claim.json")
+    already_owned_recovery = (
+        allow_same_identity and same
+        and previous.get("FENCE_VERSION") == 1
+        and isinstance(previous.get("SUPERVISOR_DISPATCH_ARCHIVE"), dict)
+        and prior_claim_path.is_dir() and isinstance(prior_claim, dict)
+        and completion.identity_values_match(prior_claim, task)
+        and not any(
+            completion.identity_values_match(entry, task)
+            for entry in completion.lookup_entries(ROOT, msg_id)
+        )
+    )
+    if already_owned_recovery:
+        # Recovery of an existing owner is not a fresh authorization or claim.
+        # Ordinary intervention revisions only fence unseen Supervisor work; the
+        # already-claimed attempt keeps completion/publication authority.
+        import executor_claim
+        ok, reason = executor_claim.verify_authorized_dispatch(
+            ROOT, *[task[key] for key in IDENTITY_KEYS], allow_paused_running=True
+        )
+        expires = parse_time(previous.get("EXPIRES_AT"))
+        if not ok:
+            raise RuntimeError(f"Existing Executor owner authorization is invalid: {reason}")
+        if expires is None or utc_now() >= expires:
+            raise RuntimeError("Existing Executor owner authorization has expired")
+        runtime["recovered_owned_executor_attempt"] = {
+            **{key: task[key] for key in IDENTITY_KEYS},
+            "policy": "PRESERVE_ALREADY_CLAIMED_ATTEMPT",
+            "recovered_at": stamp(),
+        }
+        save_runtime(runtime)
+        return task
+    if (expected_control_revision is not None
+            and control_state["revision"] != expected_control_revision):
+        raise RuntimeError(
+            "Supervisor control revision changed before authorization; "
+            "candidate did not observe the latest human control input"
+        )
+    legacy_running_recovery = (
+        allow_same_identity and same
+        and not isinstance(previous.get("SUPERVISOR_DISPATCH_ARCHIVE"), dict)
+        and prior_claim_path.is_dir() and isinstance(prior_claim, dict)
+        and completion.identity_values_match(prior_claim, task)
+    )
+    if legacy_running_recovery:
+        # A permanent pre-upgrade claim is not a new acquisition. Keep its exact
+        # authorization so the existing owner may publish/complete; claim.py still
+        # rejects every new archive-less acquisition.
+        runtime["legacy_running_recovery"] = {
+            **{key: task[key] for key in IDENTITY_KEYS},
+            "policy": "EXISTING_CLAIM_COMPLETION_ONLY",
+            "recorded_at": stamp(),
+        }
+        save_runtime(runtime)
+        return task
+    if legacy_direct_reregistration:
+        control.record_legacy_reregistration_origin_locked(
+            ROOT, _active_project_id(), task, dispatch_bytes
+        )
+    try:
+        candidate_origin = control.verify_candidate_origin(
+            ROOT, task, dispatch_bytes, expected_revision=expected_control_revision
+        )
+    except control.ControlError as exc:
+        raise RuntimeError(str(exc)) from exc
     if same and previous.get("FENCE_VERSION") != 1:
-        completion = _completion_helper()
         _, claim_path = completion.load_claim(ROOT, task)
         if allow_same_identity and any(
             entry["STATUS"] == completion.STATUS_COMMITTED and task_identity_matches(entry, task)
@@ -521,6 +630,18 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
             raise RuntimeError("Legacy claimed attempt cannot be upgraded in flight; stop its worker and recover with a fresh identity")
     if previous and not same:
         retire_executor(runtime, previous, "SUPERSEDED", superseded_by=msg_id)
+    # SUPERVISOR-DISPATCH-ARCHIVE-V1.  This exact byte snapshot is durably
+    # archived before authorized_dispatch is installed.  Archive creation and
+    # authorization share the claim/fence serialization point: a claim can
+    # never interleave between them, and an archive failure prevents the save.
+    archive_binding = control.archive_dispatch(
+        ROOT, _active_project_id(), task, dispatch_bytes,
+        origin={
+            "originating_control_revision": candidate_origin["originating_control_revision"],
+            "supervisor_turn_id": candidate_origin["supervisor_turn_id"],
+            "decision_receipt_sha256": candidate_origin["decision_receipt_sha256"],
+        },
+    )
     registered_at = (runtime.get("dispatch_registered_at") if same else None) or stamp()
     timing_runtime = {**runtime, "dispatch_registered_at": registered_at}
     deadline, _, _, _ = executor_deadline(timing_runtime, state, task)
@@ -528,11 +649,23 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
         "schema_version": AUTHORIZED_DISPATCH_SCHEMA_VERSION,
         **{key: task[key] for key in IDENTITY_KEYS},
         "TO_ZCODE_SHA256": hashlib.sha256(dispatch_bytes).hexdigest(),
-        "AUTHORIZED_AT": stamp(),
+        "AUTHORIZED_AT": previous.get("AUTHORIZED_AT") if same and previous.get("AUTHORIZED_AT") else stamp(),
         "IS_FINAL_VERIFICATION": is_final_verification_task(task),
         "FENCE_VERSION": 1,
         "PROJECT_ID": _active_project_id(),
+        "SUPERVISOR_CONTROL_ORIGIN": {
+            "originating_control_revision": candidate_origin["originating_control_revision"],
+            "supervisor_turn_id": candidate_origin["supervisor_turn_id"],
+            "decision_receipt_sha256": candidate_origin["decision_receipt_sha256"],
+        },
         "EXPIRES_AT": previous["EXPIRES_AT"] if same and previous.get("EXPIRES_AT") else deadline.isoformat(),
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            "schema_version": archive_binding["schema_version"],
+            "metadata_file": archive_binding["metadata_file"],
+            "archive_file": archive_binding["archive_file"],
+            "authorization_file": archive_binding["authorization_file"],
+            "dispatch_sha256": archive_binding["dispatch_sha256"],
+        },
     }
     if authorized["IS_FINAL_VERIFICATION"]:
         # FV-IDENTITY-BINDING-V1: the Runtime's own validated authorization record is
@@ -541,6 +674,9 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
         # transient project-state bookkeeping.
         authorized["FINAL_VERIFICATION_GATE"] = task["FINAL_VERIFICATION_GATE"]
     runtime["authorized_dispatch"] = authorized
+    archive_required_from = runtime.get("supervisor_dispatch_archive_required_from_message_id")
+    if archive_required_from is None:
+        runtime["supervisor_dispatch_archive_required_from_message_id"] = msg_id
     runtime["last_dispatched_message_id"] = msg_id
     runtime["last_dispatched_nonce"] = task["NONCE"]
     runtime["timeout_notified_for_nonce"] = None
@@ -553,6 +689,10 @@ def register_dispatched_task(runtime: dict, state: dict, *, allow_same_identity:
         state["updated_at"] = stamp()
         atomic_json(PROJECT_STATE, state)
     save_runtime(runtime)
+    # Claimability is sealed only after the authorization record is durable and
+    # while the same fence lock is still held. A crash before this create leaves
+    # a visible but unclaimable authorization that restart can safely finish.
+    control.seal_dispatch_authorization(ROOT, authorized)
     return task
 
 
@@ -2119,6 +2259,7 @@ def load_runtime() -> dict:
         "dispatch_validation_repair_used": 0,
         "last_dispatch_validation_error": None,
         "last_quarantined_dispatch": None,
+        "supervisor_dispatch_archive_required_from_message_id": None,
         # GOAL-ANCHOR-V1: Runtime-owned cross-check copy of the active project's
         # bound canonical goal hash; recorded on first verified turn.
         "goal_anchor_binding": None,
@@ -2129,8 +2270,60 @@ def load_runtime() -> dict:
 
 
 def save_runtime(runtime: dict) -> None:
-    runtime["updated_at"] = stamp()
-    atomic_json(RUNTIME_STATE, runtime)
+    """Fresh, fenced merge so stale Orchestrator snapshots cannot erase controls."""
+    with _fence_helper().runtime_lock(ROOT):
+        fresh = read_json(RUNTIME_STATE, {}) or {}
+        if not isinstance(fresh, dict):
+            fresh = {}
+        merged = {**fresh, **runtime}
+
+        retired = []
+        for source in (fresh.get("retired_message_ids") or [],
+                       runtime.get("retired_message_ids") or []):
+            if not isinstance(source, list) or any(type(value) is not int for value in source):
+                raise RuntimeError("retired_message_ids malformed during Runtime merge")
+            for value in source:
+                if value not in retired:
+                    retired.append(value)
+        merged["retired_message_ids"] = retired
+
+        retirements = []
+        seen_retirements = set()
+        for source in (fresh.get("executor_retirements") or [],
+                       runtime.get("executor_retirements") or []):
+            if not isinstance(source, list):
+                raise RuntimeError("executor_retirements malformed during Runtime merge")
+            for value in source:
+                if not isinstance(value, dict):
+                    raise RuntimeError("executor_retirements entry malformed during Runtime merge")
+                key = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                if key not in seen_retirements:
+                    seen_retirements.add(key)
+                    retirements.append(value)
+        if retirements:
+            merged["executor_retirements"] = retirements
+
+        fresh_consumed = int(fresh.get("last_consumed_message_id", 0) or 0)
+        incoming_consumed = int(runtime.get("last_consumed_message_id", 0) or 0)
+        if fresh_consumed > incoming_consumed:
+            for key in ("last_consumed_message_id", "last_consumed_nonce",
+                        "last_consumed_brief_sha256", "executor_receipts_consumed"):
+                if key in fresh:
+                    merged[key] = fresh[key]
+        try:
+            pause = (_supervisor_control_helper().load_control(ROOT).get("pause") or {})
+            if pause.get("status") != "RUNNING" and merged.get("status") not in {
+                "STOPPED_BY_USER", "HUMAN_REVIEW", "DEADLINE_REACHED", "ORCHESTRATOR_ERROR"
+            }:
+                merged["status"] = ("PAUSE_PENDING_AFTER_CURRENT_STAGE"
+                                    if pause.get("status") == "PENDING_AFTER_CURRENT_STAGE"
+                                    else "PAUSED")
+        except Exception:
+            pass
+        merged["updated_at"] = stamp()
+        atomic_json(RUNTIME_STATE, merged)
+        runtime.clear()
+        runtime.update(merged)
 
 
 def read_project_state() -> dict:
@@ -3246,6 +3439,7 @@ def build_codex_prompt(
     state: dict | None = None,
     *,
     state_sha256: str | None = None,
+    control_turn: dict | None = None,
 ) -> str:
     """Build a compact Supervisor turn with the small authoritative files injected.
 
@@ -3309,6 +3503,42 @@ def build_codex_prompt(
             "executor_task must be null, current_task must be null, and no MESSAGE_ID may be "
             "allocated.\n"
             "=== END HUMAN DECISION TRANSACTION OUTPUT CONTRACT ==="
+        )
+    intervention_block = ""
+    interventions = ((control_turn or {}).get("interventions") or [])
+    if interventions:
+        rendered = json.dumps(interventions, ensure_ascii=False, indent=2)
+        verbatim_blocks = "\n".join(
+            f"--- BEGIN VERBATIM {item.get('intervention_id')} ---\n"
+            f"{item.get('instruction_text', '')}\n"
+            f"--- END VERBATIM {item.get('intervention_id')} ---"
+            for item in interventions
+        )
+        audit = any(str(item.get("mode") or "").upper() == "AUDIT" for item in interventions)
+        audit_text = (
+            "At least one request is AUDIT mode. Perform an adversarial Supervisor review "
+            "before normal progression. You may broaden READ-ONLY inspection to relevant "
+            "archived dispatches, authoritative completion records, later decisions, current "
+            "project state, artifacts, evidence, and dependency impact. Do not trust PASS or "
+            "COMPLETED merely because the Executor reported it. Remain the Supervisor: do not "
+            "perform bulk Executor production or large rewrites. Reach a normal reliable "
+            "CONTINUE, REVISE, REDIRECT/CHANGE_METHOD, HUMAN_REVIEW, or STOP decision."
+            if audit else
+            "Apply these STEER requests to this Supervisor decision before normal progression."
+        )
+        intervention_block = (
+            "\n\n=== RUNTIME-VERIFIED HUMAN SUPERVISOR INTERVENTIONS ===\n"
+            f"{rendered}\n"
+            "\n=== VERBATIM INTERVENTION TEXT ===\n"
+            f"{verbatim_blocks}\n"
+            "=== END VERBATIM INTERVENTION TEXT ===\n"
+            "=== END HUMAN SUPERVISOR INTERVENTIONS ===\n"
+            "The instruction_text fields above are immutable human input and must be applied "
+            "exactly once by Runtime accounting. They are not Executor completions, never edit "
+            "PROJECT_GOAL, and never authorize TO_ZCODE directly. A target_message_id is a "
+            "historical correction anchor: preserve all history, assess materially dependent "
+            "later work, and use only fresh MESSAGE_IDs for any repair. "
+            f"{audit_text}"
         )
     goal_text = safe_read_text(goal_path, 12000) if goal_path.exists() else "[NO PROJECT GOAL FILE]"
     # GOAL-ANCHOR-V1: verified goal identity + alignment contract (empty in legacy mode).
@@ -3464,7 +3694,7 @@ to update state/publish a task or to inspect one precise evidence artifact when 
 
 === PROJECT GOAL ===
 {goal_text}
-=== END PROJECT GOAL ==={goal_anchor_block}{profile_block}{scope_block}{human_decision_block}
+=== END PROJECT GOAL ==={goal_anchor_block}{profile_block}{scope_block}{human_decision_block}{intervention_block}
 
 === CURRENT EXECUTOR BRIEF ===
 {brief_text}
@@ -3489,20 +3719,297 @@ def find_codex() -> str:
     return codex
 
 
+def _same_supervisor_invocation(pending: dict, reason: str,
+                                event: dict | None) -> bool:
+    return (pending.get("reason") == reason and pending.get("event") == event)
+
+
+def persist_supervisor_event(runtime: dict, reason: str,
+                             event: dict | None) -> dict:
+    """Durably own an invocation event before pause/terminal/begin checks.
+
+    Completion consumption and Supervisor invocation are separate commits.  This
+    record bridges them for live resume and restart and is cleared only by the
+    durable decision-receipt accounting transaction.
+    """
+    fresh = load_runtime()
+    pending = fresh.get("pending_supervisor_event")
+    if not isinstance(pending, dict):
+        pending = {
+            "reason": reason,
+            "event": event,
+            "recorded_at": stamp(),
+            "decision_attempts": 0,
+            "retry_exhausted": False,
+        }
+        fresh["pending_supervisor_event"] = pending
+        save_runtime(fresh)
+    # Never replace already-owned input. A caller asking for a generic retry
+    # while a completion/intervention event is pending services the older
+    # durable event first.
+    runtime.clear()
+    runtime.update(fresh)
+    return pending
+
+
+def validate_supervisor_candidate_snapshot(state: dict, task: dict,
+                                           dispatch_bytes: bytes) -> None:
+    """Apply the registration validator to the exact receipt-bound bytes."""
+    runtime = load_runtime()
+    if hashlib.sha256(dispatch_bytes).hexdigest() != hashlib.sha256(
+            TO_ZCODE.read_bytes()).hexdigest():
+        raise RuntimeError("Supervisor candidate snapshot changed during validation")
+    validate_dispatch_payload(
+        runtime, state, task, allow_same_identity=False
+    )
+
+
+def authoritative_committed_completion_for_current(runtime: dict,
+                                                    state: dict) -> dict | None:
+    """Return a valid committed completion for the authorized current identity.
+
+    This is deliberately narrower than dispatch validation.  It distinguishes an
+    already-owned attempt that crossed the authoritative completion commit point
+    from a fresh Supervisor candidate that still has to satisfy the current control
+    revision at authorization time.
+    """
+    if state.get("status") != "WAITING_EXECUTOR":
+        return None
+    current = state.get("current_task") or {}
+    authorized = runtime.get("authorized_dispatch")
+    message_id = task_value(current, "MESSAGE_ID")
+    if (message_id is None or not isinstance(authorized, dict)
+            or not task_identity_matches(authorized, current)):
+        return None
+    completion = _completion_helper()
+    return next((
+        entry for entry in completion.lookup_entries(ROOT, message_id)
+        if entry.get("STATUS") == completion.STATUS_COMMITTED
+        and entry.get("PROJECT_ID") == _active_project_id()
+        and task_identity_matches(entry, current)
+        and task_identity_matches(entry, authorized)
+        and completion.entry_hashes_intact(entry)
+    ), None)
+
+
+def validate_startup_candidate_snapshot(state: dict, task: dict,
+                                        dispatch_bytes: bytes) -> None:
+    """Validate recovered fresh work, except an already committed owned attempt."""
+    runtime = load_runtime()
+    committed = authoritative_committed_completion_for_current(runtime, state)
+    if committed is not None and task_identity_matches(task, committed):
+        return
+    validate_supervisor_candidate_snapshot(state, task, dispatch_bytes)
+
+
+def _supervisor_invocation_blocked(runtime: dict, state: dict,
+                                   pending: dict) -> bool:
+    status = state.get("status")
+    if STOP_FLAG.exists() or status == "STOPPED":
+        runtime["status"] = "STOPPED_BY_USER" if STOP_FLAG.exists() else "STOPPED"
+        save_runtime(runtime)
+        return True
+    if HUMAN_REVIEW_FLAG.exists() or status == "HUMAN_REVIEW":
+        runtime["status"] = "HUMAN_REVIEW"
+        save_runtime(runtime)
+        return True
+    if pending.get("retry_exhausted"):
+        return True
+    if hard_runtime_deadline(state):
+        runtime["status"] = "DEADLINE_REACHED"
+        save_runtime(runtime)
+        return True
+    if status in {"COMPLETE", "BLOCKED"}:
+        return True
+    return False
+
+
+def exhaust_supervisor_retry_budget(runtime: dict, reason: str, event: dict | None,
+                                    error: str | None) -> None:
+    """Enter a bounded, auditable HUMAN_REVIEW without discarding input."""
+    with _fence_helper().runtime_lock(ROOT):
+        state = read_project_state()
+        if STOP_FLAG.exists() or state.get("status") == "STOPPED":
+            return
+        fresh = load_runtime()
+        pending = fresh.get("pending_supervisor_event")
+        if not isinstance(pending, dict) or not _same_supervisor_invocation(
+                pending, reason, event):
+            raise RuntimeError("Supervisor retry event changed before exhaustion")
+        pending["retry_exhausted"] = True
+        pending["last_error"] = str(error or "invalid/no-op Supervisor decision")[:800]
+        pending["exhausted_at"] = stamp()
+        fresh["pending_supervisor_event"] = pending
+        fresh["status"] = "HUMAN_REVIEW"
+        fresh["last_supervisor_retry_failure"] = dict(pending)
+        state["status"] = "HUMAN_REVIEW"
+        state["current_task"] = None
+        state["blocked_reason"] = (
+            "Supervisor decision retry budget exhausted; pending human input was "
+            "preserved for audit and explicit recovery"
+        )
+        state["supervisor_retry_failure"] = {
+            "reason": reason,
+            "decision_attempts": pending.get("decision_attempts"),
+            "last_error": pending["last_error"],
+            "at": pending["exhausted_at"],
+        }
+        state["updated_at"] = stamp()
+        atomic_json(PROJECT_STATE, state)
+        save_runtime(fresh)
+        runtime.clear()
+        runtime.update(fresh)
+    log(
+        "Supervisor decision retry budget exhausted; entering HUMAN_REVIEW",
+        reason=reason,
+        attempts=pending.get("decision_attempts"),
+        error=pending.get("last_error"),
+    )
+
+
+def finalize_supervisor_retry_result(runtime: dict, reason: str,
+                                     event: dict | None, result: dict) -> None:
+    """Account one uncommitted Supervisor result under the durable retry budget.
+
+    Both live completion and startup recovery use this ordering.  In particular,
+    dispatch-repair cleanup may itself be terminal on the final invalid candidate;
+    that exception is contained until the already-exhausted Supervisor decision
+    budget has durably entered HUMAN_REVIEW.
+    """
+    fresh_runtime = load_runtime()
+    runtime.clear()
+    runtime.update(fresh_runtime)
+    pending = runtime.get("pending_supervisor_event")
+    if not isinstance(pending, dict) or not _same_supervisor_invocation(
+            pending, reason, event):
+        raise RuntimeError("durable Supervisor retry event was lost")
+    pending["last_error"] = str(
+        result.get("error") or "invalid/no-op Supervisor decision"
+    )[:800]
+    runtime["pending_supervisor_event"] = pending
+    save_runtime(runtime)
+    exhausted = (
+        int(pending.get("decision_attempts", 0) or 0)
+        >= MAX_SUPERVISOR_DECISION_ATTEMPTS
+    )
+    invalidation = {"quarantine": None}
+    cleanup_error = None
+    try:
+        if result.get("candidate_validation_failed"):
+            # Reuse the established strict validator repair path. The candidate
+            # was not receipt-committed and its intervention remains pending.
+            handle_dispatch_registration_failure(
+                runtime, read_project_state(), RuntimeError(pending["last_error"])
+            )
+            invalidation = {"quarantine": runtime.get("last_quarantined_dispatch")}
+        else:
+            invalidation = _supervisor_control_helper().invalidate_candidate(
+                ROOT, "UNCOMMITTED_OR_STALE_SUPERVISOR_DECISION"
+            )
+    except Exception as exc:
+        if not exhausted:
+            raise
+        # The dispatch-repair budget can exhaust on the same result as the
+        # durable Supervisor decision budget. Preserve its diagnostic, but do
+        # not let it escape before the safer bounded-review state commits.
+        cleanup_error = repr(exc)[:800]
+        invalidation = {"quarantine": runtime.get("last_quarantined_dispatch")}
+    finally:
+        if exhausted:
+            exhaust_supervisor_retry_budget(
+                runtime, reason, event, pending.get("last_error")
+            )
+    if cleanup_error is not None:
+        log(
+            "Dispatch repair also exhausted after final invalid Supervisor result",
+            reason=reason,
+            error=cleanup_error,
+            quarantine=invalidation.get("quarantine"),
+        )
+    log(
+        ("Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized"
+         if exhausted else
+         "Supervisor result had no eligible committed decision; next turn retained"),
+        reason=reason,
+        quarantine=invalidation.get("quarantine"),
+    )
+
+
+def record_supervisor_decision_attempt(runtime: dict, reason: str,
+                                       event: dict | None) -> dict:
+    """Increment the durable budget immediately before the external model call."""
+    fresh = load_runtime()
+    pending = fresh.get("pending_supervisor_event")
+    if not isinstance(pending, dict) or not _same_supervisor_invocation(
+            pending, reason, event):
+        raise RuntimeError("durable Supervisor event changed before model invocation")
+    pending["decision_attempts"] = int(pending.get("decision_attempts", 0) or 0) + 1
+    pending["last_attempt_at"] = stamp()
+    fresh["pending_supervisor_event"] = pending
+    save_runtime(fresh)
+    runtime.clear()
+    runtime.update(fresh)
+    return pending
+
+
 def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
+    pending_invocation = persist_supervisor_event(runtime, reason, event)
+    reason = str(pending_invocation.get("reason") or "SUPERVISOR_TURN")
+    event = (pending_invocation.get("event")
+             if isinstance(pending_invocation.get("event"), dict) else None)
     state_before = read_project_state()
+    control = _supervisor_control_helper()
+    if _supervisor_invocation_blocked(runtime, state_before, pending_invocation):
+        log("Supervisor invocation retained but blocked by lifecycle guard",
+            reason=reason, project_status=state_before.get("status"))
+        return
+    if int(pending_invocation.get("decision_attempts", 0) or 0) >= MAX_SUPERVISOR_DECISION_ATTEMPTS:
+        exhaust_supervisor_retry_budget(
+            runtime, reason, event, pending_invocation.get("last_error")
+        )
+        return
+    if control.pause_status(ROOT) != "RUNNING":
+        runtime["status"] = "PAUSED"
+        save_runtime(runtime)
+        log("Supervisor turn deferred because Runtime is paused", reason=reason)
+        return
+    try:
+        control_turn = control.begin_supervisor_turn(
+            ROOT, _active_project_id(), {"reason": reason, "event": event})
+    except control.ControlError as exc:
+        if "paused" in str(exc).lower():
+            runtime["status"] = "PAUSED"
+            save_runtime(runtime)
+            log("Supervisor turn deferred at atomic turn boundary because Runtime is paused",
+                reason=reason)
+            return
+        raise
     # A Supervisor turn may replace current_task or change lifecycle state. Fence
     # any unfinished Executor before that external writer starts; never hold the
     # publication lock across a model invocation.
     with _fence_helper().runtime_lock(ROOT):
+        fresh_runtime = load_runtime()
+        runtime.clear()
+        runtime.update(fresh_runtime)
         authorized = runtime.get("authorized_dispatch")
         if isinstance(authorized, dict):
-            retire_executor(runtime, authorized, "SUPERVISOR_TURN")
-            save_runtime(runtime)
+            # A committed completion owns this race and must remain normal
+            # consume/seal history; only unfinished authorization is revoked when
+            # a new Supervisor writer begins.
+            completion_exists = any(
+                task_identity_matches(entry, authorized)
+                for entry in _completion_helper().lookup_entries(
+                    ROOT, int(task_value(authorized, "MESSAGE_ID") or -1)
+                )
+            )
+            if not completion_exists:
+                retire_executor(runtime, authorized, "SUPERVISOR_TURN")
+                save_runtime(runtime)
     # GOAL-ANCHOR-V1: every Supervisor invocation path re-reads the canonical goal
     # from disk and verifies its bound SHA-256 before prompt construction; an
     # unverified goal state halts the turn with no prompt, decision, or dispatch.
     if not goal_anchor_gate(runtime, state_before):
+        control.finish_supervisor_turn(ROOT, control_turn, processed=False)
         return
     codex = find_codex()
     human_decision_turn = reason == "HUMAN_DECISION_RESUME"
@@ -3517,7 +4024,9 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         event,
         state_before,
         state_sha256=state_sha_before,
+        control_turn=control_turn,
     )  # G1-A: goal_file aware
+    pending_invocation = record_supervisor_decision_attempt(runtime, reason, event)
     started = time.monotonic()
     log("Starting Codex supervisor turn", reason=reason)
     effort = supervisor_effort(state_before, reason)
@@ -3590,6 +4099,30 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         )
     else:
         state = read_project_state()
+    # The model completed one decision with the snapshotted interventions. Mark
+    # those inputs consumed, then invalidate any candidate if a human action raced
+    # this invocation. A second check inside registration closes the smaller
+    # post-check/pre-authorization window.
+    retry_control_turn = control.finish_supervisor_turn(
+        ROOT, control_turn, processed=True,
+        candidate_validator=validate_supervisor_candidate_snapshot,
+    )
+    fresh_runtime = load_runtime()
+    runtime.clear()
+    runtime.update(fresh_runtime)
+    if retry_control_turn:
+        result = control.load_control(ROOT).get("last_supervisor_turn_result") or {}
+        finalize_supervisor_retry_result(runtime, reason, event, result)
+        return
+    pending_supervisor = runtime.get("pending_supervisor_event")
+    if (isinstance(pending_supervisor, dict)
+            and pending_supervisor.get("reason") == reason
+            and pending_supervisor.get("event") == event):
+        runtime["pending_supervisor_event"] = None
+        save_runtime(runtime)
+    if runtime.get("paused_deferred_event") == event:
+        runtime["paused_deferred_event"] = None
+        save_runtime(runtime)
     log("Codex supervisor turn finished", reason=reason, elapsed_seconds=elapsed, project_status=state.get("status"))
     # RICH-CONSOLE-UX: concise Supervisor decision feedback (presentation only).
     last_decision = state.get("last_supervisor_decision")
@@ -3619,8 +4152,23 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         if not goal_anchor_gate(runtime, state):
             return
         try:
-            task = register_dispatched_task(runtime, state, allow_same_identity=False)
+            task = register_dispatched_task(
+                runtime,
+                state,
+                allow_same_identity=False,
+                expected_control_revision=control_turn["revision"],
+            )
         except RuntimeError as exc:
+            if "control revision changed before authorization" in str(exc):
+                invalidation = control.invalidate_candidate(
+                    ROOT, "STALE_SUPERVISOR_CONTROL_REVISION"
+                )
+                log(
+                    "Supervisor candidate invalidated before authorization",
+                    reason=reason,
+                    quarantine=invalidation.get("quarantine"),
+                )
+                return
             if "same task identity" in str(exc):
                 try:
                     state_unchanged = state_sha_before is not None and sha256(PROJECT_STATE) == state_sha_before
@@ -4270,6 +4818,15 @@ def main() -> int:
         # must not overwrite the former owner's retirement or pending timeout.
         runtime = load_runtime()
         activate_project_scope()  # G3: validated scope read under ownership too
+        _supervisor_control_helper().initialize_control_plane(ROOT)
+        recovered_turn = _supervisor_control_helper().reconcile_inflight_turn(
+            ROOT, candidate_validator=validate_startup_candidate_snapshot
+        )
+        if recovered_turn:
+            log("Recovered interrupted Supervisor control transaction", **recovered_turn)
+        # Recovery/control commands may have advanced monotonic Runtime fields while
+        # the initial snapshot was being acquired. Continue from the fresh merge.
+        runtime = load_runtime()
     except BaseException:
         release_lock()
         raise
@@ -4278,6 +4835,20 @@ def main() -> int:
         runtime["status"] = "RUNNING"
         save_runtime(runtime)
         log("Orchestrator v2 started")
+        if recovered_turn and recovered_turn.get("candidate_validation_failed"):
+            pending = runtime.get("pending_supervisor_event")
+            if not isinstance(pending, dict):
+                raise RuntimeError(
+                    "invalid recovered Supervisor candidate has no durable retry event"
+                )
+            pending_event = (pending.get("event")
+                             if isinstance(pending.get("event"), dict) else None)
+            finalize_supervisor_retry_result(
+                runtime,
+                str(pending.get("reason") or "SUPERVISOR_TURN"),
+                pending_event,
+                recovered_turn,
+            )
         # Honor hard pause/stop conditions before any model invocation.
         state = read_project_state()
         if STOP_FLAG.exists():
@@ -4286,12 +4857,77 @@ def main() -> int:
             log("control/STOP detected before startup; Codex was not invoked")
             emit_user_notification(runtime, "STOPPED_BY_USER", state)
             return 2
+        if state.get("status") == "STOPPED":
+            runtime["status"] = "STOPPED"
+            save_runtime(runtime)
+            log("Project is terminal STOPPED before startup; Codex was not invoked")
+            emit_user_notification(runtime, "STOPPED", state)
+            return 5
         if HUMAN_REVIEW_FLAG.exists() or state.get("status") == "HUMAN_REVIEW":
             runtime["status"] = "HUMAN_REVIEW"
             save_runtime(runtime)
             log("Human review present before startup; Codex was not invoked")
             emit_user_notification(runtime, "HUMAN_REVIEW", state)
             return 3
+        control = _supervisor_control_helper()
+        startup_paused = control.pause_status(ROOT) != "RUNNING"
+        # Repair completion-derived state before deciding whether a historical
+        # permanent claim represents active work.
+        reconcile_completion_ledger(runtime, state)
+        state = read_project_state()
+        if startup_paused:
+            status_view = control.current_status(ROOT)
+            if (state.get("status") == "WAITING_EXECUTOR"
+                    and status_view.get("active_task_completion_status") in {
+                        _completion_helper().STATUS_COMMITTED,
+                        _completion_helper().STATUS_CONSUMED,
+                    }):
+                if status_view.get("active_task_completion_status") == _completion_helper().STATUS_COMMITTED:
+                    _, deferred = consume_executor_receipt(runtime)
+                else:
+                    deferred = replay_consumed_receipt_event(
+                        runtime, state.get("current_task") or {}, state
+                    )
+                if deferred is not None:
+                    runtime["paused_deferred_event"] = deferred
+                    runtime["status"] = "PAUSED"
+                    save_runtime(runtime)
+                    control.settle_pause(ROOT, "CURRENT_STAGE_COMPLETED_AT_STARTUP")
+                    log("Recovered completed paused stage; Supervisor event deferred",
+                        message_id=deferred.get("message_id"))
+                    return 6
+            if not (
+                state.get("status") == "WAITING_EXECUTOR"
+                and status_view.get("active_task_claimed")
+            ):
+                control.settle_pause(ROOT, "PAUSED_AT_STARTUP")
+                runtime["status"] = "PAUSED"
+                save_runtime(runtime)
+                log("Runtime is paused; no Supervisor or Executor stage started")
+                return 6
+
+        # FINAL-RECHECK-N1: completion truth precedes candidate freshness at
+        # restart.  An ordinary intervention may advance the control revision
+        # while an already-owned task finishes; that revision belongs to the next
+        # Supervisor boundary and must not turn the committed result into a stale
+        # candidate repair.  Fresh candidates still take the normal registration
+        # path below and retain every revision check.
+        startup_completion_handled = False
+        if (not startup_paused
+                and authoritative_committed_completion_for_current(runtime, state) is not None):
+            signal_seen, completion_event = consume_executor_receipt(runtime)
+            if not signal_seen or completion_event is None:
+                raise RuntimeError(
+                    "Authoritative committed completion could not be recovered at startup"
+                )
+            log(
+                "Committed owned completion recovered before startup dispatch registration",
+                message_id=completion_event.get("message_id"),
+            )
+            invoke_codex(runtime, "EXECUTOR_RESULT_READY", completion_event)
+            seal_completions(runtime, read_project_state())
+            state = read_project_state()
+            startup_completion_handled = True
         if hard_runtime_deadline(state):
             runtime["status"] = "DEADLINE_REACHED"
             save_runtime(runtime)
@@ -4304,15 +4940,56 @@ def main() -> int:
             invoke_codex(runtime, "FINAL_VERIFICATION_GATE_REQUIRED", gate_event)
             state = read_project_state()
 
-        # COMPLETION-SEAL-V1: repair derived state from the authoritative completion
-        # ledger before any lifecycle branch runs (pointer recovery, artifact repair,
-        # sealing of decisions already past). The ledger is the source of truth.
-        reconcile_completion_ledger(runtime, state)
-        state = read_project_state()
+        if state.get("status") in {"COMPLETE", "BLOCKED", "STOPPED"}:
+            terminal_status = state.get("status")
+            runtime["status"] = terminal_status
+            save_runtime(runtime)
+            emit_user_notification(runtime, terminal_status, state)
+            return 0 if terminal_status == "COMPLETE" else 5
+
+        # COMPLETION-SEAL-V1 reconciliation above is the source-of-truth repair.
 
         # Startup is lifecycle-aware. A restart while WAITING_EXECUTOR must never spend a
         # second Supervisor turn or duplicate-dispatch the stage that is already in flight.
-        if state.get("status") == "SUPERVISOR_TURN":
+        pending_supervisor = runtime.get("pending_supervisor_event")
+        pending_handled = False
+        if (not startup_paused and not startup_completion_handled
+                and isinstance(pending_supervisor, dict)):
+            pending_event = (pending_supervisor.get("event")
+                             if isinstance(pending_supervisor.get("event"), dict) else None)
+            invoke_codex(
+                runtime,
+                str(pending_supervisor.get("reason") or "SUPERVISOR_TURN"),
+                pending_event,
+            )
+            if isinstance(pending_event, dict) and pending_event.get("type") == "EXECUTOR_RESULT_READY":
+                seal_completions(runtime, read_project_state())
+            state = read_project_state()
+            pending_handled = True
+        deferred = runtime.get("paused_deferred_event")
+        deferred_handled = False
+        if (not startup_paused and not startup_completion_handled
+                and not pending_handled and isinstance(deferred, dict)
+                and state.get("status") == "WAITING_EXECUTOR"
+                and deferred.get("message_id") == task_value(
+                    state.get("current_task") or {}, "MESSAGE_ID"
+                )):
+            invoke_codex(runtime, str(deferred.get("type") or "EXECUTOR_RESULT_READY"), deferred)
+            if deferred.get("type") == "EXECUTOR_RESULT_READY":
+                seal_completions(runtime, read_project_state())
+            after = read_project_state()
+            if (after.get("status") != "WAITING_EXECUTOR"
+                    or task_value(after.get("current_task") or {}, "MESSAGE_ID")
+                    != deferred.get("message_id")):
+                runtime["paused_deferred_event"] = None
+                save_runtime(runtime)
+            deferred_handled = True
+            state = after
+        if startup_paused:
+            log("Safe pause is waiting for the already-claimed Executor stage")
+        elif startup_completion_handled or deferred_handled or pending_handled:
+            pass
+        elif state.get("status") == "SUPERVISOR_TURN":
             resume_event = human_decision_resume_event(state)
             if resume_event is not None:
                 invoke_codex(runtime, "HUMAN_DECISION_RESUME", resume_event)
@@ -4379,6 +5056,58 @@ def main() -> int:
                 emit_user_notification(runtime, "HUMAN_REVIEW", state)
                 return 3
 
+            if state.get("status") == "STOPPED":
+                runtime["status"] = "STOPPED"
+                save_runtime(runtime)
+                log("Project reached terminal STOPPED; pending Supervisor events retained")
+                emit_user_notification(runtime, "STOPPED", state)
+                return 5
+
+            pause_state = control.pause_status(ROOT)
+            if pause_state != "RUNNING":
+                # A safe pause does not revoke an already-claimed valid attempt.
+                # Continue polling only long enough to consume its authoritative
+                # completion, then defer the next Supervisor turn until resume.
+                if state.get("status") == "WAITING_EXECUTOR":
+                    signal_seen, deferred_event = consume_executor_receipt(runtime)
+                    if deferred_event:
+                        control.settle_pause(ROOT, "CURRENT_STAGE_COMPLETED")
+                        runtime["status"] = "PAUSED"
+                        runtime["paused_deferred_event"] = deferred_event
+                        save_runtime(runtime)
+                        log(
+                            "Current Executor stage completed; next Supervisor turn deferred by pause",
+                            message_id=deferred_event.get("message_id"),
+                        )
+                        return 6
+                    if signal_seen:
+                        time.sleep(POLL_SECONDS)
+                        continue
+                    paused_view = control.current_status(ROOT)
+                    if paused_view.get("active_task_claimed"):
+                        paused_timeout = executor_timeout_event(runtime, state)
+                        if paused_timeout:
+                            control.invalidate_candidate(
+                                ROOT, "EXECUTOR_TIMEOUT_DURING_PAUSE"
+                            )
+                            control.settle_pause(ROOT, "CURRENT_STAGE_TIMED_OUT")
+                            runtime["status"] = "PAUSED"
+                            save_runtime(runtime)
+                            log(
+                                "Claimed Executor stage timed out while pause was pending",
+                                message_id=paused_timeout.get("message_id"),
+                            )
+                            return 6
+                        runtime["status"] = "PAUSE_PENDING_AFTER_CURRENT_STAGE"
+                        save_runtime(runtime)
+                        time.sleep(POLL_SECONDS)
+                        continue
+                control.settle_pause(ROOT, "PAUSED_BEFORE_NEXT_STAGE")
+                runtime["status"] = "PAUSED"
+                save_runtime(runtime)
+                log("Runtime paused before the next Supervisor/Executor stage")
+                return 6
+
             if hard_runtime_deadline(state):
                 runtime["status"] = "DEADLINE_REACHED"
                 save_runtime(runtime)
@@ -4398,6 +5127,16 @@ def main() -> int:
                 log("Project reached terminal state", project_status=terminal_status, infrastructure_status=state.get("infrastructure_status"))
                 emit_user_notification(runtime, terminal_status, state)
                 return 0 if terminal_status == "COMPLETE" else 5
+
+            pending_supervisor = runtime.get("pending_supervisor_event")
+            if isinstance(pending_supervisor, dict):
+                invoke_codex(
+                    runtime,
+                    str(pending_supervisor.get("reason") or "SUPERVISOR_TURN"),
+                    pending_supervisor.get("event")
+                    if isinstance(pending_supervisor.get("event"), dict) else None,
+                )
+                continue
 
             signal_seen, event = consume_executor_receipt(runtime)
             if event:

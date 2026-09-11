@@ -6,6 +6,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import executor_claim as c
+import supervisor_control as sc
 
 with tempfile.TemporaryDirectory() as td:
     root = Path(td)
@@ -30,8 +31,28 @@ with tempfile.TemporaryDirectory() as td:
         "TO_ZCODE_SHA256": hashlib.sha256((root / "TO_ZCODE.md").read_bytes()).hexdigest(),
         "AUTHORIZED_AT": c.now_iso(),
     }
+    origin = {"originating_control_revision": 0,
+              "supervisor_turn_id": "test-turn-700006",
+              "decision_receipt_sha256": "a" * 64}
+    binding = sc.archive_dispatch(root, None, task, (root / "TO_ZCODE.md").read_bytes(),
+                                  origin=origin)
+    auth.update({
+        "PROJECT_ID": None, "FENCE_VERSION": 1,
+        "EXPIRES_AT": "2099-01-01T00:00:00+00:00",
+        "SUPERVISOR_CONTROL_ORIGIN": origin,
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            key: binding[key] for key in ("schema_version", "metadata_file", "archive_file",
+                                           "authorization_file", "dispatch_sha256")
+        },
+    })
+    sc.seal_dispatch_authorization(root, auth)
+    (root / "control" / "project_state.json").write_text(json.dumps({
+        "status": "WAITING_EXECUTOR",
+        "current_task": {key: task[key] for key in c.IDENTITY_KEYS},
+    }), encoding="utf-8")
     (root / "control" / "orchestrator_runtime.json").write_text(
-        json.dumps({"authorized_dispatch": auth, "retired_message_ids": []}),
+        json.dumps({"status": "RUNNING", "authorized_dispatch": auth,
+                    "retired_message_ids": []}),
         encoding="utf-8",
     )
     first = c.acquire(root, 700006, "PET", "DISCOVERY", 1, "same-nonce")

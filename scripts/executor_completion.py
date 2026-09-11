@@ -705,6 +705,13 @@ def commit(root: Path, staging_dir: Path, *, claim_token=None) -> int:
 
 def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
     root = Path(root).resolve()
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import supervisor_control
+    # An accepted intervention journal is an authority barrier even if its
+    # submitter crashed before advancing the control revision/retirement record.
+    supervisor_control.reconcile_control_transactions_locked(root)
     project_id, project_root = resolve_active_project(root)
     if project_id is None:
         project_root = root

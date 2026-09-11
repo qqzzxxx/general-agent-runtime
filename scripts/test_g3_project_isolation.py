@@ -23,6 +23,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import supervisor_control as supervisor_helper
 CHAOS_TOOLS = LAB / "audit" / "tools"
 PRE_G3 = LAB / "audit" / "implementation_g3" / "pre_g3_orchestrator.py"  # the G2 build
 
@@ -67,6 +68,31 @@ def norm(text):
 
 def wire(value):
     return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2) + "\n```\n"
+
+
+def archived_authorization(root, identity, data, project_id=None):
+    """Create a tokenless completion-test authorization with a real v1.2 archive."""
+    origin = {
+        "originating_control_revision": supervisor_helper.load_control(root)["revision"],
+        "supervisor_turn_id": f"fixture-{identity['MESSAGE_ID']}-{identity['NONCE']}",
+        "decision_receipt_sha256": hashlib.sha256(data + b"fixture-origin").hexdigest(),
+    }
+    binding = supervisor_helper.archive_dispatch(
+        root, project_id, identity, data, origin=origin)
+    authorization = {
+        "schema_version": 1, **identity,
+        "TO_ZCODE_SHA256": hashlib.sha256(data).hexdigest(),
+        "PROJECT_ID": project_id,
+        "AUTHORIZED_AT": "2030-01-01T00:00:00+00:00",
+        "SUPERVISOR_CONTROL_ORIGIN": origin,
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            key: binding[key] for key in (
+                "schema_version", "metadata_file", "archive_file",
+                "authorization_file", "dispatch_sha256")
+        },
+    }
+    supervisor_helper.seal_dispatch_authorization(root, authorization)
+    return authorization
 
 
 class G3Base(unittest.TestCase):
@@ -329,13 +355,10 @@ class G3IsolationTests(G3Base):
         }
         wire_text = wire(task)
         (self.root / "TO_ZCODE.md").write_text(wire_text, encoding="utf-8")
-        authorization = {
-            "schema_version": 1,
-            **{key: task[key] for key in ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE")},
-            "TO_ZCODE_SHA256": hashlib.sha256(
-                (self.root / "TO_ZCODE.md").read_bytes()).hexdigest(),
-            "AUTHORIZED_AT": "2030-01-01T00:00:00+00:00",
-        }
+        identity = {key: task[key] for key in
+                    ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE")}
+        authorization = archived_authorization(
+            self.root, identity, (self.root / "TO_ZCODE.md").read_bytes())
         (self.root / "control" / "orchestrator_runtime.json").write_text(
             json.dumps({"authorized_dispatch": authorization, "retired_message_ids": []}),
             encoding="utf-8",
@@ -350,7 +373,8 @@ class G3IsolationTests(G3Base):
         self.assertEqual(len(list(claim_dir.iterdir())), 1)  # ROOT\handoff\executor_claims
         src = (CANDIDATE / "scripts" / "executor_claim.py").read_text(encoding="utf-8")
         self.assertIn("os.mkdir(path)", src)
-        self.assertNotIn("PROJECT_ID", src)  # claim ownership untouched
+        self.assertIn("SUPERVISOR_DISPATCH_ARCHIVE", src)
+        self.assertIn("PROJECT_ID", src)  # archive authorization is project-bound in v1.2
 
 
 class G3RecoveryTests(G3Base):
@@ -383,11 +407,8 @@ class G3RecoveryTests(G3Base):
         (self.root / "TO_ZCODE.md").write_text(wire(payload), encoding="utf-8")
         runtime_path = self.root / "control" / "orchestrator_runtime.json"
         runtime_disk = json.loads(runtime_path.read_text(encoding="utf-8-sig")) if runtime_path.exists() else {}
-        runtime_disk["authorized_dispatch"] = {
-            "schema_version": 1, **identity,
-            "TO_ZCODE_SHA256": hashlib.sha256((self.root / "TO_ZCODE.md").read_bytes()).hexdigest(),
-            "AUTHORIZED_AT": "2030-01-01T00:00:00+00:00",
-        }
+        runtime_disk["authorized_dispatch"] = archived_authorization(
+            self.root, identity, (self.root / "TO_ZCODE.md").read_bytes(), pid)
         runtime_path.write_text(json.dumps(runtime_disk), encoding="utf-8")
         self.assertEqual(
             claim_helper.acquire(self.root, identity["MESSAGE_ID"], identity["TASK_ID"],

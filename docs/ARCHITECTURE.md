@@ -50,6 +50,61 @@ identity field before work starts. Consequences:
 - a modified inbox never matches (no executor-side task injection);
 - a consumed message id or reused identity is rejected permanently.
 
+## Supervisor control plane (v1.2)
+
+`SUPERVISOR-DISPATCH-ARCHIVE-V1` runs inside the same fence-serialized registration
+as authorization. After mechanical validation, Runtime Core writes the exact
+`TO_ZCODE.md` bytes and self-describing metadata under
+`handoff/supervisor_dispatch_archive/<project>/`; only then does it save the
+authorization record. The claim helper verifies the archive identity and the same
+SHA-256 bound to the inbox, plus the authorization seal and current Supervisor origin
+revision. Same identity/same bytes is idempotent; same project and
+`MESSAGE_ID` with a different identity or hash fails closed. Rejected candidates
+remain quarantine records and never enter the authorized archive.
+
+There is no archive-less acquisition compatibility mode. An unclaimed legacy
+authorization is rejected. An explicitly re-registered dispatch receives a durable
+origin receipt, exact archive, and seal before it can be claimed. Only a matching
+permanent claim that already existed before upgrade can use the fenced legacy
+completion-only recovery path; the historical claim alone is not treated as active
+after its completion is committed, consumed, or sealed.
+
+Human Supervisor interventions are immutable inputs under
+`handoff/supervisor_interventions/<project>/`. Mutable delivery status is separate
+from the original bytes. Submission uses a recoverable transaction journal containing
+the exact instruction bytes and intended revision; every fence authority path
+reconciles an accepted but partially applied transaction before proceeding. A
+monotonically increasing control revision binds every
+Supervisor invocation: a pause or intervention arriving after prompt construction
+invalidates and quarantines the unseen candidate before it can become claimable.
+Interventions that arrive while an already-claimed attempt is running wait for the
+next Supervisor decision unless the operator explicitly requests Runtime-level
+revocation. Historical targets are correction anchors; dispatch/completion history
+is never rewritten and repair work always uses a fresh `MESSAGE_ID`.
+
+Supervisor output is also a transaction boundary. A turn is accepted only when it
+appends exactly one decision-history entry, commits a valid lifecycle state, and—when
+dispatching—binds the exact candidate identity/hash. Runtime stores a decision receipt
+before marking its interventions consumed. Recovery either finishes that validated
+decision or requeues the inputs; process success alone has no authority.
+
+Pause is separate from STOP and HUMAN_REVIEW. Idle or unclaimed work reaches
+`PAUSED` immediately (an unclaimed dispatch is retired); an already-claimed stage
+may finish under safe pause, after which its authoritative completion is consumed
+and the next Supervisor decision is deferred until resume. Interrupt mode retires
+the current identity so fence checkpoints revoke its Runtime authority; it is not
+an OS process kill. Ordering is fence-deterministic: a previously committed completion
+wins and remains deliverable, while a retirement committed first prevents a later
+completion commit. The pause record carries a recoverable transaction until required
+retirement and lifecycle writes are durable, so a crash at the pause commit boundary
+does not reverse that ordering.
+
+The read-only task, feedback, intervention, status, and combined-timeline queries
+and all mutations have JSON forms in `scripts/supervisor_control.py`. This is the
+stable backend boundary intended for a later v1.3 browser console. JSON commands emit
+one ASCII-escaped JSON document on stdout so redirected output remains parseable under
+Windows PowerShell 5 code pages; wrapper lifecycle text is emitted separately.
+
 ## Concurrency and instance isolation
 
 - **Executor claims** — `scripts/executor_claim.py` acquires a permanent claim under

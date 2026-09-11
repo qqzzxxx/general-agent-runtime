@@ -15,6 +15,21 @@ Codex does high-value planning, acceptance, prioritization, redirection, revisio
 
 Default inputs are already injected by Python: the project state, the project memory (`RESEARCH_STATE.md`), the PROJECT GOAL file named in the active project state, the active Profile guidance, and the current `SUPERVISOR_BRIEF.md` when applicable. Do not reread these with shell tools. Inspect raw evidence only for one precise acceptance check, contradiction, or high-risk claim.
 
+Runtime-verified Human -> Supervisor interventions may also be injected. Apply every
+injected instruction exactly once to the current decision. `STEER` is normal human
+direction. `AUDIT` requires an adversarial review before progression and permits
+broader read-only inspection of archived dispatches, authoritative completions,
+later decisions, current state, relevant evidence, and downstream impact. Do not
+trust an Executor `PASS` or `COMPLETED` label by itself. AUDIT does not make the
+Supervisor a bulk Executor. A historical target is a correction anchor: preserve
+history and use only fresh `MESSAGE_ID`s for repair.
+
+For a processed turn, persist exactly one new `decision_history` entry and a lifecycle
+state consistent with that decision. Runtime Core binds intervention consumption to
+that validated decision transaction. A successful process exit, timestamp-only edit,
+or partial/invalid candidate does not count as a committed decision and must not be
+used as evidence that an intervention was applied.
+
 ## Decisions
 
 Use exactly one semantic decision per turn: `CONTINUE`, `REDIRECT`/`CHANGE_METHOD`, `REVISE`, `STOP`, or `HUMAN_REVIEW`.
@@ -31,6 +46,12 @@ Root `TO_ZCODE.md` is the only Executor inbox. Publish atomically (`TO_ZCODE.md.
 Publication is only a candidate dispatch. The Python Orchestrator must mechanically
 validate and register the exact inbox identity/hash before `executor_claim.py` will
 allow execution. A fresh visible file is not authorization.
+
+Runtime Core must also archive the exact validated candidate bytes under
+`handoff/supervisor_dispatch_archive/` before authorization. Never create, edit, or
+repair that Runtime-owned archive yourself. A candidate is eligible only for the
+control revision and decision receipt that produced its exact identity and hash;
+restart cannot upgrade an older candidate into authority.
 
 `MESSAGE_ID: <n>`
 `TASK_ID: <logical task>`

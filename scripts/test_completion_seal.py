@@ -40,6 +40,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import supervisor_control as supervisor_control
 import resume_human_review as resume_module
 
 
@@ -129,6 +130,22 @@ class CompletionSealTests(unittest.TestCase):
             "TO_ZCODE_SHA256": hashlib.sha256((self.root / "TO_ZCODE.md").read_bytes()).hexdigest(),
             "AUTHORIZED_AT": "2030-01-01T00:00:00+00:00",
         }
+        origin = {"originating_control_revision": 0,
+                  "supervisor_turn_id": f"completion-fixture-{message_id}",
+                  "decision_receipt_sha256": "a" * 64}
+        binding = supervisor_control.archive_dispatch(
+            self.root, self.PROJECT_ID, task,
+            (self.root / "TO_ZCODE.md").read_bytes(), origin=origin)
+        authorization.update({
+            "PROJECT_ID": self.PROJECT_ID,
+            "SUPERVISOR_CONTROL_ORIGIN": origin,
+            "SUPERVISOR_DISPATCH_ARCHIVE": {
+                key: binding[key] for key in ("schema_version", "metadata_file",
+                                               "archive_file", "authorization_file",
+                                               "dispatch_sha256")
+            },
+        })
+        supervisor_control.seal_dispatch_authorization(self.root, authorization)
         if fv:
             authorization["IS_FINAL_VERIFICATION"] = True
             authorization["FINAL_VERIFICATION_GATE"] = task["FINAL_VERIFICATION_GATE"]

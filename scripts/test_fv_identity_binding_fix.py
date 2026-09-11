@@ -30,6 +30,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import supervisor_control as supervisor_helper
 
 
 def load(name, path):
@@ -44,6 +45,31 @@ o = load("fv_identity_binding_orchestrator", CANDIDATE / "orchestrator.py")
 
 def wire(value):
     return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2) + "\n```\n"
+
+
+def archived_authorization(root, identity, data, project_id=None):
+    """Create a tokenless compatibility authorization with a real v1.2 archive."""
+    origin = {
+        "originating_control_revision": supervisor_helper.load_control(root)["revision"],
+        "supervisor_turn_id": f"fixture-{identity['MESSAGE_ID']}-{identity['NONCE']}",
+        "decision_receipt_sha256": hashlib.sha256(data + b"fixture-origin").hexdigest(),
+    }
+    binding = supervisor_helper.archive_dispatch(
+        root, project_id, identity, data, origin=origin)
+    authorization = {
+        "schema_version": 1, **identity,
+        "TO_ZCODE_SHA256": hashlib.sha256(data).hexdigest(),
+        "PROJECT_ID": project_id,
+        "AUTHORIZED_AT": o.stamp(),
+        "SUPERVISOR_CONTROL_ORIGIN": origin,
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            key: binding[key] for key in (
+                "schema_version", "metadata_file", "archive_file",
+                "authorization_file", "dispatch_sha256")
+        },
+    }
+    supervisor_helper.seal_dispatch_authorization(root, authorization)
+    return authorization
 
 
 def claim(cid, ctype):
@@ -573,12 +599,11 @@ class FVIdentityBindingTests(unittest.TestCase):
         # current_task mirror. The completion commit chain still applies.
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(task))
-        self.runtime["authorized_dispatch"] = {
-            "schema_version": 1,
-            **{key: task[key] for key in o.IDENTITY_KEYS},
-            "TO_ZCODE_SHA256": hashlib.sha256(o.TO_ZCODE.read_bytes()).hexdigest(),
-            "AUTHORIZED_AT": o.stamp(),
-        }
+        self.runtime["authorized_dispatch"] = archived_authorization(
+            o.ROOT,
+            {key: task[key] for key in o.IDENTITY_KEYS},
+            o.TO_ZCODE.read_bytes(),
+        )
         o.atomic_json(o.RUNTIME_STATE, self.runtime)
         consumed, event, brief_hash = self.publish_receipt_and_consume(
             task, self.receipt(task)

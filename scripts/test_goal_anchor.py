@@ -350,7 +350,7 @@ class DispatchAuthorizationTests(GoalAnchorFixture):
         self.assertIsNone(state["current_task"])
         self.assertIsNone(self.read_runtime_file().get("authorized_dispatch"))
 
-    def test_startup_reauthorization_proceeds_with_verified_goal(self):
+    def test_explicit_reregistration_then_startup_recovery_proceeds_with_verified_goal(self):
         class WaitOnceView:
             def __getattr__(self, name):
                 return lambda *a, **k: None
@@ -365,6 +365,9 @@ class DispatchAuthorizationTests(GoalAnchorFixture):
         runtime["last_dispatched_message_id"] = 700100
         runtime["last_dispatched_nonce"] = "nonce-goal-anchor-1"
         self.m.atomic_json(self.m.RUNTIME_STATE, runtime)
+        # Startup itself must not mint authority for provenance-free bytes.
+        # Explicit migration/re-registration creates the durable v1.2 origin.
+        self.m.register_dispatched_task(runtime, self.read_state(), allow_same_identity=True)
         with patch.object(self.m, "_view", lambda: WaitOnceView()):
             # waiting_tick raises KeyboardInterrupt; main() catches it and exits 130.
             self.assertEqual(self.m.main(), 130)

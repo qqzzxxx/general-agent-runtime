@@ -16,6 +16,20 @@ Use `START_AGENT_SYSTEM.ps1` from the project folder. It refuses to start if ano
 
 Create `control/STOP` (or use `STOP_AGENT_SYSTEM.ps1`). A real STOP is checked before any new Codex call and is terminal for the running orchestrator.
 
+`supervisor_control.py` is the reusable v1.2 operator/control-plane API. Its
+subcommands expose JSON-capable status, exact Supervisor dispatch history,
+authoritative Executor feedback, a combined timeline, immutable interventions,
+pause, and resume. Root PowerShell wrappers are the normal operator entry points;
+future UI code should call the structured operations instead of scraping display text.
+JSON mode is a strict machine interface: stdout is one ASCII-escaped JSON document,
+while human lifecycle/start messages use a separate stream. Task queries validate the
+full archive/seal trust boundary and report `AUTHORIZED_VALID`, `UNAUTHORIZED`,
+`INCOMPLETE`, or `CORRUPT` without repairing records.
+
+New claims always require a valid v1.2 dispatch archive and authorization seal.
+Archive-less pre-upgrade metadata is not upgraded implicitly; only a task that already
+owns its permanent claim can use the completion-only legacy recovery path.
+
 ## Resume HUMAN_REVIEW
 
 Do not edit `project_state.json` and do not invent an approval token. Copy

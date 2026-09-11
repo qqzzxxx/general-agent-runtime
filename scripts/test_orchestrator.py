@@ -12,6 +12,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import supervisor_control as supervisor_helper
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "orchestrator.py"
 spec = importlib.util.spec_from_file_location("orchestrator_v2", MODULE_PATH)
@@ -21,6 +22,31 @@ spec.loader.exec_module(o)
 
 def wire(value):
     return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2) + "\n```\n"
+
+
+def archived_authorization(root, identity, data, project_id=None):
+    """Create a tokenless completion-test authorization with a real v1.2 archive."""
+    origin = {
+        "originating_control_revision": supervisor_helper.load_control(root)["revision"],
+        "supervisor_turn_id": f"fixture-{identity['MESSAGE_ID']}-{identity['NONCE']}",
+        "decision_receipt_sha256": hashlib.sha256(data + b"fixture-origin").hexdigest(),
+    }
+    binding = supervisor_helper.archive_dispatch(
+        root, project_id, identity, data, origin=origin)
+    authorization = {
+        "schema_version": 1, **identity,
+        "TO_ZCODE_SHA256": hashlib.sha256(data).hexdigest(),
+        "PROJECT_ID": project_id,
+        "AUTHORIZED_AT": o.stamp(),
+        "SUPERVISOR_CONTROL_ORIGIN": origin,
+        "SUPERVISOR_DISPATCH_ARCHIVE": {
+            key: binding[key] for key in (
+                "schema_version", "metadata_file", "archive_file",
+                "authorization_file", "dispatch_sha256")
+        },
+    }
+    supervisor_helper.seal_dispatch_authorization(root, authorization)
+    return authorization
 
 
 class OrchestratorMechanicalTests(unittest.TestCase):
@@ -133,16 +159,12 @@ class OrchestratorMechanicalTests(unittest.TestCase):
         brief.update(changes)
         payload = {"PROTOCOL_VERSION": 2, **identity, "OBJECTIVE": "fixture", "OUTPUTS": []}
         o.atomic_write(o.TO_ZCODE, wire(payload))
+        authorization = archived_authorization(o.ROOT, identity, o.TO_ZCODE.read_bytes())
         o.atomic_json(o.RUNTIME_STATE, {
-            "authorized_dispatch": {
-                "schema_version": 1,
-                **identity,
-                "TO_ZCODE_SHA256": hashlib.sha256(o.TO_ZCODE.read_bytes()).hexdigest(),
-                "AUTHORIZED_AT": o.stamp(),
-            },
+            "authorized_dispatch": authorization,
             "retired_message_ids": [],
         })
-        self.runtime["authorized_dispatch"] = {"schema_version": 1, **identity}
+        self.runtime["authorized_dispatch"] = authorization
         self.assertEqual(
             claim_helper.acquire(
                 o.ROOT,
@@ -294,6 +316,9 @@ class OrchestratorMechanicalTests(unittest.TestCase):
         }
         o.atomic_write(o.TO_ZCODE, wire(payload))
         o.atomic_json(o.PROJECT_STATE, self.base_state)
+        # Explicitly migrate/re-register this pre-control fixture before testing
+        # restart. v1.2 startup itself must not authorize provenance-free work.
+        o.register_dispatched_task(self.runtime, self.base_state, allow_same_identity=True)
         with patch.object(o, "invoke_codex", side_effect=AssertionError("Codex must not be called on WAITING_EXECUTOR restart")):
             with patch.object(o.time, "sleep", side_effect=KeyboardInterrupt):
                 code = o.main()
