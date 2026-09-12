@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,19 @@ INTERVENTION_SCHEMA_VERSION = 1
 INTERVENTION_TRANSACTION_SCHEMA_VERSION = 1
 CANDIDATE_ORIGIN_SCHEMA_VERSION = 1
 DECISION_RECEIPT_SCHEMA_VERSION = 1
+# SUPERVISOR-TURN-OBSERVABILITY-V1: one structured record per finished
+# Supervisor turn, written by the control plane itself so the Console can
+# observe turns without ever joining untrusted compatibility artifacts.
+SUPERVISOR_TURN_RECORD_SCHEMA = "SUPERVISOR-TURN-OBSERVABILITY-V1"
+SUPERVISOR_TURN_RECORD_SCHEMA_VERSION = 1
+# Explicit queued Supervisor configuration (P8). The queue applies only at a
+# turn boundary inside begin_supervisor_turn; an active model call is never
+# interrupted, replaced, or mutated. The supported effort set is the domain
+# this Runtime's Codex integration applies today; other suggestions from the
+# Console vocabulary are refused deterministically instead of guessed.
+SUPERVISOR_CONFIG_SCHEMA_VERSION = 1
+SUPERVISOR_CONFIG_EFFORTS = ("LOW", "MEDIUM", "HIGH")
+SUPERVISOR_CONFIG_MODEL_MAX_CHARS = 80
 INTERVENTION_MODES = ("STEER", "AUDIT")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -1185,6 +1199,167 @@ def decision_receipt_path(root: Path, turn_id: str) -> Path:
     return Path(root) / "control" / "supervisor_decisions" / f"{turn_id}.json"
 
 
+def supervisor_turn_record_path(root: Path, turn_id: str) -> Path:
+    return Path(root) / "control" / "supervisor_turns" / f"{turn_id}.json"
+
+
+def supervisor_config_path(root: Path) -> Path:
+    return Path(root) / "control" / "supervisor_config.json"
+
+
+def _validate_config_model(model) -> str:
+    if not isinstance(model, str):
+        raise ControlError("Supervisor config model must be a string")
+    value = model.strip()
+    if not value or len(value) > SUPERVISOR_CONFIG_MODEL_MAX_CHARS:
+        raise ControlError(
+            "Supervisor config model must be a non-empty string of at most "
+            f"{SUPERVISOR_CONFIG_MODEL_MAX_CHARS} characters")
+    if any(unicodedata.category(char) == "Cc" for char in value):
+        raise ControlError(
+            "Supervisor config model must not contain control characters")
+    return value
+
+
+def _validate_config_block(block: dict, *, keys: tuple) -> dict:
+    if not isinstance(block, dict) or set(block) != set(keys):
+        raise ControlError("Supervisor config block schema is invalid")
+    for key in keys:
+        if block.get(key) is None and key != "model":
+            raise ControlError(f"Supervisor config {key} is required")
+    model = block["model"]
+    if model is not None:
+        model = _validate_config_model(model)
+    effort = block.get("reasoning_effort")
+    if effort not in SUPERVISOR_CONFIG_EFFORTS:
+        raise ControlError(
+            "Supervisor config reasoning_effort must be one of "
+            + ", ".join(SUPERVISOR_CONFIG_EFFORTS))
+    revision = block.get("config_revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise ControlError("Supervisor config revision must be a positive integer")
+    return {**block, "model": model}
+
+
+def load_supervisor_config(root: Path) -> dict:
+    """Strictly read the Runtime-owned configuration document.
+
+    A missing file is the honest "never configured" default (active and
+    pending absent — the fixed Runtime policy applies). Malformed state is
+    reported, never repaired or silently reset.
+    """
+    path = supervisor_config_path(root)
+    value = _read_json(path, None)
+    if value is None:
+        return {"schema_version": SUPERVISOR_CONFIG_SCHEMA_VERSION,
+                "PROJECT_ID": None, "active": None, "pending": None,
+                "updated_at": None}
+    if not isinstance(value, dict) \
+            or value.get("schema_version") != SUPERVISOR_CONFIG_SCHEMA_VERSION:
+        raise ControlError("supervisor_config.json schema mismatch")
+    if set(value) != {"schema_version", "PROJECT_ID", "active", "pending",
+                      "updated_at"}:
+        raise ControlError("supervisor_config.json key set is invalid")
+    project_id = value["PROJECT_ID"]
+    if project_id is not None and not isinstance(project_id, str):
+        raise ControlError("supervisor_config.json PROJECT_ID is invalid")
+    active = value["active"]
+    if active is not None:
+        _validate_config_block(active, keys=("model", "reasoning_effort",
+                                             "queued_at", "config_revision",
+                                             "applied_at", "source_turn_id"))
+    pending = value["pending"]
+    if pending is not None:
+        _validate_config_block(pending, keys=("model", "reasoning_effort",
+                                              "queued_at", "config_revision"))
+    return value
+
+
+def queue_supervisor_config(root: Path, config: dict,
+                            project_id: str | None = None) -> dict:
+    """Validate and queue one explicit Supervisor configuration change.
+
+    The change is stored as pending and consumed only at the next eligible
+    Supervisor turn boundary. An in-flight turn is reported truthfully and
+    never interrupted, replaced, or mutated by this call.
+    """
+    root = Path(root).resolve()
+    if not isinstance(config, dict) or set(config) != {"model",
+                                                       "reasoning_effort"}:
+        raise ControlError(
+            'Supervisor config change must be exactly {"model", '
+            '"reasoning_effort"}')
+    model = _validate_config_model(config["model"])
+    effort = config["reasoning_effort"]
+    if effort not in SUPERVISOR_CONFIG_EFFORTS:
+        raise ControlError(
+            "Supervisor config reasoning_effort must be one of "
+            + ", ".join(SUPERVISOR_CONFIG_EFFORTS))
+    import executor_fence
+    with executor_fence.runtime_lock(root):
+        reconcile_control_transactions_locked(root)
+        if (root / "control" / "STOP").exists():
+            raise ControlError(
+                "STOPPED is terminal; Supervisor configuration changes are "
+                "forbidden")
+        active_pid, _, _ = resolve_active_project(root)
+        if active_pid is None:
+            raise ControlError(
+                "no active project exists; Supervisor configuration is not "
+                "applicable")
+        if project_id is not None and project_id != active_pid:
+            raise ControlError(
+                "Supervisor configuration project binding mismatch")
+        control = load_control(root)
+        turn_in_flight = isinstance(control.get("inflight_supervisor_turn"),
+                                    dict)
+        document = load_supervisor_config(root)
+        if document.get("PROJECT_ID") not in {None, active_pid}:
+            raise ControlError(
+                "supervisor_config.json is bound to a different project")
+        previous = max(
+            (block.get("config_revision") or 0 for block in
+             (document.get("active"), document.get("pending"))
+             if isinstance(block, dict)),
+            default=0)
+        pending = {"model": model, "reasoning_effort": effort,
+                   "queued_at": now_iso(), "config_revision": previous + 1}
+        document["PROJECT_ID"] = active_pid
+        document["pending"] = pending
+        document["updated_at"] = now_iso()
+        _atomic_json(supervisor_config_path(root), document)
+        return {"queued": True, "turn_in_flight": turn_in_flight,
+                "pending": pending, "active": document.get("active"),
+                "note": "the change applies at the next eligible Supervisor "
+                        "turn; an active turn is never interrupted"}
+
+
+def _consume_pending_supervisor_config_locked(root: Path, turn_id: str) -> dict:
+    """Consume the queued configuration at this turn boundary (lock held).
+
+    A consumed change stays active: every later turn boundary keeps
+    reporting it as the applied queued configuration until it is itself
+    replaced by a newer queued change.
+    """
+    document = load_supervisor_config(root)
+    pending = document.get("pending")
+    if isinstance(pending, dict):
+        document["active"] = {**pending, "applied_at": now_iso(),
+                              "source_turn_id": turn_id}
+        document["pending"] = None
+        document["updated_at"] = now_iso()
+        _atomic_json(supervisor_config_path(root), document)
+    active = document.get("active")
+    if isinstance(active, dict):
+        return {"source": "queued",
+                "config_revision": active.get("config_revision"),
+                "model": active.get("model"),
+                "reasoning_effort": active.get("reasoning_effort"),
+                "queued_at": active.get("queued_at")}
+    return {"source": "fixed_policy", "config_revision": None,
+            "model": None, "reasoning_effort": None, "queued_at": None}
+
+
 def initialize_control_plane_locked(root: Path) -> dict:
     """Durably mark the v1.2 authority boundary before startup recovery."""
     if not control_path(root).exists():
@@ -1539,6 +1714,12 @@ def begin_supervisor_turn(root: Path, project_id: str | None,
                  "intervention_ids": [item.get("intervention_id") for item in items],
                  "invocation": invocation,
                  "started_at": now_iso()}
+        # SUPERVISOR-TURN-OBSERVABILITY-V1 / explicit configuration: the turn
+        # boundary is the only point where a queued configuration change
+        # becomes active. It is consumed under the same durable lock as the
+        # turn itself; an already-running model call can never observe it.
+        turn["supervisor_config"] = _consume_pending_supervisor_config_locked(
+            root, turn_id)
         control["inflight_supervisor_turn"] = turn
         save_control(root, control)
         for item in items:
@@ -1629,9 +1810,198 @@ def _consume_invocation_event_locked(root: Path, turn: dict) -> None:
         _failure_point("supervisor_after_event_consumed")
 
 
+_OBSERVATION_KEYS = {"model", "reasoning_effort", "elapsed_seconds", "usage",
+                     "context_manifest"}
+_OBSERVATION_USAGE_KEYS = {"reported", "input_tokens", "output_tokens",
+                           "total_tokens", "source", "note"}
+
+
+def _manifest_scalar(value) -> bool:
+    if value is None or isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float)):
+        return True
+    return isinstance(value, str) and 0 < len(value) <= 300
+
+
+def _validate_manifest_value(value, *, depth: int, label: str) -> None:
+    if _manifest_scalar(value):
+        return
+    limit = 32 if isinstance(value, list) else 16
+    if (not isinstance(value, (list, dict)) or len(value) > limit
+            or depth > 2):
+        raise ControlError(
+            f"Supervisor turn observation context_manifest.{label} exceeds "
+            "the bounded manifest shape")
+    for key, item in (value.items() if isinstance(value, dict) else
+                      enumerate(value)):
+        if isinstance(key, str) and not (1 <= len(key) <= 60):
+            raise ControlError(
+                "Supervisor turn observation context_manifest keys must be "
+                "bounded strings")
+        if depth >= 2 and not _manifest_scalar(item):
+            raise ControlError(
+                f"Supervisor turn observation context_manifest.{label} "
+                "nests deeper than the bounded manifest shape")
+        if depth < 2:
+            _validate_manifest_value(item, depth=depth + 1, label=label)
+
+
+def _validate_context_manifest(manifest) -> None:
+    if manifest is None:
+        return
+    if not isinstance(manifest, dict) or not manifest or len(manifest) > 16:
+        raise ControlError(
+            "Supervisor turn observation context_manifest must be a bounded "
+            "non-empty object")
+    for key, value in manifest.items():
+        if not isinstance(key, str) or not (1 <= len(key) <= 60):
+            raise ControlError(
+                "Supervisor turn observation context_manifest keys must be "
+                "bounded strings")
+        _validate_manifest_value(value, depth=1, label=key)
+
+
+def _validated_turn_observation(observation) -> dict | None:
+    """Strictly validate the orchestrator's per-turn observation, fail closed.
+
+    Validation happens before any accounting mutation so an invalid
+    observation can never consume a turn, its interventions, or its receipt.
+    """
+    if observation is None:
+        return None
+    if not isinstance(observation, dict) or set(observation) != _OBSERVATION_KEYS:
+        raise ControlError("Supervisor turn observation schema is invalid")
+    for key in ("model", "reasoning_effort"):
+        value = observation[key]
+        if value is None:
+            continue
+        if (not isinstance(value, str) or not value.strip()
+                or len(value) > 120):
+            raise ControlError(
+                f"Supervisor turn observation {key} is invalid")
+    elapsed = observation["elapsed_seconds"]
+    if elapsed is not None and (isinstance(elapsed, bool)
+                                or not isinstance(elapsed, (int, float))
+                                or elapsed < 0 or elapsed > 2_592_000):
+        raise ControlError(
+            "Supervisor turn observation elapsed_seconds is invalid")
+    usage = observation["usage"]
+    if not isinstance(usage, dict) or set(usage) != _OBSERVATION_USAGE_KEYS:
+        raise ControlError("Supervisor turn observation usage schema is invalid")
+    if not isinstance(usage["reported"], bool):
+        raise ControlError(
+            "Supervisor turn observation usage reported must be a boolean")
+    tokens = {}
+    for key in ("input_tokens", "output_tokens", "total_tokens"):
+        value = usage[key]
+        if value is not None and (isinstance(value, bool)
+                                  or not isinstance(value, int) or value < 0):
+            raise ControlError(
+                "Supervisor turn observation token counts must be "
+                "non-negative integers or null")
+        tokens[key] = value
+    if usage["reported"]:
+        if all(value is None for value in tokens.values()):
+            raise ControlError(
+                "a reported usage block must carry at least one token count")
+        if (not isinstance(usage["source"], str) or not usage["source"].strip()
+                or len(usage["source"]) > 80):
+            raise ControlError(
+                "a reported usage block requires a bounded source")
+    elif any(value is not None for value in tokens.values()):
+        raise ControlError(
+            "an unreported usage block must not carry token counts")
+    if usage["note"] is not None and (not isinstance(usage["note"], str)
+                                      or not 1 <= len(usage["note"]) <= 300):
+        raise ControlError(
+            "Supervisor turn observation usage note must be null or a "
+            "bounded string")
+    _validate_context_manifest(observation["context_manifest"])
+    return observation
+
+
+def _write_supervisor_turn_record(root: Path, turn: dict, *, committed: bool,
+                                  stale: bool, recovery: bool, error,
+                                  candidate_validation_failed: bool,
+                                  receipt, receipt_file, receipt_hash,
+                                  candidate, observation) -> None:
+    """Durably record one finished Supervisor turn (create-only).
+
+    The record is Runtime-owned observability metadata written under the
+    fence lock at the same boundary that consumes the turn. A record that
+    already exists (recovery replay) is never overwritten: the first durable
+    record — the one that may carry the only live observation — wins.
+    """
+    path = supervisor_turn_record_path(root, str(turn.get("turn_id") or ""))
+    if path.exists():
+        return
+    observed = observation if isinstance(observation, dict) else {}
+    snapshot = (turn.get("supervisor_config")
+                if isinstance(turn.get("supervisor_config"), dict) else {})
+    # The queued snapshot is the configured truth; the observation carries the
+    # effective fixed-policy values when no queue was consumed.
+    config_block = {
+        "source": snapshot.get("source"),
+        "config_revision": snapshot.get("config_revision"),
+        # The consumed queue snapshot is the configured truth; the
+        # observation fills in the effective fixed-policy values only when
+        # no queue was consumed.
+        "model": snapshot.get("model") or observed.get("model"),
+        "reasoning_effort": (snapshot.get("reasoning_effort")
+                             or observed.get("reasoning_effort")),
+        "queued_at": snapshot.get("queued_at"),
+    }
+    decision_source = receipt if isinstance(receipt, dict) else None
+    decision = {
+        "committed": committed,
+        "receipt_file": receipt_file,
+        "receipt_sha256": receipt_hash,
+        "decision": (decision_source.get("decision")
+                     if decision_source else None),
+        "decision_sha256": (decision_source.get("decision_sha256")
+                            if decision_source else None),
+        "decision_summary": ((decision_source.get("decision") or {}).get("reason")
+                             if decision_source else None),
+        "decision_history_index": (decision_source.get("decision_history_index")
+                                   if decision_source else None),
+        "resulting_status": (decision_source.get("resulting_status")
+                             if decision_source else None),
+    }
+    usage = observed.get("usage")
+    if not isinstance(usage, dict):
+        usage = {"reported": False, "input_tokens": None,
+                 "output_tokens": None, "total_tokens": None, "source": None,
+                 "note": "no Supervisor observation was recorded for this "
+                         "turn"}
+    record = {
+        "schema": SUPERVISOR_TURN_RECORD_SCHEMA,
+        "schema_version": SUPERVISOR_TURN_RECORD_SCHEMA_VERSION,
+        "turn_id": turn.get("turn_id"),
+        "PROJECT_ID": turn.get("PROJECT_ID"),
+        "invocation": turn.get("invocation"),
+        "started_at": turn.get("started_at"),
+        "finished_at": now_iso(),
+        "duration_seconds": observed.get("elapsed_seconds"),
+        "supervisor_config": config_block,
+        "usage": usage,
+        "context_manifest": observed.get("context_manifest"),
+        "decision": decision,
+        "dispatch_linkage": candidate,
+        "intervention_ids": list(turn.get("intervention_ids") or []),
+        "outcome": {"committed": committed, "stale": stale,
+                    "recovered_after_crash": recovery,
+                    "candidate_validation_failed": candidate_validation_failed,
+                    "error": error},
+    }
+    _atomic_json(path, record, create_only=True)
+
+
 def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
                                    recovery: bool = False,
-                                   candidate_validator=None) -> dict:
+                                   candidate_validator=None,
+                                   observation=None) -> dict:
+    observation = _validated_turn_observation(observation)
     reconcile_control_transactions_locked(root)
     control = load_control(root)
     inflight = control.get("inflight_supervisor_turn")
@@ -1647,6 +2017,7 @@ def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
     error = None
     receipt_file = receipt_hash = None
     candidate = None
+    decision_receipt = None
     candidate_validation_failed = False
     if existing_receipt is not None:
         receipt_file = decision_receipt_path(
@@ -1660,6 +2031,7 @@ def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
     elif processed and not stale:
         try:
             receipt, candidate = _decision_transaction(root, turn)
+            decision_receipt = receipt
             if candidate is not None and candidate_validator is not None:
                 try:
                     _, _, state_path = resolve_active_project(root)
@@ -1705,6 +2077,18 @@ def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
         except Exception as exc:
             if error is None:
                 error = str(exc)
+    # SUPERVISOR-TURN-OBSERVABILITY-V1: durably record the finished turn
+    # (create-only) before the in-flight accounting is cleared, so a record
+    # exists for every begun turn that reaches this boundary.
+    _write_supervisor_turn_record(
+        root, turn, committed=committed, stale=stale, recovery=recovery,
+        error=error,
+        candidate_validation_failed=candidate_validation_failed,
+        receipt=(existing_receipt if existing_receipt is not None
+                 else decision_receipt),
+        receipt_file=receipt_file, receipt_hash=receipt_hash,
+        candidate=(candidate if committed else None),
+        observation=observation)
     control = load_control(root)
     current = control.get("inflight_supervisor_turn")
     if isinstance(current, dict) and current.get("turn_id") == turn.get("turn_id"):
@@ -1723,14 +2107,22 @@ def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
 
 
 def finish_supervisor_turn(root: Path, turn: dict, *, processed: bool,
-                           candidate_validator=None) -> bool:
-    """Consume inputs only with a validated durable decision; return retry required."""
+                           candidate_validator=None,
+                           observation=None) -> bool:
+    """Consume inputs only with a validated durable decision; return retry required.
+
+    The optional observation (SUPERVISOR-TURN-OBSERVABILITY-V1) carries the
+    orchestrator's per-turn facts — effective model/effort, elapsed time,
+    reported token usage, and the bounded context manifest — into the
+    durable turn record. It is validated before any accounting mutation.
+    """
     root = Path(root).resolve()
     import executor_fence
     with executor_fence.runtime_lock(root):
         return _finish_supervisor_turn_locked(
             root, turn, processed=processed, recovery=False,
             candidate_validator=candidate_validator,
+            observation=observation,
         )["requires_retry"]
 
 
@@ -1763,6 +2155,19 @@ def invalidate_candidate(root: Path, reason: str) -> dict:
         return _invalidate_candidate_locked(root, reason)
 
 
+def _bounded_inflight_view(inflight) -> dict | None:
+    """Bounded, honest view of an in-flight Supervisor turn for the status
+    document: only the stable identity and its start time are surfaced, and
+    only when both are well-formed strings."""
+    if not isinstance(inflight, dict):
+        return None
+    turn_id = inflight.get("turn_id")
+    started_at = inflight.get("started_at")
+    if not isinstance(turn_id, str) or not isinstance(started_at, str):
+        return None
+    return {"turn_id": turn_id, "started_at": started_at}
+
+
 def current_status(root: Path) -> dict:
     root = Path(root).resolve()
     project_id, _, state_path = resolve_active_project(root)
@@ -1774,6 +2179,14 @@ def current_status(root: Path) -> dict:
     active_current = (active if isinstance(active, dict) and isinstance(current, dict)
                       and _same_identity(active, current) else None)
     lifecycle = _active_lifecycle(root, runtime, active_current, current)
+    completion = lifecycle["completion"]
+    # P9 additive observability keys: a bounded in-flight turn view and the
+    # active identity's completion commit fact for the Console's alert
+    # projections. Additive only; no legacy key changed shape.
+    completion_view = None
+    if isinstance(completion, dict):
+        completion_view = {"status": completion.get("STATUS"),
+                           "committed_at": completion.get("COMMITTED_AT")}
     return {
         "schema_version": 1,
         "PROJECT_ID": project_id,
@@ -1793,6 +2206,9 @@ def current_status(root: Path) -> dict:
         "human_review": ((root / "control" / "HUMAN_REVIEW").exists()
                          or state.get("status") == "HUMAN_REVIEW"),
         "stop": (root / "control" / "STOP").exists(),
+        "supervisor_turn_inflight": _bounded_inflight_view(
+            control.get("inflight_supervisor_turn")),
+        "active_task_completion": completion_view,
     }
 
 
@@ -1847,6 +2263,12 @@ def main(argv=None) -> int:
     pause.add_argument("--json", action="store_true")
     resume_parser = sub.add_parser("resume")
     resume_parser.add_argument("--json", action="store_true")
+    config_parser = sub.add_parser("queue-supervisor-config")
+    config_parser.add_argument("--model", required=True)
+    # No argparse `choices`: an invalid value must surface through the JSON
+    # error envelope (fail closed), not an argparse usage abort.
+    config_parser.add_argument("--effort", required=True)
+    config_parser.add_argument("--json", action="store_true")
     ns = parser.parse_args(argv)
     root = ns.root.resolve()
     try:
@@ -1895,6 +2317,12 @@ def main(argv=None) -> int:
             return 0
         elif ns.command == "resume":
             _emit(resume(root), ns.json)
+            return 0
+        elif ns.command == "queue-supervisor-config":
+            _emit({"ok": True,
+                   "supervisor_config": queue_supervisor_config(
+                       root, {"model": ns.model,
+                              "reasoning_effort": ns.effort})}, ns.json)
             return 0
         else:
             raise ControlError("unknown command")

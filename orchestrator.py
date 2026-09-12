@@ -2410,6 +2410,132 @@ def supervisor_effort(state: dict, reason: str) -> str:
     return SUPERVISOR_REASONING_EFFORT
 
 
+def supervisor_profile_for_turn(turn_config, state: dict, reason: str) -> tuple:
+    """Resolve the effective (model, effort, source) for one Supervisor call.
+
+    A validated queued configuration consumed at the turn boundary (source
+    "queued") is the only way the fixed Supervisor policy is overridden, and
+    the override is explicit, bounded, and recorded. Anything doubtful falls
+    back to the fixed policy instead of guessing.
+    """
+    config = turn_config if isinstance(turn_config, dict) else {}
+    if (config.get("source") == "queued"
+            and isinstance(config.get("model"), str)
+            and config["model"].strip()
+            and config.get("reasoning_effort") in
+            _supervisor_control_helper().SUPERVISOR_CONFIG_EFFORTS):
+        return config["model"], config["reasoning_effort"].lower(), "queued"
+    return SUPERVISOR_MODEL, supervisor_effort(state, reason), "fixed_policy"
+
+
+_UNAVAILABLE_PREFIX = "[UNAVAILABLE:"
+
+
+def _supervisor_brief_available(reason: str, event) -> bool:
+    """Mirror build_codex_prompt's executor-brief branch, fact-only."""
+    if reason not in {"EXECUTOR_RESULT_READY", "MALFORMED_EXECUTOR_RECEIPT",
+                      "MALFORMED_EXECUTOR_SIGNAL"}:
+        return False
+    committed_path = ((event or {}).get("committed_receipt_path")
+                      if isinstance(event, dict) else None)
+    if committed_path and _completion_helper().load_entry_file(
+            Path(committed_path)) is not None:
+        return True
+    return SUPERVISOR_BRIEF.exists()
+
+
+def _turn_file_facts(path: Path, max_chars: int) -> dict:
+    """Bounded provided-file facts for the Supervisor context manifest."""
+    try:
+        relative = os.path.relpath(path, ROOT).replace("\\", "/")
+    except Exception:
+        relative = path.name
+    text = safe_read_text(path, max_chars)
+    return {"path": relative,
+            "present": not text.startswith(_UNAVAILABLE_PREFIX),
+            "truncated": len(text) > max_chars}
+
+
+def supervisor_turn_context_manifest(*, reason: str, event, goal_state: dict,
+                                     goal_path: Path, interventions: list,
+                                     human_decision, supervisor_rules_path: Path,
+                                     project_state_path: Path,
+                                     research_state_path: Path,
+                                     executor_brief_available: bool) -> dict:
+    """Boundedly record what this Supervisor turn was actually provided.
+
+    This is observability metadata about input classes and references —
+    never model reasoning and never file contents.
+    """
+    goal_present = bool(goal_path and goal_path.exists())
+    event_keys = sorted(str(key) for key in event) \
+        if isinstance(event, dict) else []
+    receipt = None
+    if isinstance(human_decision, dict) and human_decision.get("receipt_id"):
+        receipt = {"receipt_id": human_decision.get("receipt_id"),
+                   "receipt_sha256": human_decision.get("receipt_sha256")}
+    manifest = {
+        "supervisor_rules": _turn_file_facts(supervisor_rules_path, 14000),
+        "project_state": _turn_file_facts(project_state_path, 18000),
+        "research_state": _turn_file_facts(research_state_path, 18000),
+        "project_goal": {
+            "path": _turn_file_facts(goal_path, 12000)["path"]
+            if goal_present else None,
+            "present": goal_present,
+            "truncated": goal_present
+            and len(safe_read_text(goal_path, 12000)) > 12000,
+        },
+        "profile": {"project_type": goal_state.get("project_type")
+                    if isinstance(goal_state, dict) else None},
+        "human_decision_receipt": receipt,
+        "interventions": [
+            {"intervention_id": item.get("intervention_id"),
+             "mode": item.get("mode")}
+            for item in (interventions or [])[:32]
+        ],
+        "executor_brief": {"source": "provided" if executor_brief_available
+                           else "none"},
+        "mechanical_event": {"reason": str(reason), "event_keys": event_keys},
+    }
+    return manifest
+
+
+def supervisor_turn_usage(output_path: Path) -> dict:
+    """Extract token usage only when the Codex output reliably reports it.
+
+    The only recognized source is a JSON output document with a
+    `token_usage` block whose three fields are all non-negative integers.
+    Anything else — missing, oversized, malformed, partial, or typed oddly —
+    is reported as not reported. Token counts are never estimated or
+    reconstructed.
+    """
+    not_reported = {"reported": False, "input_tokens": None,
+                    "output_tokens": None, "total_tokens": None,
+                    "source": None,
+                    "note": "the Codex environment did not report token "
+                            "usage for this turn"}
+    try:
+        if not output_path.is_file() \
+                or output_path.stat().st_size > 512 * 1024:
+            return not_reported
+        document = json.loads(output_path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return not_reported
+    if not isinstance(document, dict):
+        return not_reported
+    usage = document.get("token_usage")
+    if not isinstance(usage, dict):
+        return not_reported
+    counts = {}
+    for key in ("input_tokens", "output_tokens", "total_tokens"):
+        value = usage.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return not_reported
+        counts[key] = value
+    return {"reported": True, **counts,
+            "source": "codex_output_token_usage", "note": None}
+
+
 def _read_profile_text(path: Path, what: str) -> str:
     try:
         text = path.read_text(encoding="utf-8-sig")
@@ -4026,17 +4152,45 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         state_sha256=state_sha_before,
         control_turn=control_turn,
     )  # G1-A: goal_file aware
+    # SUPERVISOR-TURN-OBSERVABILITY-V1: boundedly record the context classes
+    # this turn is provided, for the durable turn record. Observation is
+    # never allowed to break the turn: the goal path is resolved the same
+    # way the prompt resolves it, and an unresolvable path is recorded as
+    # an absent goal rather than raised.
+    try:
+        goal_path_for_manifest = resolve_goal_path(state_before)
+    except Exception:
+        goal_path_for_manifest = None
+    turn_manifest = supervisor_turn_context_manifest(
+        reason=reason,
+        event=event,
+        goal_state=state_before,
+        goal_path=goal_path_for_manifest,
+        interventions=(control_turn or {}).get("interventions") or [],
+        human_decision=load_verified_human_decision_for_supervisor(state_before),
+        supervisor_rules_path=SUPERVISOR_RULES,
+        project_state_path=PROJECT_STATE,
+        research_state_path=RESEARCH_STATE,
+        executor_brief_available=_supervisor_brief_available(reason, event),
+    )
     pending_invocation = record_supervisor_decision_attempt(runtime, reason, event)
     started = time.monotonic()
     log("Starting Codex supervisor turn", reason=reason)
-    effort = supervisor_effort(state_before, reason)
-    log("Codex supervisor profile fixed", model=SUPERVISOR_MODEL, effort=effort, phase=state_before.get("phase"), reason=reason)
+    model, effort, profile_source = supervisor_profile_for_turn(
+        control_turn.get("supervisor_config"), state_before, reason)
+    if profile_source == "queued":
+        log("Codex supervisor profile applied from queued configuration",
+            model=model, effort=effort, phase=state_before.get("phase"),
+            reason=reason)
+    else:
+        log("Codex supervisor profile fixed", model=model, effort=effort,
+            phase=state_before.get("phase"), reason=reason)
 
     cmd = [
         codex,
         "exec",
         "-m",
-        SUPERVISOR_MODEL,
+        model,
         "-C",
         str(ROOT),
         "--skip-git-repo-check",
@@ -4103,9 +4257,17 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     # those inputs consumed, then invalidate any candidate if a human action raced
     # this invocation. A second check inside registration closes the smaller
     # post-check/pre-authorization window.
+    observation = {
+        "model": model,
+        "reasoning_effort": effort,
+        "elapsed_seconds": elapsed,
+        "usage": supervisor_turn_usage(output_path),
+        "context_manifest": turn_manifest,
+    }
     retry_control_turn = control.finish_supervisor_turn(
         ROOT, control_turn, processed=True,
         candidate_validator=validate_supervisor_candidate_snapshot,
+        observation=observation,
     )
     fresh_runtime = load_runtime()
     runtime.clear()

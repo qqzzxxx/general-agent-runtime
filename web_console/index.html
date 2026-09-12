@@ -1,0 +1,4410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>General Agent Runtime v1.3 — Project Cockpit</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    margin: 0 auto; max-width: 86rem; padding: 0 1rem 2rem;
+    color: #1c2733; background: #f7f9fb; line-height: 1.45;
+  }
+  header { padding: 1rem 0 0.2rem; }
+  h1 { font-size: 1.3rem; margin-bottom: 0.15rem; }
+  h2 { font-size: 1.02rem; margin: 0 0 0.4rem; }
+  h3 { font-size: 0.9rem; margin: 0.8rem 0 0.2rem; color: #40546a; }
+  .hint { color: #5a6b7d; margin: 0.1rem 0 0; font-size: 0.92rem; }
+  .cockpit-grid {
+    display: grid; gap: 0.9rem; margin-top: 0.9rem;
+    grid-template-columns: 250px minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+  #column-runtimes, #column-current, #column-control { min-width: 0; }
+  section {
+    background: #ffffff; border: 1px solid #d9e1e8; border-radius: 8px;
+    padding: 0.85rem 1rem; margin-top: 0.9rem;
+  }
+  .placeholder {
+    border: 1px dashed #b7c3cd; border-radius: 6px; background: #fbfcfd;
+    color: #5a6b7d; padding: 0.6rem 0.8rem; font-size: 0.88rem;
+  }
+  .placeholder strong { color: #40546a; }
+  .state { font-weight: 600; font-size: 1.05rem; margin: 0.2rem 0; }
+  .ok { color: #17682f; }
+  .bad { color: #a4262c; }
+  .muted { color: #5a6b7d; }
+  dl { display: grid; grid-template-columns: max-content 1fr;
+       gap: 0.15rem 1rem; margin: 0.4rem 0 0; }
+  dt { color: #5a6b7d; }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  ul#ce-milestones { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+  ul#ce-milestones li { padding: 0.05rem 0; }
+  ul#rh-errors { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+  ul#rh-errors li { padding: 0.05rem 0; overflow-wrap: anywhere; }
+  .runtime-item {
+    display: block; width: 100%; text-align: left; font: inherit;
+    margin: 0.25rem 0; padding: 0.4rem 0.6rem; border-radius: 6px;
+    border: 1px solid #c6d0d9; background: #eef2f6; cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+  .runtime-item:hover { background: #e2e9ef; }
+  .runtime-item.selected { border-color: #2b5d8c; background: #dce9f5; }
+  .runtime-item .rid { color: #5a6b7d; font-size: 0.8rem; }
+  button#refresh, button#refresh-health {
+    font: inherit; padding: 0.25rem 0.8rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6; cursor: pointer;
+  }
+  button#refresh:hover, button#refresh-health:hover { background: #e2e9ef; }
+  details { margin-top: 0.5rem; }
+  summary { cursor: pointer; color: #40546a; }
+  footer { margin-top: 1.6rem; color: #5a6b7d; font-size: 0.85rem; }
+  /* P4 Timeline panel */
+  #tl-controls { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  #tl-controls select, #tl-controls input, #tl-controls button {
+    font: inherit; padding: 0.2rem 0.45rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6;
+  }
+  #tl-controls input { background: #ffffff; min-width: 12rem; }
+  #tl-controls button { cursor: pointer; }
+  #tl-controls button:hover { background: #e2e9ef; }
+  .timeline-round {
+    border: 1px solid #d9e1e8; border-radius: 6px; background: #fbfcfd;
+    margin: 0.4rem 0; padding: 0.35rem 0.6rem;
+  }
+  .timeline-round summary { list-style: none; cursor: pointer; }
+  .timeline-round .round-head { display: flex; flex-wrap: wrap; gap: 0.4rem;
+    align-items: baseline; }
+  .round-status { font-weight: 600; }
+  .round-status.completed { color: #17682f; }
+  .round-status.untrusted, .round-status.anomaly { color: #a4262c; }
+  .round-meta { color: #5a6b7d; font-size: 0.85rem; }
+  .badge { display: inline-block; border: 1px solid #c6d0d9; color: #5a6b7d;
+    border-radius: 10px; padding: 0 0.5rem; font-size: 0.78rem; }
+  .badge.warn { border-color: #d0a12c; color: #7a5c00; }
+  .badge.bad { border-color: #a4262c; color: #a4262c; }
+  .round-detail-open { font: inherit; cursor: pointer; margin-top: 0.3rem;
+    padding: 0.2rem 0.7rem; border-radius: 6px; border: 1px solid #2b5d8c;
+    background: #dce9f5; }
+  #tl-pages { display: flex; gap: 0.6rem; align-items: center; margin: 0.5rem 0; }
+  #tl-pages button { font: inherit; padding: 0.2rem 0.7rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6; cursor: pointer; }
+  #tl-pages button:disabled { opacity: 0.45; cursor: default; }
+  #tl-new-events button { font: inherit; padding: 0.25rem 0.8rem;
+    border-radius: 6px; border: 1px solid #2b5d8c; background: #dce9f5;
+    cursor: pointer; }
+  /* P4 Task Detail drawer */
+  #task-drawer {
+    position: fixed; top: 0; right: 0; height: 100vh; width: min(46rem, 96vw);
+    background: #ffffff; border-left: 2px solid #2b5d8c;
+    box-shadow: -6px 0 18px rgba(28, 39, 51, 0.18);
+    padding: 0.8rem 1rem; overflow-y: auto; z-index: 20;
+  }
+  #td-head { display: flex; justify-content: space-between; gap: 0.6rem;
+    align-items: baseline; }
+  #td-close { font: inherit; cursor: pointer; padding: 0.2rem 0.7rem;
+    border-radius: 6px; border: 1px solid #8a97a5; background: #eef2f6; }
+  #td-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.6rem 0; }
+  #td-tabs button { font: inherit; font-size: 0.88rem; cursor: pointer;
+    padding: 0.22rem 0.7rem; border-radius: 14px; border: 1px solid #c6d0d9;
+    background: #f2f5f8; }
+  #td-tabs button.active { border-color: #2b5d8c; background: #dce9f5;
+    font-weight: 600; }
+  #td-body pre {
+    white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f6f8;
+    border: 1px solid #d9e1e8; border-radius: 6px; padding: 0.6rem;
+    font-size: 0.82rem; max-height: 60vh; overflow-y: auto;
+  }
+  #td-body .unavailable { color: #a4262c; }
+  /* P5 Human Control + Pending Controls */
+  #hc-feedback {
+    border: 1px solid #c6d0d9; border-radius: 6px; padding: 0.4rem 0.6rem;
+    margin: 0.4rem 0; font-size: 0.88rem; overflow-wrap: anywhere;
+  }
+  #hc-feedback.hc-ok { border-color: #17682f; background: #eef7f0; }
+  #hc-feedback.hc-error { border-color: #a4262c; background: #fbeeee; }
+  .hc-confirm {
+    border: 1px solid #d0a12c; background: #fdf6e3; border-radius: 6px;
+    padding: 0.45rem 0.6rem; margin: 0.4rem 0; font-size: 0.88rem;
+  }
+  .hc-confirm p { margin: 0.15rem 0; }
+  .hc-danger {
+    border: 1px solid #a4262c; background: #fff5f5; border-radius: 6px;
+    padding: 0.45rem 0.6rem; margin: 0.45rem 0 0;
+  }
+  .hc-danger h4 { color: #a4262c; margin: 0.2rem 0; }
+  button.hc-danger-button {
+    font: inherit; cursor: pointer; padding: 0.25rem 0.8rem;
+    border-radius: 6px; border: 1px solid #a4262c; background: #ffffff;
+    color: #a4262c; font-weight: 600;
+  }
+  button.hc-danger-button:hover { background: #fbeeee; }
+  #human-control-section button, #hc-int-form select,
+  #hc-int-form textarea, #hc-review-form textarea,
+  #hc-stop-challenge input {
+    font: inherit; padding: 0.22rem 0.6rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6;
+  }
+  #human-control-section button { cursor: pointer; }
+  #human-control-section button:hover:not(:disabled) { background: #e2e9ef; }
+  #human-control-section button:disabled { opacity: 0.45; cursor: default; }
+  #hc-int-form, #hc-review-form { margin: 0.3rem 0 0; }
+  #hc-int-form label, #hc-review-form label { display: block;
+    margin: 0.35rem 0 0.1rem; color: #40546a; font-size: 0.88rem; }
+  #hc-int-form select, #hc-int-form textarea, #hc-review-form textarea,
+  #hc-stop-challenge input { width: 100%; background: #ffffff; }
+  #hc-review-reason {
+    white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f6f8;
+    border: 1px solid #d9e1e8; border-radius: 6px; padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+  #hc-review-facts { font-size: 0.88rem; }
+  #hc-review-prepared { border: 1px solid #2b5d8c; border-radius: 6px;
+    background: #f0f6fc; padding: 0.45rem 0.6rem; margin: 0.4rem 0;
+    font-size: 0.85rem; overflow-wrap: anywhere; }
+  .hc-item {
+    border: 1px solid #d9e1e8; border-radius: 6px; background: #fbfcfd;
+    margin: 0.35rem 0; padding: 0.35rem 0.55rem; font-size: 0.88rem;
+  }
+  .hc-item .hc-cat { font-weight: 600; }
+  .badge.pending { border-color: #d0a12c; color: #7a5c00; }
+  .badge.consumed { border-color: #17682f; color: #17682f; }
+  .badge.superseded, .badge.failed, .badge.needs_recovery {
+    border-color: #a4262c; color: #a4262c; }
+  /* P6 Artifact Center */
+  #ac-controls { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  #ac-controls select, #ac-controls input, #ac-controls button {
+    font: inherit; padding: 0.2rem 0.45rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6;
+  }
+  #ac-controls input { background: #ffffff; min-width: 8rem; }
+  #ac-controls button { cursor: pointer; }
+  #ac-controls button:hover { background: #e2e9ef; }
+  #ac-pages { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+    margin: 0.5rem 0; }
+  #ac-pages button, #ac-page-size { font: inherit; padding: 0.2rem 0.7rem;
+    border-radius: 6px; border: 1px solid #8a97a5; background: #eef2f6;
+    cursor: pointer; }
+  #ac-pages button:disabled { opacity: 0.45; cursor: default; }
+  .ac-item {
+    border: 1px solid #d9e1e8; border-radius: 6px; background: #fbfcfd;
+    margin: 0.4rem 0; padding: 0.35rem 0.6rem;
+  }
+  .ac-head { display: flex; flex-wrap: wrap; gap: 0.4rem;
+    align-items: baseline; }
+  .ac-name { font: inherit; cursor: pointer; padding: 0.15rem 0.55rem;
+    border-radius: 6px; border: 1px solid #2b5d8c; background: #dce9f5; }
+  .ac-detail { margin-top: 0.4rem; border-top: 1px solid #d9e1e8;
+    padding-top: 0.35rem; }
+  .ac-preview pre {
+    white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f6f8;
+    border: 1px solid #d9e1e8; border-radius: 6px; padding: 0.6rem;
+    font-size: 0.82rem; max-height: 50vh; overflow-y: auto;
+  }
+  .ac-preview table { border-collapse: collapse; font-size: 0.85rem;
+    margin: 0.3rem 0; }
+  .ac-preview td { border: 1px solid #d9e1e8; padding: 0.15rem 0.5rem; }
+  .ac-preview img { max-width: 100%; max-height: 60vh;
+    border: 1px solid #d9e1e8; border-radius: 6px; }
+  .ac-provenance, .ac-preview { margin-top: 0.4rem; }
+  /* P7 Setup Wizard */
+  #setup-steps { margin: 0.5rem 0; }
+  #setup-steps fieldset { border: 1px solid #d9e1e8; border-radius: 6px;
+    margin: 0.5rem 0; padding: 0.5rem 0.7rem; }
+  #setup-steps legend { font-weight: 600; color: #40546a;
+    padding: 0 0.4rem; }
+  #setup-wizard-section button, #setup-wizard-section select,
+  #setup-wizard-section input[type="text"], #setup-wizard-section textarea {
+    font: inherit; padding: 0.22rem 0.6rem; border-radius: 6px;
+    border: 1px solid #8a97a5; background: #eef2f6;
+  }
+  #setup-wizard-section input[type="text"], #setup-wizard-section textarea,
+  #setup-wizard-section select { width: 100%; background: #ffffff; }
+  #setup-wizard-section button { cursor: pointer; }
+  #setup-wizard-section button:hover:not(:disabled) { background: #e2e9ef; }
+  #setup-wizard-section button:disabled { opacity: 0.45; cursor: default; }
+  #setup-wizard-section label { display: block; margin: 0.35rem 0 0.1rem;
+    color: #40546a; font-size: 0.88rem; }
+  #setup-goal-drop { border: 1px dashed #8a97a5; border-radius: 6px;
+    background: #fbfcfd; padding: 0.6rem; text-align: center;
+    color: #5a6b7d; font-size: 0.88rem; }
+  #setup-goal-drop.dragover { background: #dce9f5; border-color: #2b5d8c; }
+  #setup-goal-validation .bad, .setup-check.bad { color: #a4262c; }
+  #setup-goal-validation .ok, .setup-check.pass { color: #17682f; }
+  .setup-check { margin: 0.2rem 0; font-size: 0.88rem; }
+  .setup-nav { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+  #setup-zcode-prompt, #setup-workshop-pack, #setup-startup-prompt {
+    white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem;
+    max-height: 30vh; overflow-y: auto; }
+  #setup-input-inventory li { overflow-wrap: anywhere; }
+  #setup-status { font-size: 0.88rem; }
+  @media (max-width: 980px) {
+    .cockpit-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>General Agent Runtime v1.3 — Project Cockpit</h1>
+  <p class="hint">Observation and Human Control (P3 + P4 + P5 + P6) plus
+  the P7 Project Setup wizard: what the
+  selected Runtime is doing right now, what happens next, whether you must
+  act, the round-by-round history with an inspectable Task Detail drawer, the
+  read-only Artifact Center with bounded previews and provenance, safe
+  human controls — Pause/Resume, interventions, Formal STOP, and the
+  HUMAN_REVIEW decision flow — and the four-step setup flow for a new
+  project on an already registered Runtime. Every control calls the existing
+  v1.2 Runtime
+  entry points; nothing authoritative is edited from the browser, and facts
+  the Runtime did not report are shown as unavailable — never invented.</p>
+</header>
+
+<div class="cockpit-grid">
+
+  <aside id="column-runtimes">
+    <section id="runtime-section">
+      <h2>Runtimes</h2>
+      <p><button id="refresh" type="button">Refresh list</button></p>
+      <div id="runtime-list"></div>
+      <p class="hint" id="runtimes-hint">Loading…</p>
+      <div class="placeholder">
+        <strong>New Project</strong> — open the Project Setup wizard in the
+        center column: Goal + Inputs, Codex Supervisor configuration,
+        ZCode Automation setup, then Readiness / Preflight / Start, for an
+        already registered Runtime.
+      </div>
+    </section>
+    <section id="health-section">
+      <h2>Backend health</h2>
+      <p class="state" id="health-state">checking…</p>
+      <dl id="health-details"></dl>
+    </section>
+  </aside>
+
+  <main id="column-current">
+    <section id="current-execution">
+      <h2>Current execution</h2>
+      <p class="state muted" id="ce-state-label">Select a Runtime to observe
+        it.</p>
+      <p id="ce-detail" class="muted"></p>
+      <dl>
+        <dt>Who is working</dt><dd id="ce-worker">—</dd>
+        <dt>Since</dt><dd id="ce-since">—</dd>
+      </dl>
+      <h3>What happens next</h3>
+      <p id="ce-next-label" class="muted">—</p>
+      <p id="ce-next-detail" class="muted"></p>
+      <h3>Does the user need to act?</h3>
+      <p id="ce-action" class="muted">—</p>
+      <h3>Protocol milestones</h3>
+      <ul id="ce-milestones"></ul>
+      <h3>Task identity</h3>
+      <dl id="ce-protocol"></dl>
+      <details>
+        <summary>Bounded technical details</summary>
+        <dl id="ce-tech"></dl>
+      </details>
+    </section>
+    <section id="supervisor-section">
+      <h2>Supervisor turns &amp; usage</h2>
+      <p class="hint">Observability built from the Runtime's own
+      SUPERVISOR-TURN-OBSERVABILITY-V1 turn records: what Codex decided and
+      why, which context classes it was given, reported timing and token
+      usage, and which dispatch resulted. Facts the Codex environment did not
+      report are shown as unavailable or <strong>Not reported</strong> — never
+      estimated.</p>
+      <h3>Latest completed turn</h3>
+      <div id="sv-latest-turn">
+        <p class="muted">Select a Runtime to observe it.</p>
+      </div>
+      <h3>Reported usage</h3>
+      <dl id="sv-usage-summary"></dl>
+      <h3>Codex Supervisor configuration</h3>
+      <div id="sv-config-state"></div>
+      <details id="sv-config-details">
+        <summary>Queue a model / reasoning change</summary>
+        <p class="hint">The change is validated and queued for the next
+        eligible Supervisor turn; it <strong>never interrupts an active
+        call</strong>. Until a change is queued, the Runtime's fixed
+        Supervisor policy applies.</p>
+        <p id="sv-config-draft" class="hint"></p>
+        <label for="sv-config-model">Supervisor model</label>
+        <input id="sv-config-model" type="text" maxlength="80"
+               placeholder="e.g. gpt-5.6-sol">
+        <label for="sv-config-effort">Reasoning effort</label>
+        <select id="sv-config-effort" aria-label="Reasoning effort">
+          <option value="LOW">LOW</option>
+          <option value="MEDIUM">MEDIUM</option>
+          <option value="HIGH">HIGH</option>
+        </select>
+        <p><button id="sv-config-submit" type="button">Queue configuration
+          change</button></p>
+        <p id="sv-config-status" class="muted">The submitted change is queued
+          — it applies next Supervisor turn and is shown as pending until
+          then.</p>
+      </details>
+    </section>
+    <section id="alerts-section">
+      <h2>Soft alerts</h2>
+      <p class="hint">Deterministic, non-AI projections from the Runtime's
+      own evidence: prolonged ZCode pickup, authorization nearing expiry, an
+      unusually long Codex turn, a committed-but-unconsumed completion,
+      Runtime offline, and existing severe or error states. Severity runs
+      informational / warning / <strong>needs-attention</strong>. Facts the
+      Runtime does not report are listed as unavailable or
+      <strong>Not reported</strong> — never fabricated.</p>
+      <div id="alerts-list"></div>
+      <p id="alerts-status" class="muted">Select a Runtime to observe it.</p>
+    </section>
+    <section id="settings-section">
+      <h2>Settings &amp; operator note</h2>
+      <p class="hint">Console-owned defaults with per-Runtime overrides. A
+      value shown as <strong>override</strong> replaces the
+      <strong>global-default</strong> for this Runtime only. Supervisor
+      model/effort values recorded here are defaults only: they reach the
+      Runtime through the formal queue and apply at the next eligible
+      Supervisor turn — they never interrupt an active call and never edit
+      authoritative state directly.</p>
+      <h3>Global defaults</h3>
+      <label for="settings-global-model">Default Supervisor model</label>
+      <input id="settings-global-model" type="text" maxlength="80"
+             placeholder="empty = the Runtime's fixed policy">
+      <label for="settings-global-effort">Default reasoning effort</label>
+      <select id="settings-global-effort"
+              aria-label="Default reasoning effort">
+        <option value="">inherit Runtime policy</option>
+        <option value="LOW">LOW</option>
+        <option value="MEDIUM">MEDIUM</option>
+        <option value="HIGH">HIGH</option>
+      </select>
+      <label for="settings-global-summary">Decision summary mode</label>
+      <select id="settings-global-summary"
+              aria-label="Decision summary mode">
+        <option value="compact">compact</option>
+        <option value="full">full</option>
+      </select>
+      <label for="settings-global-pagesize">Timeline page size (5–100)</label>
+      <input id="settings-global-pagesize" type="number" min="5" max="100">
+      <fieldset id="settings-thresholds">
+        <legend>Alert thresholds (minutes unless noted)</legend>
+        <label for="settings-threshold-zcode-pickup">ZCode pickup alert
+          after</label>
+        <input id="settings-threshold-zcode-pickup" type="number"
+          min="1" max="10080">
+        <label for="settings-threshold-expiry-warning">Authorization expiry
+          warning window</label>
+        <input id="settings-threshold-expiry-warning" type="number"
+          min="1" max="10080">
+        <label for="settings-threshold-expiry-critical">Authorization expiry
+          critical window</label>
+        <input id="settings-threshold-expiry-critical" type="number"
+          min="1" max="10080">
+        <label for="settings-threshold-turn">Codex turn alert after</label>
+        <input id="settings-threshold-turn" type="number"
+          min="1" max="10080">
+        <label for="settings-threshold-unconsumed">Unconsumed completion
+          alert after</label>
+        <input id="settings-threshold-unconsumed" type="number"
+          min="1" max="10080">
+        <label for="settings-threshold-usage-factor">Usage outlier factor
+          (× recent average)</label>
+        <input id="settings-threshold-usage-factor" type="number"
+          min="1.5" max="100" step="0.5">
+        <label for="settings-threshold-usage-sample">Usage outlier minimum
+          comparable sample</label>
+        <input id="settings-threshold-usage-sample" type="number"
+          min="2" max="20">
+      </fieldset>
+      <p><button id="settings-global-save" type="button">Save global
+        defaults</button></p>
+      <p id="settings-global-status" class="muted">Select a Runtime to
+        observe it.</p>
+      <h3>This Runtime's overrides</h3>
+      <p class="hint">Leave a field empty (or choose “inherit”) to clear the
+      override and inherit the global default again.</p>
+      <label for="settings-runtime-model">Supervisor model override</label>
+      <input id="settings-runtime-model" type="text" maxlength="80"
+             placeholder="empty = inherit">
+      <label for="settings-runtime-effort">Reasoning effort override</label>
+      <select id="settings-runtime-effort"
+              aria-label="Reasoning effort override">
+        <option value="">inherit</option>
+        <option value="LOW">LOW</option>
+        <option value="MEDIUM">MEDIUM</option>
+        <option value="HIGH">HIGH</option>
+      </select>
+      <label for="settings-runtime-pagesize">Timeline page size override
+        (5–100)</label>
+      <input id="settings-runtime-pagesize" type="number" min="5" max="100"
+             placeholder="empty = inherit">
+      <p><button id="settings-runtime-save" type="button">Save this
+        Runtime's overrides</button></p>
+      <p id="settings-runtime-status" class="muted">—</p>
+      <p><button id="settings-queue-config" type="button">Queue this
+        Runtime's model/effort for the next Supervisor turn</button></p>
+      <h3>UI-only operator note</h3>
+      <p class="hint">A local note for operators. It is <strong>UI-only</strong>
+      and <strong>never enters Codex context automatically</strong>. Only the
+      explicit “Convert to intervention” action hands the text to the formal
+      Human Control form, where you choose the mode and submit it
+      yourself.</p>
+      <textarea id="settings-note" maxlength="4000" rows="3"
+        placeholder="Visible to operators of this Console only"></textarea>
+      <p>
+        <button id="settings-note-save" type="button">Save note</button>
+        <button id="settings-note-clear" type="button">Clear note</button>
+        <button id="settings-note-to-intervention" type="button">Convert to
+          intervention</button>
+      </p>
+      <p id="settings-note-status" class="muted">—</p>
+      <h3>Notifications</h3>
+      <p class="hint">Optional informational events (COMPLETE, safe Pause
+      reached, prolonged ZCode pickup, high token turn) are opt-in.
+      Must-attention events (HUMAN_REVIEW, ORCHESTRATOR_ERROR, severe
+      Runtime health failure, expiry risk) are on by default. Browser
+      notification permission is requested only by the explicit button
+      below; a refused or unavailable browser degrades to the visible
+      <strong>in-Console</strong> attention state. Nothing here navigates
+      you anywhere or notifies on every normal Agent event.</p>
+      <p><button id="settings-notify-enable" type="button">Enable browser
+        notifications</button></p>
+      <p id="settings-notify-status" class="muted">Browser notifications are
+        off; alerts stay visible in-Console.</p>
+      <fieldset id="settings-notify-prefs">
+        <legend>Notify on</legend>
+        <label><input type="checkbox" id="settings-notify-complete">
+          COMPLETE</label>
+        <label><input type="checkbox" id="settings-notify-safe-pause">
+          safe Pause reached</label>
+        <label><input type="checkbox" id="settings-notify-zcode-pickup">
+          prolonged ZCode pickup</label>
+        <label><input type="checkbox" id="settings-notify-high-token-turn">
+          high token turn</label>
+        <label><input type="checkbox" id="settings-notify-human-review">
+          HUMAN_REVIEW</label>
+        <label><input type="checkbox" id="settings-notify-orchestrator-error">
+          ORCHESTRATOR_ERROR</label>
+        <label><input type="checkbox" id="settings-notify-health-severe">
+          severe Runtime health failure</label>
+        <label><input type="checkbox" id="settings-notify-expiry-risk">
+          task expiry risk</label>
+      </fieldset>
+      <p><button id="settings-notify-save" type="button">Save notification
+        preferences</button></p>
+    </section>
+    <section id="timeline-section">
+      <h2>Timeline</h2>
+      <p class="hint">Round-grouped project history built from the
+      authoritative Runtime archive and completion ledger. One round groups
+      the Codex → ZCode dispatch, the ZCode → Codex completion, and the human
+      interventions bound to the same MESSAGE_ID. Open a round's details and
+      its Task Detail drawer for the exact archived dispatch and the
+      authoritative completion.</p>
+      <div id="tl-controls">
+        <select id="tl-order" aria-label="Order">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+        <select id="tl-page-size" aria-label="Rounds per page">
+          <option value="10">10 / page</option>
+          <option value="20" selected>20 / page</option>
+          <option value="50">50 / page</option>
+        </select>
+        <select id="tl-kind" aria-label="Event filter">
+          <option value="all">All events</option>
+          <option value="dispatch">Codex → ZCode</option>
+          <option value="completion">ZCode → Codex</option>
+          <option value="intervention">Human intervention</option>
+        </select>
+        <input id="tl-search" maxlength="120" type="text"
+               placeholder="Search message / task / stage">
+        <button id="tl-search-apply" type="button">Search</button>
+        <button id="tl-refresh" type="button">Refresh</button>
+      </div>
+      <p id="tl-new-events" hidden>
+        <button id="tl-jump-latest" type="button">New events available —
+          Jump to latest</button>
+      </p>
+      <div id="tl-pages">
+        <button id="tl-prev" type="button">← Previous</button>
+        <span id="tl-page-indicator" class="muted">page —</span>
+        <button id="tl-next" type="button">Next →</button>
+      </div>
+      <div id="tl-rounds"></div>
+      <p id="tl-status" class="muted">Loading…</p>
+    </section>
+    <section id="recent-artifacts-section">
+      <h2>Recent artifacts</h2>
+      <p class="hint">The most recent artifacts this Runtime's completion
+      ledger binds provenance for. Opening one lands in the Artifact Center
+      already filtered to its MESSAGE_ID; inspection is read-only and
+      rendering stays inert text.</p>
+      <ul id="ra-list"></ul>
+      <p><button id="ra-view-all" type="button">View all artifacts</button></p>
+      <p id="ra-status" class="muted">Select a Runtime to observe it.</p>
+    </section>
+    <section id="artifact-center-section">
+      <h2>Artifact Center</h2>
+      <p class="hint">Read-only artifact workspace. Artifacts are discovered
+      only from the active project's authorized publication roots
+      (<code>workspace/</code>, <code>evidence/</code>,
+      <code>reports/</code>) and the authoritative completion ledger.
+      Previews are bounded per format, verified against the receipt hash,
+      and render as inert text only; provenance names the producing round
+      when a verified receipt binds the file — and says
+      <strong>unbound</strong> when it does not. Nothing here can edit,
+      rename, delete, or overwrite an artifact; the only action is feedback
+      to Codex through the formal intervention surface.</p>
+      <div id="ac-controls">
+        <select id="ac-root" aria-label="Publication root">
+          <option value="">All roots</option>
+          <option value="workspace">workspace/</option>
+          <option value="evidence">evidence/</option>
+          <option value="reports">reports/</option>
+        </select>
+        <select id="ac-type" aria-label="Artifact type">
+          <option value="">All types</option>
+          <option value="markdown">Markdown</option>
+          <option value="text">Text</option>
+          <option value="log">Log</option>
+          <option value="code">Code</option>
+          <option value="png">PNG</option>
+          <option value="jpeg">JPEG</option>
+          <option value="webp">WebP</option>
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="pdf">PDF</option>
+          <option value="unsupported">Unsupported</option>
+        </select>
+        <select id="ac-status-filter" aria-label="Binding status">
+          <option value="">All states</option>
+          <option value="ledger">Ledger-bound</option>
+          <option value="unbound">Unbound</option>
+          <option value="missing">Missing</option>
+        </select>
+        <input id="ac-message" type="number" min="0" max="999999999"
+          placeholder="MESSAGE_ID">
+        <input id="ac-task" maxlength="120" type="text" placeholder="Task">
+        <input id="ac-search" maxlength="120" type="text"
+          placeholder="Search name / path">
+        <button id="ac-apply" type="button">Apply</button>
+        <button id="ac-refresh" type="button">Refresh</button>
+      </div>
+      <div id="ac-pages">
+        <select id="ac-page-size" aria-label="Artifacts per page">
+          <option value="10">10 / page</option>
+          <option value="20" selected>20 / page</option>
+          <option value="50">50 / page</option>
+        </select>
+        <button id="ac-prev" type="button">← Previous</button>
+        <span id="ac-page-indicator" class="muted">page —</span>
+        <button id="ac-next" type="button">Next →</button>
+      </div>
+      <div id="ac-list"></div>
+      <p id="ac-status" class="muted">Select a Runtime to browse its
+        artifacts.</p>
+      <div id="ac-feedback" class="hc-confirm" hidden>
+        <p id="ac-fb-summary"></p>
+        <label for="ac-fb-mode">Mode</label>
+        <select id="ac-fb-mode">
+          <option value="STEER">STEER — Give feedback to Codex (you know
+            what should change)</option>
+          <option value="AUDIT">Deep Review — Ask Codex to Deep Review this
+            result (inspect before deciding)</option>
+        </select>
+        <label for="ac-fb-comment">Comment (bounded; the feedback carries
+          artifact path references only — contents and history are never
+          attached)</label>
+        <textarea id="ac-fb-comment" maxlength="4000" rows="4"
+          placeholder="What should Codex do or inspect about the selected
+          artifacts?"></textarea>
+        <p><button id="ac-fb-submit" type="button" disabled>Submit artifact
+          feedback</button></p>
+      </div>
+      <div id="ac-fb-confirm" class="hc-confirm" hidden>
+        <p>The feedback is submitted through the P5 formal intervention
+        surface, bound to the producing MESSAGE_ID and the selected artifact
+        paths (references only). It is queued like any other intervention:
+        queued → delivered → consumed.</p>
+        <p>
+          <button id="ac-fb-confirm-button" type="button">Confirm
+            submission</button>
+          <button id="ac-fb-cancel-button" type="button">Cancel</button>
+        </p>
+      </div>
+    </section>
+
+    <section id="setup-wizard-section">
+      <h2>Project Setup</h2>
+      <p class="hint">Four-step guided setup for an <strong>already
+      registered Runtime</strong> (select it on the left): Goal + Inputs,
+      Codex Supervisor configuration, ZCode Automation setup, and
+      Readiness / Preflight / Start. The Console stores your choices as a
+      Console-owned setup draft; bootstrap and start are delegated to the
+      Runtime's own formal entry points, and nothing authoritative is
+      written by the browser. Goal size limit: 256 KiB of UTF-8 Markdown
+      per file.</p>
+      <p id="setup-status" class="muted">Select a Runtime to configure a
+        new project.</p>
+      <div id="setup-steps">
+
+        <fieldset id="setup-step-1">
+          <legend>Step 1 — Project Goal + Inputs</legend>
+          <p class="hint">PROJECT_GOAL.md defines the destination, not
+          Runtime routing internals: it should carry Objective, Context,
+          Available Inputs, Required Deliverables, Constraints, Non-Goals,
+          and Acceptance Criteria — and must not prescribe MESSAGE_ID
+          values, NONCE values, claim/fence mechanics, or exact turn
+          counts. Outputs must stay inside the supported publication roots
+          (workspace/, evidence/, reports/); artifacts/ as an output root
+          is rejected before bootstrap.</p>
+          <label for="setup-project-id">Project ID (ASCII letters, digits,
+            dot, underscore, hyphen; never overwrites an existing
+            project)</label>
+          <input id="setup-project-id" type="text" maxlength="64"
+            autocomplete="off" placeholder="my-project-001">
+          <label for="setup-project-type">ProjectType</label>
+          <select id="setup-project-type">
+            <option value="GENERAL">GENERAL — open-ended goal-directed
+              work</option>
+            <option value="ACADEMIC_RESEARCH">ACADEMIC_RESEARCH —
+              research questions, citations, evidence standards</option>
+            <option value="SOFTWARE_ENGINEERING">SOFTWARE_ENGINEERING —
+              codebases, tests, engineering deliverables</option>
+            <option value="BUSINESS_RESEARCH">BUSINESS_RESEARCH — market
+              and competitive analysis, decision memos</option>
+          </select>
+          <label for="setup-goal-file">Goal file (.md, .markdown, .txt —
+            read locally by your browser, then validated and stored in the
+            Console draft)</label>
+          <input id="setup-goal-file" type="file"
+            accept=".md,.markdown,.txt">
+          <div id="setup-goal-drop" tabindex="0">…or drop the Goal file
+            here (bounded Markdown only)</div>
+          <p id="setup-goal-summary" class="muted">No Goal file loaded.</p>
+          <p><button id="setup-goal-save" type="button" disabled>Validate
+            and save Goal</button></p>
+          <div id="setup-goal-validation"></div>
+          <p><button id="setup-workshop-open" type="button">Goal Workshop:
+            context pack and startup prompt for an external Web AI</button></p>
+          <div id="setup-workshop-panel" hidden>
+            <p class="hint">Copy both blocks into your external Web AI
+            (such as ChatGPT) yourself. The Console never embeds, calls, or
+            automates any Web AI, and the pack never contains the Runtime
+            Root path.</p>
+            <label for="setup-workshop-pack">Context pack (bounded;
+              generated from the canonical contract and this Runtime's
+              facts)</label>
+            <textarea id="setup-workshop-pack" rows="10" readonly></textarea>
+            <p><button id="setup-workshop-copy" type="button">Copy context
+              pack</button></p>
+            <label for="setup-startup-prompt">Startup prompt</label>
+            <textarea id="setup-startup-prompt" rows="5" readonly></textarea>
+            <p><button id="setup-startup-copy" type="button">Copy startup
+              prompt</button></p>
+          </div>
+          <h3>Project inputs (metadata-only inventory)</h3>
+          <p class="hint">Register files or folders that already exist on
+          this machine by typing or pasting each <strong>absolute
+          path</strong> (one per line, at most 8). The Console records a
+          normalized metadata inventory only — file contents are never
+          read, embedded, copied, moved, or deleted, symlink/reparse points
+          are never followed, and paths inside another registered Runtime
+          are refused.</p>
+          <textarea id="setup-input-paths" rows="3"
+            placeholder="C:\data\cafe-sales.csv&#10;C:\data\datasets"></textarea>
+          <p>
+            <button id="setup-inputs-register" type="button">Register input
+              inventory</button>
+            <button id="setup-inputs-none" type="button">No additional
+              inputs are needed</button>
+          </p>
+          <ul id="setup-input-inventory" class="muted"></ul>
+        </fieldset>
+
+        <fieldset id="setup-step-2" hidden>
+          <legend>Step 2 — Codex Supervisor configuration</legend>
+          <p class="hint">Choices below are a <strong>draft only</strong>:
+          the v1.2 Runtime exposes no Supervisor model-config interface, so
+          nothing is applied to the Runtime and no active turn was changed.
+          The Runtime currently reports no provider capability list, so the
+          options below are Console-side suggestions recorded with your
+          draft.</p>
+          <label for="setup-sup-model">Supervisor model (leave empty to
+            decide later)</label>
+          <input id="setup-sup-model" type="text" maxlength="80"
+            autocomplete="off" placeholder="e.g. GPT-5.6 Sol">
+          <label for="setup-sup-effort">Reasoning effort</label>
+          <select id="setup-sup-effort">
+            <option value="">Not chosen yet</option>
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH">HIGH</option>
+            <option value="EXTRA_HIGH">EXTRA_HIGH</option>
+            <option value="HIGHEST">HIGHEST</option>
+            <option value="ULTRA">ULTRA</option>
+          </select>
+          <label for="setup-sup-mode">Decision explanation mode (default
+            Compact)</label>
+          <select id="setup-sup-mode">
+            <option value="MINIMAL">Minimal — structural state only</option>
+            <option value="COMPACT" selected>Compact — short decision
+              summary each Supervisor turn</option>
+            <option value="DETAILED_ON_DEMAND">Detailed on demand — extra
+              explanation only when requested</option>
+          </select>
+          <p><button id="setup-sup-save" type="button">Save configuration
+            draft</button></p>
+          <p id="setup-sup-note" class="muted"></p>
+        </fieldset>
+
+        <fieldset id="setup-step-3" hidden>
+          <legend>Step 3 — ZCode Automation setup</legend>
+          <p class="hint">One Scheduled Automation per Runtime Root; the
+          Console does <strong>not</strong> choose the ZCode model and it
+          <strong>cannot see</strong> whether ZCode Automation is configured
+          or enabled — that acknowledgement is yours to make. The canonical
+          prompt below is rendered from the Runtime's own template with the
+          exact Runtime Root bound, byte-equivalent to
+          PREPARE_ZCODE_AUTOMATION.ps1.</p>
+          <dl>
+            <dt>Runtime Root (ZCode Workspace)</dt>
+            <dd id="setup-zcode-root">—</dd>
+          </dl>
+          <p><button id="setup-zcode-fetch" type="button">Render canonical
+            Automation prompt</button></p>
+          <label for="setup-zcode-prompt">Canonical Automation prompt</label>
+          <textarea id="setup-zcode-prompt" rows="8" readonly></textarea>
+          <p><button id="setup-zcode-copy" type="button" disabled>Copy
+            prompt</button></p>
+          <h3>Setup steps (from ZCODE_SETUP.md)</h3>
+          <ol id="setup-zcode-steps"></ol>
+          <p><label><input type="checkbox" id="setup-zcode-ack"> I have
+            configured (or deliberately deferred) the ZCode Scheduled
+            Automation for this Runtime Root.</label></p>
+          <p><button id="setup-zcode-acknowledge" type="button"
+            disabled>Record acknowledgement</button></p>
+        </fieldset>
+
+        <fieldset id="setup-step-4" hidden>
+          <legend>Step 4 — Readiness / Preflight / Start</legend>
+          <p><button id="setup-readiness-run" type="button">Run readiness
+            checks</button></p>
+          <p class="hint">Each specification check is reported separately:
+            goal_loaded, goal_anchor, inputs_registered,
+            project_type_valid, supervisor_config_valid, runtime_healthy,
+            python_requirements, control_plane_v12, zcode_acknowledged,
+            preflight — all required, all fail-closed.</p>
+          <div id="setup-readiness-list"></div>
+          <p><button id="setup-start" type="button"
+            disabled>Start Agent Collaboration</button></p>
+          <div id="setup-start-confirm" class="hc-confirm" hidden>
+            <p>Start runs the documented bootstrap (start_project.py) and
+            then the Runtime's own START_AGENT_SYSTEM.ps1 entry point, only
+            if every readiness check passes; the request goes to the
+            bounded <code>/setup/start</code> endpoint and answers
+            <code>SETUP_NOT_READY</code> (nothing bootstrapped or started)
+            otherwise. The bootstrap never overwrites an existing project
+            or Goal Anchor.</p>
+            <p>
+              <button id="setup-start-go" type="button">Confirm
+                start</button>
+              <button id="setup-start-cancel" type="button">Cancel</button>
+            </p>
+          </div>
+          <div id="setup-start-result"></div>
+          <p><button id="setup-open-cockpit" type="button" hidden>Open the
+            selected Runtime's Cockpit</button></p>
+        </fieldset>
+
+      </div>
+      <div class="setup-nav">
+        <button id="setup-back" type="button">← Back</button>
+        <button id="setup-next" type="button">Next →</button>
+      </div>
+    </section>
+    <section id="runtime-create-section">
+      <h2>New Runtime from the supported release</h2>
+      <p class="hint">Creates a new isolated Runtime Root by copying this
+      installation's supported release skeleton — product, control plane,
+      profiles, Console, and documentation only. Never copied: projects,
+      completion/claim/dispatch ledgers, STOP/attention flags, logs,
+      registry data, credentials, or caches. The destination
+      <strong>must not exist</strong> — nothing is ever overwritten, no
+      created Runtime is started automatically, and a failed copy is rolled
+      back. The source is this installation; the browser cannot name a
+      source path or command.</p>
+      <label for="rc-template">Template</label>
+      <select id="rc-template" aria-label="Template"></select>
+      <label for="rc-destination">Destination directory (absolute path on
+        this machine)</label>
+      <input id="rc-destination" type="text" spellcheck="false">
+      <label for="rc-label">Console label</label>
+      <input id="rc-label" type="text" maxlength="120">
+      <p><button id="rc-submit" type="button">Create Runtime</button></p>
+      <p id="rc-status" class="muted">Creation is explicit, validated, and
+        registered only after a complete validated copy.</p>
+    </section>
+  </main>
+
+  <aside id="column-control">
+    <section id="runtime-health">
+      <h2>Runtime health</h2>
+      <p><button id="refresh-health" type="button">Refresh now</button></p>
+      <dl>
+        <dt>Web Console backend</dt><dd id="rh-backend">—</dd>
+        <dt>Orchestrator</dt><dd id="rh-orchestrator">—</dd>
+        <dt>Codex (Supervisor)</dt><dd id="rh-codex">—</dd>
+        <dt>ZCode last observed activity</dt><dd id="rh-zcode">—</dd>
+        <dt>Current authorization</dt><dd id="rh-authorization">—</dd>
+        <dt>Current claim</dt><dd id="rh-claim">—</dd>
+        <dt>Pending interventions</dt><dd id="rh-interventions">—</dd>
+      </dl>
+      <h3>Errors and warnings</h3>
+      <ul id="rh-errors"></ul>
+    </section>
+    <section id="human-control-section">
+      <h2>Human control</h2>
+      <p class="hint">Controls call the v1.2 Runtime entry points only. A
+      mutation is never invented here and never edits authoritative Runtime
+      files directly; the Runtime decides and reports the outcome.</p>
+      <div id="hc-feedback" hidden></div>
+
+      <h3>Safe Pause / Resume</h3>
+      <p id="hc-pause-row">
+        <button id="hc-pause" type="button" disabled>Safe Pause</button>
+        <label><input type="checkbox" id="hc-pause-interrupt">
+          Also interrupt the current task</label>
+      </p>
+      <div id="hc-pause-confirm" class="hc-confirm" hidden>
+        <p id="hc-pause-effect"></p>
+        <p>
+          <button id="hc-pause-confirm-button" type="button">Confirm
+            Pause</button>
+          <button id="hc-pause-cancel-button" type="button">Cancel</button>
+        </p>
+      </div>
+      <p id="hc-resume-row">
+        <button id="hc-resume" type="button" disabled>Resume</button>
+      </p>
+      <div id="hc-resume-confirm" class="hc-confirm" hidden>
+        <p>Resume clears the pause. The Runtime returns to RUNNING and the
+        Orchestrator may start the next Supervisor turn. A HUMAN_REVIEW is
+        not cleared by Resume — it needs a Human Decision below.</p>
+        <p>
+          <button id="hc-resume-confirm-button" type="button">Confirm
+            Resume</button>
+          <button id="hc-resume-cancel-button" type="button">Cancel</button>
+        </p>
+      </div>
+
+      <h3>Human intervention</h3>
+      <form id="hc-int-form">
+        <label for="hc-int-mode">Mode</label>
+        <select id="hc-int-mode">
+          <option value="STEER">STEER — you know what should change</option>
+          <option value="AUDIT">Deep Review / AUDIT — inspect before
+            deciding</option>
+        </select>
+        <label for="hc-int-comment">Comment (bounded)</label>
+        <textarea id="hc-int-comment" maxlength="4000" rows="4"
+          placeholder="What should Codex do or inspect?"></textarea>
+        <label for="hc-int-target">Target</label>
+        <select id="hc-int-target">
+          <option value="project">Current project</option>
+          <option value="message">Historical MESSAGE_ID</option>
+        </select>
+        <input id="hc-int-message-id" type="number" min="0" max="999999999"
+          placeholder="MESSAGE_ID" disabled>
+        <label><input type="checkbox" id="hc-int-interrupt">
+          Interrupt the current task and replan</label>
+        <p><button id="hc-int-submit" type="button"
+          disabled>Submit intervention</button></p>
+      </form>
+      <div id="hc-int-confirm" class="hc-confirm" hidden>
+        <p>The intervention is queued for the next Supervisor turn (queued →
+        delivered → consumed). Default: the current valid task may finish
+        first.</p>
+        <p>
+          <button id="hc-int-confirm-button" type="button">Confirm
+            submission</button>
+          <button id="hc-int-cancel-button" type="button">Cancel</button>
+        </p>
+      </div>
+
+      <div id="hc-review-block" hidden>
+        <h3>HUMAN_REVIEW — human decision required</h3>
+        <p id="hc-review-facts"></p>
+        <p class="hint">Why automation stopped (from the Runtime's own
+        HUMAN_REVIEW record):</p>
+        <details id="hc-review-reason-details" open>
+          <summary>View Full Reason</summary>
+          <pre id="hc-review-reason"></pre>
+        </details>
+        <p class="hint">Data and history are preserved. The Runtime does not
+        resume automatically from HUMAN_REVIEW; a Human Decision you submit
+        below is required before the Supervisor can continue. Resume alone
+        will not clear this state.</p>
+        <p><button id="hc-review-prepare-button" type="button">Prepare a
+          Human Decision</button></p>
+        <form id="hc-review-form" hidden>
+          <label for="hc-review-content">Decision content</label>
+          <textarea id="hc-review-content" maxlength="24000" rows="5"
+            placeholder="What the Supervisor is authorized to do next.">
+          </textarea>
+          <label for="hc-review-constraints">Constraints — one per line</label>
+          <textarea id="hc-review-constraints" rows="4"
+            placeholder="Hard limits the Supervisor must repeat verbatim.">
+          </textarea>
+          <p><button id="hc-review-prepare-submit" type="button">Prepare
+            decision</button></p>
+        </form>
+        <div id="hc-review-prepared" hidden></div>
+        <div id="hc-review-confirm" class="hc-confirm" hidden>
+          <p>Applying the decision transitions HUMAN_REVIEW → SUPERVISOR_TURN
+          through the audited Runtime helper. It is bound to the exact state
+          hash captured at prepare time; a stale or duplicated application
+          fails closed and changes nothing.</p>
+          <p>
+            <button id="hc-review-apply-button" type="button">Apply Human
+              Decision</button>
+            <button id="hc-review-apply-cancel-button" type="button">
+              Cancel</button>
+          </p>
+        </div>
+      </div>
+
+      <details id="hc-highrisk">
+        <summary>High-risk actions</summary>
+        <div class="hc-danger">
+          <h4>Interrupt current task</h4>
+          <p class="hint">Revokes the current task's Runtime authority using
+          the existing fencing (the task is retired and quarantined),
+          preserves all historical records, and leaves the Runtime paused;
+          future work requires fresh authorization. This is cooperative — it
+          does not kill the Executor process, which stops at its next control
+          boundary.</p>
+          <p><button id="hc-interrupt-task" type="button"
+            class="hc-danger-button">Interrupt current task</button></p>
+          <div id="hc-interrupt-confirm" class="hc-confirm" hidden>
+            <p>The current task will be retired (authority revoked), the
+            TO_ZCODE dispatch quarantined, and the Runtime paused. History is
+            preserved. Resume when you are ready.</p>
+            <p>
+              <button id="hc-interrupt-confirm-button" type="button"
+                class="hc-danger-button">Confirm interrupt</button>
+              <button id="hc-interrupt-cancel-button" type="button">
+                Cancel</button>
+            </p>
+          </div>
+          <h4>Formal STOP</h4>
+          <p class="hint">STOP is terminal and different from Pause: the
+          Orchestrator makes no new Codex calls after detecting it, and an
+          ordinary Resume will not resurrect the stopped work — recovery
+          needs the documented STOP path. The Console asks the Runtime's
+          formal STOP entry point to apply it after a confirmation challenge
+          you request here.</p>
+          <p><button id="hc-stop-prepare" type="button"
+            class="hc-danger-button" disabled>Request STOP confirmation
+            challenge</button></p>
+          <div id="hc-stop-challenge" class="hc-confirm" hidden>
+            <p>Challenge issued. It is single-use, expires in
+            <span id="hc-stop-expires"></span> s, and is bound to this
+            Runtime and the current project state.</p>
+            <p class="hint">Challenge id: <span id="hc-stop-challenge-id">
+            </span></p>
+            <label for="hc-stop-token">Confirmation token</label>
+            <input id="hc-stop-token" type="text" maxlength="32"
+              autocomplete="off">
+            <label for="hc-stop-project">Project id (type it exactly)</label>
+            <input id="hc-stop-project" type="text" maxlength="120"
+              autocomplete="off">
+            <p>
+              <button id="hc-stop-confirm" type="button"
+                class="hc-danger-button">Confirm formal STOP</button>
+              <button id="hc-stop-cancel" type="button">Cancel</button>
+            </p>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section id="pending-controls-section">
+      <h2>Pending controls</h2>
+      <p><button id="pc-refresh" type="button">Refresh</button></p>
+      <div id="pc-list"></div>
+      <p id="pc-status" class="muted">Loading…</p>
+    </section>
+  </aside>
+
+</div>
+
+<div id="task-drawer" role="dialog" aria-labelledby="td-title" hidden>
+  <div id="td-head">
+    <h2 id="td-title">Task Detail</h2>
+    <button id="td-close" type="button">Close</button>
+  </div>
+  <p class="hint">Read-only inspection of one round. The Codex Full Dispatch
+  tab relays the exact archived TO_ZCODE bytes; the ZCode Feedback tab shows
+  the authoritative completion receipt; the Context tab shows the Supervisor
+  decision receipt only when its recorded hash verifies.</p>
+  <div id="td-tabs">
+    <button type="button" data-tab="overview" class="active">Overview</button>
+    <button type="button" data-tab="dispatch">Codex Full Dispatch</button>
+    <button type="button" data-tab="feedback">ZCode Feedback</button>
+    <button type="button" data-tab="artifacts">Artifacts</button>
+    <button type="button" data-tab="context">Context</button>
+    <button type="button" data-tab="protocol">Protocol Details</button>
+  </div>
+  <div id="td-body"></div>
+</div>
+
+<footer>Served from 127.0.0.1 only · same-origin requests to
+<code>/api/health</code>, <code>/api/status</code>,
+<code>/api/runtimes</code>,
+<code>/api/runtimes/&lt;id&gt;/cockpit</code>,
+<code>/api/runtimes/&lt;id&gt;/timeline</code>,
+<code>/api/runtimes/&lt;id&gt;/rounds/&lt;message-id&gt;</code>,
+<code>/api/runtimes/&lt;id&gt;/artifacts</code>,
+<code>/api/runtimes/&lt;id&gt;/artifacts/feedback</code>,
+<code>/api/runtimes/&lt;id&gt;/controls</code>, the bounded mutation
+routes under <code>/api/runtimes/&lt;id&gt;/controls/…</code>, and the
+bounded Setup routes under
+<code>/api/runtimes/&lt;id&gt;/setup/…</code> · every control
+delegates to the existing v1.2 Runtime entry points
+(<code>supervisor_control.py</code>, <code>start_project.py</code>,
+<code>START_AGENT_SYSTEM.ps1</code>, <code>STOP_AGENT_SYSTEM.ps1</code>,
+<code>resume_human_review.py</code>) · no model call is made to explain the
+state, the history, or the artifacts.</footer>
+
+<script>
+"use strict";
+
+const COCKPIT_POLL_MS = 5000;
+const RUNTIMES_POLL_MS = 30000;
+const HEALTH_POLL_MS = 15000;
+const TIMELINE_POLL_MS = 15000;
+let selectedRuntimeId = null;
+// P4 Timeline state: pagination/order/search/filter plus the live-refresh
+// bookkeeping. selectionPreserved marks periodic refreshes, which must keep
+// the user's page, open rounds, and drawer exactly where they are.
+let tlPageSize = "20";
+const timelineState = {
+  page: 1, order: "newest", kind: "all", q: "",
+  totalPages: 1, totalRounds: 0,
+};
+let selectionPreserved = false;
+let lastFirstRoundId = null;
+let expandedRounds = new Set();
+let drawerMessageId = null;
+let drawerTab = "overview";
+let drawerPayload = null;
+// P8: per-Runtime index of Supervisor turn records keyed by the resulting
+// dispatch MESSAGE_ID; rebuilt on every timeline load, never guessed.
+let svTurnIndex = null;
+// P9: notification deduplication is keyed by Runtime id + stable alert id,
+// so the same fact never notifies twice and switching Runtimes cannot
+// re-notify for a different root's already-seen alerts.
+const notifiedAlertIds = new Set();
+let runtimeSettingsCache = null;
+const NOTIFICATION_PREF_KEYS = {
+  HUMAN_REVIEW: "human_review",
+  ORCHESTRATOR_ERROR: "orchestrator_error",
+  HEALTH_SEVERE: "health_severe",
+  EXPIRY_RISK: "expiry_risk",
+  COMPLETE: "complete",
+  SAFE_PAUSE: "safe_pause",
+  ZCODE_PICKUP: "zcode_pickup",
+  HIGH_TOKEN_TURN: "high_token_turn",
+};
+const NOTIFY_CHECKBOX_IDS = {
+  complete: "settings-notify-complete",
+  safe_pause: "settings-notify-safe-pause",
+  zcode_pickup: "settings-notify-zcode-pickup",
+  high_token_turn: "settings-notify-high-token-turn",
+  human_review: "settings-notify-human-review",
+  orchestrator_error: "settings-notify-orchestrator-error",
+  health_severe: "settings-notify-health-severe",
+  expiry_risk: "settings-notify-expiry-risk",
+};
+const THRESHOLD_INPUT_IDS = {
+  zcode_pickup_minutes: "settings-threshold-zcode-pickup",
+  expiry_warning_minutes: "settings-threshold-expiry-warning",
+  expiry_critical_minutes: "settings-threshold-expiry-critical",
+  turn_minutes: "settings-threshold-turn",
+  unconsumed_minutes: "settings-threshold-unconsumed",
+  usage_outlier_factor: "settings-threshold-usage-factor",
+  usage_outlier_min_sample: "settings-threshold-usage-sample",
+};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) { node.className = className; }
+  if (text !== undefined) { node.textContent = String(text); }
+  return node;
+}
+
+function clear(node) {
+  node.replaceChildren();
+}
+
+function fillDetails(element, pairs) {
+  clear(element);
+  for (const [key, value] of pairs) {
+    element.append(el("dt", null, key), el("dd", null, value));
+  }
+}
+
+function setPanel(element, text, tone) {
+  element.textContent = String(text);
+  element.classList.toggle("ok", tone === "ok");
+  element.classList.toggle("bad", tone === "bad");
+  element.classList.toggle("muted", tone === "muted" || tone === undefined);
+}
+
+function unavailableText(label) {
+  return label ? "Unavailable — " + label : "Unavailable";
+}
+
+async function fetchJson(url, options) {
+  const response = await fetch(url,
+    Object.assign({ cache: "no-store" }, options || {}));
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    payload = null;
+  }
+  return { ok: response.ok && payload !== null, payload: payload };
+}
+
+// P5 mutation helper: one fetch call site (fetchJson) serves both GET and
+// POST; every request is same-origin.
+function postJson(url, body) {
+  return fetchJson(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(body === undefined ? {} : body),
+  });
+}
+
+function reachedText(reached) {
+  if (reached === true) { return "reached"; }
+  if (reached === false) { return "not yet"; }
+  return "not reported";
+}
+
+async function loadHealth() {
+  const state = document.getElementById("health-state");
+  try {
+    const { ok, payload } = await fetchJson("/api/health");
+    if (!ok || !payload || payload.ok !== true) {
+      setPanel(state, "health endpoint returned an error document", "bad");
+      fillDetails(document.getElementById("health-details"), []);
+      return;
+    }
+    setPanel(state, "backend is alive", "ok");
+    fillDetails(document.getElementById("health-details"), [
+      ["Backend started at", payload.backend.started_at],
+      ["Backend pid", payload.backend.pid],
+      ["Control plane script present",
+        payload.control_plane.script_present ? "yes" : "NO"],
+      ["Runtime root", payload.instance.runtime_root],
+    ]);
+    setPanel(document.getElementById("rh-backend"),
+      "ok — pid " + payload.backend.pid + " · started " +
+      payload.backend.started_at, "ok");
+  } catch (error) {
+    setPanel(state, "backend unreachable: " + error, "bad");
+  }
+}
+
+async function loadRuntimes() {
+  const list = document.getElementById("runtime-list");
+  const hint = document.getElementById("runtimes-hint");
+  try {
+    const { ok, payload } = await fetchJson("/api/runtimes");
+    clear(list);
+    if (!ok || !payload || payload.ok !== true) {
+      setPanel(hint, "Runtime list unavailable (Registry error).", "bad");
+      return;
+    }
+    if (payload.count === 0) {
+      setPanel(hint,
+        "No Runtimes are registered with this Console yet. Registration is " +
+        "a Console operation of the v1.2 tooling; this read-only stage only " +
+        "lists and selects registered Runtimes.", "muted");
+      return;
+    }
+    setPanel(hint, payload.count + " registered Runtime(s). Select one.",
+      "muted");
+    for (const entry of payload.runtimes) {
+      const button = el("button", "runtime-item");
+      button.type = "button";
+      button.dataset.runtimeId = entry.id;
+      button.append(
+        el("span", null, entry.label),
+        el("span", "rid", "  ·  id " + entry.id +
+          (entry.validation && entry.validation.ok
+            ? ""
+            : "  ·  validation failed")));
+      if (entry.id === selectedRuntimeId) {
+        button.classList.add("selected");
+      }
+      button.addEventListener("click", function () {
+        selectRuntime(entry.id);
+      });
+      list.append(button);
+    }
+    if (selectedRuntimeId === null && payload.runtimes.length === 1) {
+      selectRuntime(payload.runtimes[0].id);
+    }
+  } catch (error) {
+    clear(list);
+    setPanel(hint, "Runtime list request failed: " + error, "bad");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// P8 Supervisor-turn observability
+// ---------------------------------------------------------------------------
+
+function usageText(usage) {
+  if (!usage || !usage.reported) { return "usage not reported"; }
+  const parts = [];
+  for (const [key, label] of [["input_tokens", "in"],
+                              ["output_tokens", "out"],
+                              ["total_tokens", "total"]]) {
+    if (usage[key] !== null && usage[key] !== undefined) {
+      parts.push(label + " " + usage[key]);
+    }
+  }
+  return parts.length ? tokensLabel(parts) : "usage not reported";
+}
+
+function tokensLabel(parts) {
+  return parts.join(" / ") + " tokens";
+}
+
+function turnProfileText(turn) {
+  const config = (turn && turn.supervisor_config) || {};
+  const model = config.model || "unknown model";
+  const effort = config.reasoning_effort || "unknown effort";
+  const source = config.source === "queued"
+    ? " (queued configuration)" : " (fixed policy)";
+  return model + " · " + effort + source;
+}
+
+function svTurnForRound(messageId) {
+  return svTurnIndex ? svTurnIndex.get(String(messageId)) : null;
+}
+
+function resetSupervisorPanel() {
+  svTurnIndex = null;
+  setPanel(document.getElementById("sv-config-status"),
+    "Select a Runtime to observe it.", "muted");
+  const latest = document.getElementById("sv-latest-turn");
+  clear(latest);
+  latest.append(el("p", "muted", "—"));
+  clear(document.getElementById("sv-usage-summary"));
+  clear(document.getElementById("sv-config-state"));
+  document.getElementById("sv-config-model").value = "";
+  document.getElementById("sv-config-effort").value = "HIGH";
+  setPanel(document.getElementById("sv-config-draft"), "", "muted");
+}
+
+async function loadSupervisorPanel() {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const [turns, usage, config] = await Promise.all([
+      fetchJson("/api/runtimes/" + selectedRuntimeId
+        + "/supervisor/turns?limit=5"),
+      fetchJson("/api/runtimes/" + selectedRuntimeId + "/supervisor/usage"),
+      fetchJson("/api/runtimes/" + selectedRuntimeId + "/supervisor/config"),
+    ]);
+    if (!turns.ok || !turns.payload || turns.payload.ok !== true
+        || !usage.ok || !usage.payload || usage.payload.ok !== true
+        || !config.ok || !config.payload || config.payload.ok !== true) {
+      const code = (turns.payload && turns.payload.error)
+        ? turns.payload.error.code : "HTTP error";
+      const latest = document.getElementById("sv-latest-turn");
+      clear(latest);
+      latest.append(el("p", "unavailable",
+        "Supervisor turn observability unavailable — " + code
+        + ". Nothing is shown rather than a guess."));
+      return;
+    }
+    renderSupervisorTurns(turns.payload.supervisor_turns);
+    renderSupervisorUsage(usage.payload.supervisor_usage.usage);
+    renderSupervisorConfig(config.payload.supervisor_config);
+  } catch (error) {
+    const latest = document.getElementById("sv-latest-turn");
+    clear(latest);
+    latest.append(el("p", "unavailable",
+      "Supervisor turn observability request failed: " + error));
+  }
+}
+
+function renderSupervisorTurns(document_) {
+  const latest = document.getElementById("sv-latest-turn");
+  clear(latest);
+  if (!document_.turns.length) {
+    const note = document_.honesty.length
+      ? document_.honesty[0]
+      : "no Supervisor turn records exist yet";
+    latest.append(el("p", "muted", note));
+    return;
+  }
+  const turn = document_.turns[0];
+  latest.append(el("p", null, turnProfileText(turn)));
+  const facts = document.createElement("dl");
+  fillDetails(facts, [
+    ["Turn", turn.turn_id],
+    ["Finished", turn.finished_at],
+    ["Duration", durationText(turn.duration_seconds) || "unavailable"],
+    ["Usage", usageText(turn.usage)],
+    ["Decision", turn.decision.decision || "unavailable"],
+    ["Why (decision summary)", decisionSummaryText(turn.decision.summary)],
+    ["Resulting status", turn.decision.resulting_status || "unavailable"],
+    ["Resulting dispatch", turn.dispatch_linkage
+      ? "MESSAGE " + turn.dispatch_linkage.MESSAGE_ID : "none this turn"],
+  ]);
+  latest.append(facts);
+  latest.append(el("p", "muted",
+    document_.totals.total_records + " turn record(s) · "
+    + document_.totals.total_unusable + " unusable record(s) surfaced"));
+}
+
+function renderSupervisorUsage(usage) {
+  const summary = document.getElementById("sv-usage-summary");
+  fillDetails(summary, [
+    ["Input tokens (reported)", usage.totals.input_tokens ?? "Not reported"],
+    ["Output tokens (reported)", usage.totals.output_tokens ?? "Not reported"],
+    ["Total tokens (reported)", usage.totals.total_tokens ?? "Not reported"],
+    ["Turns with reported usage", usage.turns_with_reported_usage
+      + " of " + usage.turns_total],
+    ["Average total per reported turn",
+      usage.average_total_per_reported_turn ?? "Not reported"],
+    ["Highest reported turn", usage.highest_total_turn
+      ? (usage.highest_total_turn.total_tokens + " tokens ("
+         + usage.highest_total_turn.turn_id + ")") : "Not reported"],
+    ["ZCode usage", usage.zcode_usage.reported
+      ? String(usage.zcode_usage.total_tokens) + " tokens"
+      : "Not reported"],
+  ]);
+}
+
+function renderSupervisorConfig(view) {
+  const container = document.getElementById("sv-config-state");
+  clear(container);
+  const active = el("p", null,
+    "Active: " + (view.active.configured
+      ? (view.active.model + " · " + view.active.reasoning_effort
+         + " (queued configuration, applied "
+         + (view.active.applied_at || "unknown") + ")")
+      : "Runtime fixed policy — model/effort not reported"));
+  container.append(active);
+  if (view.pending) {
+    container.append(el("p", "unavailable",
+      "Pending: " + view.pending.model + " · " + view.pending.reasoning_effort
+      + " — Model change queued — applies next Supervisor turn"
+      + " (queued " + (view.pending.queued_at || "unknown") + ")"));
+  } else {
+    container.append(el("p", "muted",
+      "No configuration change is queued."));
+  }
+  const efforts = document.getElementById("sv-config-effort");
+  clear(efforts);
+  for (const effort of view.supported_reasoning_efforts) {
+    const option = document.createElement("option");
+    option.value = effort;
+    option.textContent = effort;
+    efforts.append(option);
+  }
+  const draftNote = view.draft.available
+    ? ("Setup draft suggests: " + (view.draft.model || "no model")
+       + " · " + (view.draft.reasoning_effort || "no effort")
+       + " — Console-owned setup draft (non-authoritative); it only prefills "
+       + "this form.")
+    : "No Supervisor setup draft exists yet.";
+  setPanel(document.getElementById("sv-config-draft"), draftNote, "muted");
+  document.getElementById("sv-config-model").placeholder =
+    view.draft.available && view.draft.model
+      ? String(view.draft.model) : "e.g. gpt-5.6-sol";
+}
+
+async function submitSupervisorConfig() {
+  const model = document.getElementById("sv-config-model").value.trim();
+  const effort = document.getElementById("sv-config-effort").value;
+  const statusEl = document.getElementById("sv-config-status");
+  if (!model) {
+    setPanel(statusEl, "Enter a Supervisor model to queue a change.", "bad");
+    return;
+  }
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/supervisor/config",
+      { method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ model: model, reasoning_effort: effort }) });
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error ? payload.error.code : "HTTP error";
+      const message = payload && payload.error ? payload.error.message : "";
+      setPanel(statusEl, "Change refused — " + code + ". " + message, "bad");
+      return;
+    }
+    const result = payload.supervisor_config || {};
+    const inFlight = result.turn_in_flight
+      ? " A Supervisor turn is active right now; the active call was not "
+        + "interrupted and the change stays queued."
+      : "";
+    setPanel(statusEl,
+      "Queued: " + result.pending.model + " · "
+      + result.pending.reasoning_effort + " — applies next Supervisor turn; "
+      + "never interrupts an active call." + inFlight, "ok");
+    loadSupervisorPanel();
+  } catch (error) {
+    setPanel(statusEl, "Configuration request failed: " + error, "bad");
+  }
+}
+
+function selectRuntime(runtimeId) {
+  selectedRuntimeId = runtimeId;
+  for (const button of document.querySelectorAll(".runtime-item")) {
+    button.classList.toggle("selected",
+      button.dataset.runtimeId === selectedRuntimeId);
+  }
+  // A different Runtime is a different history: reset the browsing state so
+  // no stale page, filter, or drawer can leak between Runtimes.
+  timelineState.page = 1;
+  timelineState.q = "";
+  document.getElementById("tl-search").value = "";
+  document.getElementById("tl-new-events").hidden = true;
+  lastFirstRoundId = null;
+  expandedRounds = new Set();
+  closeDrawer();
+  // P5: control state is per-Runtime too. Close every pending confirmation
+  // and reset the STOP challenge so nothing can leak between Runtimes.
+  resetControlPanel();
+  // P6: the Artifact Center is per-Runtime as well; selection, filters, and
+  // open previews never leak across Runtimes.
+  resetArtifactCenter();
+  // P7: the Setup Wizard draft view and any in-flight confirmations are
+  // per-Runtime; nothing leaks between Runtimes.
+  resetSetupWizard();
+  // P8: Supervisor turn observability is per-Runtime as well; the turn
+  // index and any queued-configuration view reset with the selection.
+  resetSupervisorPanel();
+  // P9: alerts, settings/notes, and the Recent Artifacts block are
+  // per-Runtime too; nothing leaks between Runtimes.
+  resetAlertsPanel();
+  resetRecentArtifacts();
+  resetSettingsPanel();
+  loadCockpit();
+  loadTimeline();
+  loadControls();
+  loadSupervisorPanel();
+  loadAlerts();
+  loadRecentArtifacts();
+  loadSettingsPanel();
+}
+
+function renderInterpretation(interpretation) {
+  const state = interpretation.state;
+  const tone = state.user_action_required ? "bad"
+    : (state.family === "COMPLETE" || state.family === "IDLE"
+      ? "ok" : "muted");
+  setPanel(document.getElementById("ce-state-label"), state.label, tone);
+  setPanel(document.getElementById("ce-detail"), state.detail || "", "muted");
+  setPanel(document.getElementById("ce-worker"),
+    state.worker.available ? state.worker.who
+      : "Unavailable — nobody is actively working", "muted");
+  setPanel(document.getElementById("ce-since"),
+    state.since.available
+      ? state.since.at + "  (from " + state.since.source + ")"
+      : unavailableText(
+          "the Runtime reported no authoritative timestamp for this state"),
+    "muted");
+
+  const next = interpretation.next_expected;
+  setPanel(document.getElementById("ce-next-label"), next.label,
+    next.available ? "muted" : "bad");
+  setPanel(document.getElementById("ce-next-detail"), next.detail || "",
+    "muted");
+
+  const action = document.getElementById("ce-action");
+  if (state.user_action_required) {
+    setPanel(action,
+      "YES — " + (state.user_action_reason || "attention required"), "bad");
+  } else {
+    setPanel(action,
+      "No — " + (state.user_action_reason ||
+        "nothing is required from you right now"), "ok");
+  }
+
+  const milestones = document.getElementById("ce-milestones");
+  clear(milestones);
+  if (interpretation.milestones.length === 0) {
+    milestones.append(el("li", "muted",
+      "No task identity is active, so no milestone facts apply."));
+  }
+  for (const milestone of interpretation.milestones) {
+    milestones.append(el("li", null,
+      milestone.label + ": " + reachedText(milestone.reached) +
+      (milestone.reached === null
+        ? ""
+        : "  (" + milestone.evidence + ")")));
+  }
+
+  const protocol = interpretation.protocol;
+  fillDetails(document.getElementById("ce-protocol"), [
+    ["Message ID", protocol.available ? protocol.message_id : "—"],
+    ["Task", protocol.available ? protocol.task_id : "—"],
+    ["Stage", protocol.available ? protocol.stage_id : "—"],
+    ["Attempt", protocol.available ? protocol.attempt : "—"],
+    ["Final Verification",
+      interpretation.final_verification.available
+        ? (interpretation.final_verification.is_final_verification
+          ? "yes — this task is a Final Verification gate"
+          : "no")
+        : "unavailable"],
+  ]);
+
+  fillDetails(document.getElementById("ce-tech"), [
+    ["State family", state.family],
+    ["Interpretation", "deterministic, offline (no model call)"],
+    ["User action reason", state.user_action_reason || "—"],
+    ["Unknown fields",
+      interpretation.honesty.unknown_fields.join(", ") || "none"],
+    ["Malformed fields",
+      interpretation.honesty.malformed_fields.join(", ") || "none"],
+    ["Contradictions",
+      interpretation.honesty.contradictions.join(", ") || "none"],
+    ["Notes", interpretation.honesty.notes.join(" ") || "—"],
+  ]);
+}
+
+function renderHealth(health) {
+  const orchestrator = health.orchestrator;
+  setPanel(document.getElementById("rh-orchestrator"),
+    orchestrator.available
+      ? orchestrator.label + " (" + orchestrator.status + ")"
+      : unavailableText("the Runtime did not report an Orchestrator status"),
+    "muted");
+  const codex = health.codex;
+  setPanel(document.getElementById("rh-codex"),
+    codex.available ? codex.label
+      : unavailableText("the Runtime did not report a project status"),
+    "muted");
+  const zcode = health.zcode;
+  setPanel(document.getElementById("rh-zcode"),
+    zcode.available ? zcode.last_observed_activity
+      : unavailableText("no claim or consumed completion has been observed"),
+    "muted");
+  const auth = health.current_authorization;
+  setPanel(document.getElementById("rh-authorization"),
+    auth.available
+      ? "MESSAGE " + auth.message_id + " · " + auth.task_id +
+        " · " + auth.stage_id + " · attempt " + auth.attempt +
+        "  (from " + auth.source + ")"
+      : unavailableText("no task authorization is recorded"),
+    "muted");
+  const claim = health.current_claim;
+  setPanel(document.getElementById("rh-claim"),
+    "recorded: " + (claim.recorded ? "yes" : "no") +
+    " · running: " + (claim.running ? "yes" : "no") +
+    " · retired: " + (claim.retired ? "yes" : "no"), "muted");
+  const interventions = health.pending_interventions;
+  setPanel(document.getElementById("rh-interventions"),
+    interventions.available
+      ? interventions.count + " pending"
+      : unavailableText(null), "muted");
+
+  const errors = document.getElementById("rh-errors");
+  clear(errors);
+  if (health.errors_and_warnings.length === 0) {
+    errors.append(el("li", "muted", "none observed"));
+    return;
+  }
+  for (const entry of health.errors_and_warnings) {
+    errors.append(el("li",
+      entry.severity === "error" || entry.severity === "warning"
+        ? "bad" : "muted",
+      entry.severity + " · " + entry.code + " — " + entry.message));
+  }
+}
+
+function renderRuntimeIdentity(runtime) {
+  const protocol = document.getElementById("ce-protocol");
+  protocol.append(
+    el("dt", null, "Runtime label"), el("dd", null, runtime.label),
+    el("dt", null, "Runtime id"), el("dd", null, runtime.id));
+}
+
+async function loadCockpit() {
+  const stateLabel = document.getElementById("ce-state-label");
+  if (selectedRuntimeId === null) {
+    setPanel(stateLabel, "Select a Runtime to observe it.", "muted");
+    return;
+  }
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/cockpit");
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error
+        ? payload.error.code : "HTTP error";
+      const message = payload && payload.error ? payload.error.message : "";
+      setPanel(stateLabel, unavailableText(code), "bad");
+      setPanel(document.getElementById("ce-detail"),
+        message + "  The control plane did not answer coherently, so no " +
+        "state is shown rather than a guess.", "bad");
+      return;
+    }
+    const cockpit = payload.cockpit;
+    renderRuntimeIdentity(cockpit.runtime);
+    renderInterpretation(cockpit.interpretation);
+    renderHealth(cockpit.interpretation.health);
+    lastCockpitFamily = cockpit.interpretation.state.family;
+    updateControlButtons();
+  } catch (error) {
+    setPanel(stateLabel, "cockpit request failed: " + error, "bad");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// P4 Timeline
+// ---------------------------------------------------------------------------
+
+function timelineQuery() {
+  const params = new URLSearchParams();
+  params.set("page", String(timelineState.page));
+  params.set("page_size", tlPageSize);
+  params.set("order", timelineState.order);
+  params.set("kind", timelineState.kind);
+  if (timelineState.q) { params.set("q", timelineState.q); }
+  return params.toString();
+}
+
+function statusClass(status) {
+  if (status === "COMPLETED") { return "round-status completed"; }
+  if (status === "DISPATCH_UNTRUSTED" || status === "COMPLETION_UNTRUSTED"
+      || status === "CONTRADICTORY_HISTORY") {
+    return "round-status untrusted";
+  }
+  if (status === "COMPLETION_WITHOUT_DISPATCH") {
+    return "round-status anomaly";
+  }
+  return "round-status";
+}
+
+function durationText(seconds) {
+  if (seconds === null || seconds === undefined) { return null; }
+  if (seconds < 60) { return seconds + " s"; }
+  return Math.floor(seconds / 60) + "m " + (seconds % 60) + "s";
+}
+
+function renderRound(round) {
+  const container = el("div", "timeline-round");
+  const details = document.createElement("details");
+  details.dataset.roundId = String(round.message_id);
+  if (expandedRounds.has(round.message_id)) { details.open = true; }
+  details.addEventListener("toggle", function () {
+    if (details.open) { expandedRounds.add(round.message_id); }
+    else { expandedRounds.delete(round.message_id); }
+  });
+  const summary = document.createElement("summary");
+  const head = el("div", "round-head");
+  head.append(
+    el("span", null, "MESSAGE " + round.message_id),
+    el("span", statusClass(round.status), round.status));
+  const duration = durationText(round.duration_seconds);
+  head.append(el("span", "round-meta",
+    (duration ? " · duration " + duration : "")
+    + (round.identity.task_id ? " · " + round.identity.task_id : "")
+    + (round.identity.stage_id ? " · " + round.identity.stage_id : "")));
+  summary.append(head);
+  details.append(summary);
+
+  const body = el("div", "round-meta");
+  const badges = el("div", "round-head");
+  if (round.has_dispatch) {
+    badges.append(el("span", "badge",
+      "dispatch · " + (round.dispatch_integrity || "unknown integrity")));
+  }
+  if (round.has_completion) {
+    badges.append(el("span", "badge",
+      "completion · " + (round.completion_status || "unknown status")));
+  }
+  if (round.intervention_count > 0) {
+    badges.append(el("span", "badge warn",
+      round.intervention_count + " intervention(s)"));
+  }
+  for (const problem of round.honesty.contradictions) {
+    badges.append(el("span", "badge bad", "contradiction · " + problem));
+  }
+  body.append(badges);
+  const stamps = [];
+  if (round.archived_at) { stamps.push("dispatch archived " + round.archived_at); }
+  if (round.committed_at) { stamps.push("completion committed " + round.committed_at); }
+  body.append(el("p", null, stamps.length ? stamps.join(" · ")
+    : "The Runtime reported no timestamp for this round."));
+  const svTurn = svTurnForRound(round.message_id);
+  if (svTurn) {
+    const duration = durationText(svTurn.duration_seconds);
+    body.append(el("p", "muted",
+      "Supervisor turn: " + turnProfileText(svTurn)
+      + (duration ? " · duration " + duration : "")
+      + " · " + usageText(svTurn.usage)));
+    if (svTurn.decision.summary) {
+      body.append(el("p", "muted", "Why: " + svTurn.decision.summary));
+    }
+  }
+  for (const note of round.honesty.notes) {
+    body.append(el("p", "muted", note));
+  }
+  const openButton = el("button", "round-detail-open",
+    "Open Task Detail");
+  openButton.type = "button";
+  openButton.addEventListener("click", function () {
+    openTaskDetail(round.message_id);
+  });
+  body.append(openButton);
+  details.append(body);
+  container.append(details);
+  return container;
+}
+
+async function loadTimeline() {
+  const rounds = document.getElementById("tl-rounds");
+  const status = document.getElementById("tl-status");
+  if (selectedRuntimeId === null) {
+    clear(rounds);
+    setPanel(status, "Select a Runtime to browse its history.", "muted");
+    return;
+  }
+  try {
+    const turnsResult = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/supervisor/turns?limit=100");
+    svTurnIndex = new Map();
+    if (turnsResult.ok && turnsResult.payload
+        && turnsResult.payload.ok === true) {
+      for (const turn of turnsResult.payload.supervisor_turns.turns) {
+        const linkage = turn.dispatch_linkage;
+        if (linkage && linkage.MESSAGE_ID !== null
+            && linkage.MESSAGE_ID !== undefined) {
+          svTurnIndex.set(String(linkage.MESSAGE_ID), turn);
+        }
+      }
+    }
+
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/timeline?" + timelineQuery());
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error ? payload.error.code : "HTTP error";
+      const message = payload && payload.error ? payload.error.message : "";
+      clear(rounds);
+      setPanel(status, "Timeline unavailable — " + code + ". " + message, "bad");
+      return;
+    }
+    const timeline = payload.timeline;
+    // Live updates must not yank the user's view: on a preserved (periodic)
+    // refresh of a non-default page, a changed first round id means new
+    // rounds were inserted earlier — offer a jump instead of moving them.
+    if (selectionPreserved && timelineState.page > 1
+        && lastFirstRoundId !== null && timeline.rounds.length > 0
+        && timeline.rounds[0].message_id !== lastFirstRoundId) {
+      document.getElementById("tl-new-events").hidden = false;
+    }
+    if (timelineState.page === 1 && timeline.rounds.length > 0) {
+      lastFirstRoundId = timeline.rounds[0].message_id;
+    }
+    timelineState.totalPages = timeline.totals.pages;
+    timelineState.totalRounds = timeline.totals.rounds;
+    clear(rounds);
+    if (timeline.rounds.length === 0) {
+      setPanel(status, "No rounds are recorded for this selection"
+        + (timelineState.q ? " (search: " + timelineState.q + ")" : "")
+        + ".", "muted");
+    } else {
+      setPanel(status, timeline.totals.rounds + " round(s), "
+        + timeline.totals.pages + " page(s) · newest event first from the "
+        + "authoritative archive and ledger", "muted");
+      for (const round of timeline.rounds) { rounds.append(renderRound(round)); }
+    }
+    for (const note of timeline.honesty.notes) {
+      rounds.append(el("p", "muted", "Note: " + note));
+    }
+    document.getElementById("tl-page-indicator").textContent =
+      "page " + timelineState.page + " of " + timeline.totals.pages
+      + " · " + timeline.totals.rounds + " round(s)";
+    document.getElementById("tl-prev").disabled = timelineState.page <= 1;
+    document.getElementById("tl-next").disabled =
+      timelineState.page >= timeline.totals.pages;
+  } catch (error) {
+    clear(rounds);
+    setPanel(status, "Timeline request failed: " + error, "bad");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// P4 Task Detail drawer
+// ---------------------------------------------------------------------------
+
+function closeDrawer() {
+  drawerMessageId = null;
+  drawerPayload = null;
+  document.getElementById("task-drawer").hidden = true;
+}
+
+function setTab(tab) {
+  drawerTab = tab;
+  for (const button of document.querySelectorAll("#td-tabs button")) {
+    button.classList.toggle("active", button.dataset.tab === tab);
+  }
+}
+
+async function openTaskDetail(messageId) {
+  drawerMessageId = messageId;
+  drawerPayload = null;
+  const drawer = document.getElementById("task-drawer");
+  drawer.hidden = false;
+  document.getElementById("td-title").textContent =
+    "Task Detail — MESSAGE " + messageId;
+  setTab("overview");
+  const body = document.getElementById("td-body");
+  clear(body);
+  body.append(el("p", "muted", "Loading…"));
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/rounds/" + messageId);
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error ? payload.error.code : "HTTP error";
+      const message = payload && payload.error ? payload.error.message : "";
+      clear(body);
+      body.append(el("p", "unavailable",
+        "Task Detail unavailable — " + code + ". " + message));
+      body.append(el("p", "muted",
+        "No authoritative history is shown rather than a guess."));
+      return;
+    }
+    drawerPayload = payload;
+    renderDrawer();
+  } catch (error) {
+    clear(body);
+    body.append(el("p", "unavailable", "Task Detail request failed: " + error));
+  }
+}
+
+function drawerUnavailable(block, label) {
+  const body = document.getElementById("td-body");
+  clear(body);
+  body.append(el("p", "unavailable",
+    label + " is unavailable for this round."));
+  if (block && block.reason) {
+    body.append(el("p", "muted", "Reason: " + block.reason));
+  }
+  body.append(el("p", "muted",
+    "Unreported facts are shown as unavailable — never invented."));
+}
+
+function renderDrawer() {
+  if (drawerPayload === null || drawerMessageId === null) { return; }
+  const round = drawerPayload.round;
+  const body = document.getElementById("td-body");
+  clear(body);
+  if (drawerTab === "overview") {
+    const statusTone = round.dispatch && round.dispatch.integrity
+      && round.dispatch.integrity !== "AUTHORIZED_VALID" ? "unavailable" : "muted";
+    body.append(el("p", statusTone,
+      "Round status: " + (round.status || "unavailable")));
+    fillDetails(body.appendChild(document.createElement("dl")), [
+      ["Message ID", round.identity.message_id],
+      ["Task", round.identity.task_id || "unavailable"],
+      ["Stage", round.identity.stage_id || "unavailable"],
+      ["Attempt", round.identity.attempt ?? "unavailable"],
+      ["Dispatch archived", round.dispatch && round.dispatch.available
+        ? (round.dispatch.archived_at || "no timestamp reported")
+        : "unavailable"],
+      ["Completion committed", round.completion && round.completion.available
+        ? (round.completion.committed_at || "no timestamp reported")
+        : "unavailable"],
+      ["Duration", durationText(roundDurationSeconds(round))
+        || "not reported"],
+      ["Completion status", round.completion && round.completion.available
+        ? (round.completion.status || "unavailable")
+        : "unavailable"],
+      ["Interventions", String(round.interventions.length)],
+    ]);
+    const honesty = el("div");
+    honesty.append(el("h3", null, "Honesty notes"));
+    if (round.honesty.notes.length === 0
+        && round.honesty.control.length === 0) {
+      honesty.append(el("p", "muted", "none"));
+    }
+    for (const note of round.honesty.notes) { honesty.append(el("p", "muted", note)); }
+    for (const note of round.honesty.control) {
+      honesty.append(el("p", "bad", note.source + " control query: " + note.code));
+    }
+    for (const problem of round.honesty.contradictions) {
+      honesty.append(el("p", "bad", "Contradiction: " + problem));
+    }
+    body.append(honesty);
+    return;
+  }
+  if (drawerTab === "dispatch") {
+    const dispatch = round.dispatch;
+    if (!dispatch || !dispatch.available) {
+      drawerUnavailable(dispatch, "The exact archived Codex dispatch");
+      return;
+    }
+    if (!dispatch.exact_dispatch) {
+      body.append(el("p", "unavailable",
+        "The exact archived dispatch is not relayed because this archive "
+        + "did not verify as AUTHORIZED_VALID."));
+      body.append(el("p", "muted",
+        "Integrity verdict: " + (dispatch.integrity || "unknown")));
+      if (dispatch.error) { body.append(el("p", "muted", dispatch.error)); }
+      return;
+    }
+    body.append(el("p", "muted",
+      "Exact archived TO_ZCODE bytes, relayed verbatim:"));
+    const pre = document.createElement("pre");
+    pre.textContent = dispatch.exact_dispatch;
+    body.append(pre);
+    return;
+  }
+  if (drawerTab === "feedback") {
+    const completion = round.completion;
+    if (!completion || !completion.available) {
+      drawerUnavailable(completion, "The authoritative ZCode completion");
+      return;
+    }
+    if (completion.integrity !== "OK") {
+      body.append(el("p", "unavailable",
+        "The completion ledger entry did not verify (integrity: "
+        + completion.integrity + "); it is surfaced, never presented as "
+        + "trusted history."));
+    }
+    fillDetails(body.appendChild(document.createElement("dl")), [
+      ["Completion status", completion.status || "unavailable"],
+      ["Integrity", completion.integrity || "unavailable"],
+      ["Receipt status", completion.receipt_status || "unavailable"],
+      ["Receipt outcome", completion.receipt_outcome || "unavailable"],
+      ["Committed at", completion.committed_at || "unavailable"],
+      ["Consumed at", completion.consumed_at || "not yet"],
+      ["Sealed at", completion.sealed_at || "not yet"],
+      ["Commit ID", completion.commit_id || "unavailable"],
+      ["Ledger file", completion.ledger_file || "unavailable"],
+    ]);
+    if (completion.receipt) {
+      const details = document.createElement("details");
+      details.append(el("summary", null,
+        "Full authoritative receipt (bounded JSON)"));
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(completion.receipt, null, 2);
+      details.append(pre);
+      body.append(details);
+    }
+    return;
+  }
+  if (drawerTab === "artifacts") {
+    const artifacts = round.artifacts;
+    if (!artifacts || !artifacts.available) {
+      drawerUnavailable(artifacts, "Artifact metadata");
+      return;
+    }
+    body.append(el("p", "muted", artifacts.note));
+    const list = document.createElement("dl");
+    for (const item of artifacts.paths) {
+      list.append(el("dt", null, item.path));
+      list.append(el("dd", null, item.sha256
+        ? "sha256 " + item.sha256 : "sha256 unavailable"));
+    }
+    if (artifacts.paths.length === 0) {
+      list.append(el("dt", null, "No published paths"));
+      list.append(el("dd", null, "the receipt reported none"));
+    }
+    body.append(list);
+    const acLink = el("button", "round-detail-open",
+      "Open in Artifact Center (MESSAGE " + round.identity.message_id + ")");
+    acLink.type = "button";
+    acLink.addEventListener("click", function () {
+      openArtifactCenter(round.identity.message_id);
+    });
+    body.append(acLink);
+    return;
+  }
+  if (drawerTab === "context") {
+    const decision = round.decision;
+    if (!decision || !decision.available || !decision.verified) {
+      drawerUnavailable(decision, "The Supervisor decision receipt");
+      body.append(el("p", "muted",
+        "The decision receipt is shown only when its canonical SHA-256 "
+        + "matches the hash recorded in the dispatch archive and its "
+        + "candidate binding matches this dispatch."));
+      return;
+    }
+    fillDetails(body.appendChild(document.createElement("dl")), [
+      ["Supervisor turn", decision.turn_id],
+      ["Decision", decision.decision_decision || "unavailable"],
+      ["Reason", decision.decision_reason || "unavailable"],
+      ["Resulting status", decision.resulting_status || "unavailable"],
+      ["Committed at", decision.committed_at || "unavailable"],
+      ["Decision history index", decision.decision_history_index
+        ?? "unavailable"],
+      ["Control revision", decision.originating_control_revision
+        ?? "unavailable"],
+      ["Related interventions", (decision.intervention_ids || []).length
+        ? decision.intervention_ids.join(", ") : "none recorded"],
+    ]);
+    body.append(el("p", "muted",
+      "Verified against the hash recorded in the dispatch archive metadata; "
+      + "this is observability metadata, not private chain-of-thought."));
+    if (decision.turn_id) {
+      const turnBox = document.createElement("div");
+      body.append(turnBox);
+      turnBox.append(el("p", "muted",
+        "Supervisor turn observability: loading…"));
+      fetchJson("/api/runtimes/" + selectedRuntimeId
+        + "/supervisor/turns/" + decision.turn_id).then(function (result) {
+        turnBox.textContent = "";
+        if (!result.ok || !result.payload || result.payload.ok !== true) {
+          turnBox.append(el("p", "unavailable",
+            "The Supervisor turn record for this round is unavailable "
+            + "(it may predate turn-record keeping, or failed its "
+            + "integrity check)."));
+          return;
+        }
+        const turn = result.payload.supervisor_turn.turn;
+        const facts = document.createElement("dl");
+        fillDetails(facts, [
+          ["Turn profile", turnProfileText(turn)],
+          ["Duration", durationText(turn.duration_seconds)
+            || "unavailable"],
+          ["Input tokens", turn.usage.input_tokens ?? "usage not reported"],
+          ["Output tokens", turn.usage.output_tokens
+            ?? "usage not reported"],
+          ["Total tokens", turn.usage.total_tokens
+            ?? "usage not reported"],
+          ["Outcome", turn.outcome.recovered_after_crash
+            ? "committed (recovered after crash)"
+            : (turn.outcome.committed ? "committed" : "not committed")],
+        ]);
+        turnBox.append(el("h3", null, "Context manifest"));
+        const manifest = turn.context_manifest;
+        if (!manifest) {
+          turnBox.append(el("p", "muted",
+            "The context manifest is unavailable for this turn."));
+        } else {
+          const dl = document.createElement("dl");
+          for (const [key, value] of Object.entries(manifest)) {
+            dl.append(el("dt", null, key));
+            dl.append(el("dd", null, JSON.stringify(value)));
+          }
+          turnBox.append(dl);
+          turnBox.append(el("p", "muted",
+            "Recorded context classes only — never model reasoning and "
+            + "never file contents."));
+        }
+        turnBox.append(facts);
+      }).catch(function (error) {
+        turnBox.textContent = "";
+        turnBox.append(el("p", "unavailable",
+          "Supervisor turn record request failed: " + error));
+      });
+    }
+    return;
+  }
+  if (drawerTab === "protocol") {
+    const dispatch = round.dispatch;
+    fillDetails(body.appendChild(document.createElement("dl")), [
+      ["MESSAGE_ID", round.identity.message_id],
+      ["TASK_ID", round.identity.task_id || "unavailable"],
+      ["STAGE_ID", round.identity.stage_id || "unavailable"],
+      ["ATTEMPT", round.identity.attempt ?? "unavailable"],
+      ["NONCE", round.identity.nonce || "unavailable"],
+      ["Dispatch integrity", dispatch && dispatch.integrity
+        ? dispatch.integrity : "unavailable"],
+      ["Dispatch SHA-256", dispatch && dispatch.dispatch_sha256
+        ? dispatch.dispatch_sha256 : "unavailable"],
+      ["Supervisor turn", dispatch && dispatch.supervisor_turn_id
+        ? dispatch.supervisor_turn_id : "unavailable"],
+      ["Decision receipt SHA-256", dispatch && dispatch.decision_receipt_sha256
+        ? dispatch.decision_receipt_sha256 : "unavailable"],
+      ["Control revision", dispatch && dispatch.originating_control_revision
+        !== null && dispatch !== undefined && dispatch.originating_control_revision
+        !== undefined ? String(dispatch.originating_control_revision)
+        : "unavailable"],
+      ["Archive metadata file", dispatch && dispatch.metadata_file
+        ? dispatch.metadata_file : "unavailable"],
+      ["Archive bytes file", dispatch && dispatch.archive_file
+        ? dispatch.archive_file : "unavailable"],
+      ["Authorization seal file", dispatch && dispatch.authorization_file
+        ? dispatch.authorization_file : "unavailable"],
+      ["Completion commit ID", round.completion && round.completion.commit_id
+        ? round.completion.commit_id : "unavailable"],
+      ["Completion ledger file", round.completion && round.completion.ledger_file
+        ? round.completion.ledger_file : "unavailable"],
+      ["Claim directory", round.completion && round.completion.claim_dir
+        ? round.completion.claim_dir : "unavailable"],
+    ]);
+    return;
+  }
+}
+
+function roundDurationSeconds(round) {
+  return round.duration_seconds ?? null;
+}
+
+document.getElementById("refresh").addEventListener("click", loadRuntimes);
+document.getElementById("refresh-health").addEventListener("click",
+  function () {
+    loadHealth();
+    loadCockpit();
+    loadSupervisorPanel();
+  });
+
+// P4 Timeline controls. User-initiated changes are not "preserved" refreshes:
+// they legitimately reset the browsing position.
+document.getElementById("tl-order").addEventListener("change", function (event) {
+  timelineState.order = event.target.value;
+  timelineState.page = 1;
+  selectionPreserved = false;
+  document.getElementById("tl-new-events").hidden = true;
+  loadTimeline();
+});
+document.getElementById("tl-page-size").addEventListener("change",
+  function (event) {
+    tlPageSize = event.target.value;
+    timelineState.page = 1;
+    selectionPreserved = false;
+    document.getElementById("tl-new-events").hidden = true;
+    loadTimeline();
+  });
+document.getElementById("tl-kind").addEventListener("change", function (event) {
+  timelineState.kind = event.target.value;
+  timelineState.page = 1;
+  selectionPreserved = false;
+  document.getElementById("tl-new-events").hidden = true;
+  loadTimeline();
+});
+document.getElementById("tl-search-apply").addEventListener("click",
+  function () {
+    timelineState.q = document.getElementById("tl-search").value.trim();
+    timelineState.page = 1;
+    selectionPreserved = false;
+    document.getElementById("tl-new-events").hidden = true;
+    loadTimeline();
+  });
+document.getElementById("tl-refresh").addEventListener("click", function () {
+  selectionPreserved = false;
+  loadTimeline();
+});
+document.getElementById("tl-prev").addEventListener("click", function () {
+  if (timelineState.page > 1) {
+    timelineState.page -= 1;
+    selectionPreserved = false;
+    loadTimeline();
+  }
+});
+document.getElementById("tl-next").addEventListener("click", function () {
+  if (timelineState.page < timelineState.totalPages) {
+    timelineState.page += 1;
+    selectionPreserved = false;
+    loadTimeline();
+  }
+});
+document.getElementById("tl-jump-latest").addEventListener("click", function () {
+  timelineState.page = 1;
+  selectionPreserved = false;
+  document.getElementById("tl-new-events").hidden = true;
+  loadTimeline();
+});
+// ---------------------------------------------------------------------------
+// P6 Artifact Center
+// ---------------------------------------------------------------------------
+
+const AC_FORMAT_LABELS = {
+  markdown: "Markdown", text: "Text", log: "Log", code: "Code",
+  png: "PNG image", jpeg: "JPEG image", webp: "WebP image", csv: "CSV",
+  json: "JSON", pdf: "PDF", unsupported: "Unsupported",
+};
+const acState = {
+  page: 1, pageSize: "20", root: "", type: "", status: "", messageId: "",
+  task: "", q: "",
+};
+let acTotalPages = 1;
+// Selection for artifact feedback: path -> {messageId, name}. Selection is
+// bound to one producing MESSAGE_ID per feedback item (spec §20).
+let acSelectedPaths = new Map();
+let acOpenDetails = new Set();
+
+function acQuery() {
+  const params = new URLSearchParams();
+  params.set("page", String(acState.page));
+  params.set("page_size", acState.pageSize);
+  if (acState.root) { params.set("root", acState.root); }
+  if (acState.type) { params.set("type", acState.type); }
+  if (acState.status) { params.set("status", acState.status); }
+  if (acState.messageId !== "") { params.set("message_id", acState.messageId); }
+  if (acState.task) { params.set("task", acState.task); }
+  if (acState.q) { params.set("q", acState.q); }
+  return params.toString();
+}
+
+function resetArtifactCenter() {
+  acState.page = 1;
+  acState.root = "";
+  acState.type = "";
+  acState.status = "";
+  acState.messageId = "";
+  acState.task = "";
+  acState.q = "";
+  acSelectedPaths = new Map();
+  acOpenDetails = new Set();
+  for (const id of ("ac-message ac-task ac-search ac-root ac-type "
+      + "ac-status-filter").split(" ")) {
+    const node = document.getElementById(id);
+    if (node) { node.value = ""; }
+  }
+  hideConfirm("ac-fb-confirm");
+  document.getElementById("ac-feedback").hidden = true;
+  clear(document.getElementById("ac-list"));
+  setPanel(document.getElementById("ac-status"),
+    "Select a Runtime to browse its artifacts.", "muted");
+  document.getElementById("ac-page-indicator").textContent = "page —";
+}
+
+async function loadArtifacts() {
+  const list = document.getElementById("ac-list");
+  const status = document.getElementById("ac-status");
+  if (selectedRuntimeId === null) {
+    clear(list);
+    setPanel(status, "Select a Runtime to browse its artifacts.", "muted");
+    return;
+  }
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/artifacts?" + acQuery());
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error ? payload.error.code
+        : "HTTP error";
+      const message = payload && payload.error ? payload.error.message : "";
+      clear(list);
+      setPanel(status, "Artifact catalog unavailable — " + code + ". "
+        + message + " Nothing is shown rather than a guess.", "bad");
+      return;
+    }
+    const catalog = payload.artifacts;
+    acTotalPages = catalog.totals.pages;
+    clear(list);
+    if (catalog.artifacts.length === 0) {
+      setPanel(status, "No artifacts match this selection.", "muted");
+    } else {
+      setPanel(status, catalog.totals.artifacts + " artifact(s) · read-only "
+        + "views; provenance comes from the authoritative completion ledger",
+        "muted");
+      for (const item of catalog.artifacts) {
+        list.append(renderArtifact(item));
+      }
+    }
+    for (const note of catalog.honesty.notes) {
+      list.append(el("p", "muted", "Note: " + note));
+    }
+    document.getElementById("ac-page-indicator").textContent =
+      "page " + acState.page + " of " + catalog.totals.pages + " · "
+      + catalog.totals.artifacts + " artifact(s)";
+    document.getElementById("ac-prev").disabled = acState.page <= 1;
+    document.getElementById("ac-next").disabled =
+      acState.page >= acTotalPages;
+    updateAcFeedbackControls();
+  } catch (error) {
+    clear(list);
+    setPanel(status, "Artifact catalog request failed: " + error, "bad");
+  }
+}
+
+function acAvailabilityLabel(item) {
+  if (item.availability === "missing") { return "missing"; }
+  return item.provenance.class === "ledger" ? "ledger-bound" : "unbound";
+}
+
+function renderArtifact(item) {
+  const card = el("div", "ac-item");
+  const head = el("div", "ac-head");
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.dataset.artifactPath = item.path;
+  checkbox.checked = acSelectedPaths.has(item.path);
+  checkbox.disabled = item.provenance.class !== "ledger"
+    || item.availability !== "present";
+  checkbox.addEventListener("change", function () {
+    if (checkbox.checked) {
+      acSelectedPaths.set(item.path,
+        { messageId: item.provenance.message_id, name: item.name });
+    } else {
+      acSelectedPaths.delete(item.path);
+    }
+    updateAcFeedbackControls();
+  });
+  head.append(checkbox);
+  const nameButton = el("button", "ac-name", item.name);
+  nameButton.type = "button";
+  nameButton.addEventListener("click", function () {
+    const existing = card.querySelector(".ac-detail");
+    if (existing) {
+      acOpenDetails.delete(item.artifact_id);
+      existing.remove();
+      return;
+    }
+    acOpenDetails.add(item.artifact_id);
+    const detail = el("div", "ac-detail");
+    detail.append(el("p", "muted", "Loading detail…"));
+    card.append(detail);
+    loadAcDetail(item, detail);
+  });
+  head.append(nameButton);
+  head.append(el("span", "badge",
+    AC_FORMAT_LABELS[item.format] || item.format));
+  head.append(el("span", "badge", acAvailabilityLabel(item)));
+  if (item.provenance.class === "ledger") {
+    head.append(el("span", "badge",
+      "MESSAGE " + item.provenance.message_id));
+  }
+  card.append(head);
+  card.append(el("p", "muted", item.path));
+  return card;
+}
+
+function acVerificationLabel(value) {
+  if (value === "verified") {
+    return "verified — the bytes match the authoritative receipt hash";
+  }
+  if (value === "hash_mismatch") {
+    return "HASH MISMATCH — the bytes differ from the receipt";
+  }
+  if (value === "unavailable") {
+    return "unavailable — the hash was not computed within the bounded cap";
+  }
+  return "unverified — no authoritative receipt binds this file";
+}
+
+function renderAcProvenance(artifact) {
+  const block = el("div", "ac-provenance");
+  block.append(el("h3", null, "Provenance"));
+  const prov = artifact.provenance;
+  const pairs = [["Path", artifact.path]];
+  if (prov.class === "ledger") {
+    pairs.push(["Producing MESSAGE", prov.message_id]);
+    pairs.push(["Task", prov.task_id || "unavailable"]);
+    pairs.push(["Stage", prov.stage_id || "unavailable"]);
+    pairs.push(["Attempt", prov.attempt]);
+    pairs.push(["Producer", prov.producer || "unavailable"]);
+    pairs.push(["Published (receipt created)",
+      prov.receipt_created_at || "unavailable"]);
+    pairs.push(["Completion committed", prov.committed_at || "unavailable"]);
+    pairs.push(["completion status", prov.completion_status || "unavailable"]);
+    if (prov.republished_by && prov.republished_by.length) {
+      pairs.push(["Also published by round(s)",
+        prov.republished_by.join(", ")]);
+    }
+  } else {
+    pairs.push(["Producing MESSAGE",
+      "unavailable — no verified completion receipt binds this file "
+      + "(unbound); the name alone is never proof"]);
+  }
+  pairs.push(["Binding", prov.class === "ledger"
+    ? "verified ledger receipt" : "unbound"]);
+  pairs.push(["Size", artifact.size_bytes === null
+    || artifact.size_bytes === undefined
+    ? "unavailable" : artifact.size_bytes + " bytes"]);
+  pairs.push(["Verification",
+    acVerificationLabel(artifact.verification)]);
+  const dl = document.createElement("dl");
+  fillDetails(dl, pairs);
+  block.append(dl);
+  if (prov.class === "ledger" && prov.message_id !== null
+      && prov.message_id !== undefined) {
+    const openRound = el("button", "round-detail-open",
+      "Open Task Detail (MESSAGE " + prov.message_id + ")");
+    openRound.type = "button";
+    openRound.addEventListener("click", function () {
+      openTaskDetail(prov.message_id);
+    });
+    block.append(openRound);
+  }
+  return block;
+}
+
+function renderAcPreview(item, previewResp) {
+  const block = el("div", "ac-preview");
+  block.append(el("h3", null, "Preview (bounded, read-only)"));
+  if (!previewResp.ok || !previewResp.payload
+      || previewResp.payload.ok !== true) {
+    const error = previewResp.payload && previewResp.payload.error
+      ? previewResp.payload.error : {};
+    block.append(el("p", "bad", "Preview unavailable — "
+      + (error.code || "HTTP error") + ". " + (error.message || "")
+      + " Nothing is shown rather than a guess."));
+    return block;
+  }
+  const preview = previewResp.payload.preview;
+  const state = preview.state || "";
+  if (state === "TOO_LARGE") {
+    block.append(el("p", "bad",
+      "Preview unavailable — the file exceeds the bounded preview size for "
+      + "its format; the bytes were never read."));
+    return block;
+  }
+  if (state === "UNSUPPORTED" || preview.kind === "unavailable") {
+    block.append(el("p", "muted",
+      "Unsupported format — metadata and provenance only. Active content is "
+      + "never rendered or served."));
+    return block;
+  }
+  if (state === "NOT_UTF8") {
+    block.append(el("p", "bad",
+      "Preview unavailable — the file is not valid UTF-8 text (NOT_UTF8); "
+      + "showing bytes would be a guess."));
+    return block;
+  }
+  if (state === "FORMAT_MISMATCH") {
+    block.append(el("p", "bad",
+      "Preview unavailable — the file bytes do not match the claimed format "
+      + "(FORMAT_MISMATCH); active content is never served."));
+    return block;
+  }
+  if (preview.kind === "text") {
+    if (preview.truncated) {
+      block.append(el("p", "muted", "TRUNCATED — bounded window of "
+        + preview.returned_bytes + " bytes shown of " + preview.total_bytes
+        + " total."));
+    }
+    const pre = document.createElement("pre");
+    pre.textContent = preview.content;
+    block.append(pre);
+    return block;
+  }
+  if (preview.kind === "table") {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+    for (const row of preview.rows || []) {
+      const tr = document.createElement("tr");
+      for (const cell of row) { tr.append(el("td", null, cell)); }
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    block.append(table);
+    if (preview.truncated) {
+      block.append(el("p", "muted",
+        "TRUNCATED — bounded row preview (" + preview.rows_returned
+        + " rows shown)."));
+    }
+    return block;
+  }
+  if (preview.kind === "json") {
+    if (state === "MALFORMED_JSON") {
+      block.append(el("p", "bad",
+        "The file is not valid JSON (MALFORMED_JSON) — no structured "
+        + "preview is invented."));
+      const pre = document.createElement("pre");
+      pre.textContent = preview.error || "";
+      block.append(pre);
+      return block;
+    }
+    const pre = document.createElement("pre");
+    pre.textContent = preview.content;
+    block.append(pre);
+    if (preview.truncated) {
+      block.append(el("p", "muted", "TRUNCATED — bounded pretty-print."));
+    }
+    return block;
+  }
+  if (preview.kind === "image") {
+    const rawUrl = "/api/runtimes/" + selectedRuntimeId
+      + "/artifacts/" + item.artifact_id + "/raw";
+    const img = document.createElement("img");
+    img.alt = "Preview of " + item.name;
+    img.src = rawUrl;
+    block.append(img);
+    block.append(el("p", "muted",
+      "Served only after the receipt hash and the format magic verify."));
+    return block;
+  }
+  if (preview.kind === "pdf") {
+    block.append(el("p", "muted",
+      "PDF bytes are offered as a download only; in-browser PDF rendering is "
+      + "not enabled because embedded PDF scripts would be active content."));
+    const rawUrl = "/api/runtimes/" + selectedRuntimeId
+      + "/artifacts/" + item.artifact_id + "/raw";
+    const link = document.createElement("a");
+    link.href = rawUrl;
+    link.textContent = "Download PDF (opens locally, outside the page)";
+    block.append(link);
+    return block;
+  }
+  block.append(el("p", "muted", "Preview unavailable — unsupported kind."));
+  return block;
+}
+
+async function loadAcDetail(item, detail) {
+  try {
+    const detailResp = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/artifacts/" + item.artifact_id);
+    const previewResp = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/artifacts/"
+      + item.artifact_id + "/preview");
+    clear(detail);
+    if (!detailResp.ok || !detailResp.payload
+        || detailResp.payload.ok !== true) {
+      const error = detailResp.payload && detailResp.payload.error
+        ? detailResp.payload.error : {};
+      detail.append(el("p", "bad", "Detail unavailable — "
+        + (error.code || "HTTP error") + ". " + (error.message || "")));
+      return;
+    }
+    detail.append(renderAcProvenance(detailResp.payload.artifact));
+    detail.append(renderAcPreview(item, previewResp));
+  } catch (error) {
+    clear(detail);
+    detail.append(el("p", "bad", "Detail request failed: " + error));
+  }
+}
+
+function openArtifactCenter(messageId) {
+  acState.messageId = messageId === null || messageId === undefined
+    ? "" : String(messageId);
+  acState.page = 1;
+  document.getElementById("ac-message").value = acState.messageId;
+  document.getElementById("artifact-center-section")
+    .scrollIntoView({ behavior: "smooth", block: "start" });
+  loadArtifacts();
+}
+
+function updateAcFeedbackControls() {
+  const submit = document.getElementById("ac-fb-submit");
+  const summary = document.getElementById("ac-fb-summary");
+  const banner = document.getElementById("ac-feedback");
+  if (acSelectedPaths.size === 0) {
+    banner.hidden = true;
+    submit.disabled = true;
+    submit.title = "select at least one ledger-bound artifact";
+    return;
+  }
+  banner.hidden = false;
+  const messageIds = new Set();
+  for (const entry of acSelectedPaths.values()) {
+    messageIds.add(entry.messageId);
+  }
+  const paths = Array.from(acSelectedPaths.keys());
+  if (messageIds.size > 1) {
+    summary.textContent = "Selected artifacts belong to different rounds ("
+      + Array.from(messageIds).join(", ") + "); one feedback item binds one "
+      + "producing MESSAGE_ID. Select artifacts from a single round.";
+    submit.disabled = true;
+    return;
+  }
+  summary.textContent = "The feedback will bind MESSAGE "
+    + Array.from(messageIds)[0] + " and reference: " + paths.join(", ")
+    + " — references only; contents and history are not attached.";
+  submit.disabled = !document.getElementById("ac-fb-comment").value.trim();
+  submit.title = submit.disabled ? "write a comment first" : "";
+}
+
+document.getElementById("ac-apply").addEventListener("click", function () {
+  acState.root = document.getElementById("ac-root").value;
+  acState.type = document.getElementById("ac-type").value;
+  acState.status = document.getElementById("ac-status-filter").value;
+  acState.messageId = document.getElementById("ac-message").value;
+  acState.task = document.getElementById("ac-task").value.trim();
+  acState.q = document.getElementById("ac-search").value.trim();
+  acState.page = 1;
+  loadArtifacts();
+});
+document.getElementById("ac-refresh").addEventListener("click",
+  loadArtifacts);
+document.getElementById("ac-prev").addEventListener("click", function () {
+  if (acState.page > 1) { acState.page -= 1; loadArtifacts(); }
+});
+document.getElementById("ac-next").addEventListener("click", function () {
+  if (acState.page < acTotalPages) { acState.page += 1; loadArtifacts(); }
+});
+document.getElementById("ac-page-size").addEventListener("change",
+  function (event) {
+    acState.pageSize = event.target.value;
+    acState.page = 1;
+    loadArtifacts();
+  });
+document.getElementById("ac-fb-comment").addEventListener("input",
+  updateAcFeedbackControls);
+document.getElementById("ac-fb-submit").addEventListener("click",
+  function () {
+    if (acSelectedPaths.size === 0) { return; }
+    if (!document.getElementById("ac-fb-comment").value.trim()) { return; }
+    document.getElementById("ac-fb-confirm").hidden = false;
+  });
+document.getElementById("ac-fb-confirm-button").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null || acSelectedPaths.size === 0) { return; }
+    const mode = document.getElementById("ac-fb-mode").value;
+    const comment = document.getElementById("ac-fb-comment").value.trim();
+    const paths = Array.from(acSelectedPaths.keys());
+    const messageId = acSelectedPaths.values().next().value.messageId;
+    hideConfirm("ac-fb-confirm");
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/artifacts/feedback", {
+          mode: mode,
+          comment: comment,
+          message_id: messageId,
+          artifact_paths: paths,
+          interrupt_current: false,
+        });
+      if (ok && payload && payload.ok === true) {
+        const result = payload.control && payload.control.result
+          ? payload.control.result : {};
+        feedbackTone("Artifact feedback submitted through the formal "
+          + "intervention surface. Id: "
+          + (result.intervention_id || "unavailable") + " · status: "
+          + (result.status || "unavailable"), false);
+        acSelectedPaths = new Map();
+        document.getElementById("ac-fb-comment").value = "";
+        document.getElementById("ac-feedback").hidden = true;
+        loadArtifacts();
+        loadControls();
+      } else {
+        const error = payload && payload.error ? payload.error : {};
+        let text = "Artifact feedback refused — "
+          + (error.code || "HTTP error") + ". " + (error.message || "");
+        if (error.detail && error.detail.reason) {
+          text += " Reason: " + error.detail.reason + ".";
+        }
+        feedbackTone(text, true);
+      }
+    } catch (error) {
+      feedbackTone("Artifact feedback request failed: " + error, true);
+    }
+  });
+document.getElementById("ac-fb-cancel-button").addEventListener("click",
+  function () {
+    hideConfirm("ac-fb-confirm");
+  });
+
+// ---------------------------------------------------------------------------
+// P5 Human Control
+// ---------------------------------------------------------------------------
+
+const CONTROLS_POLL_MS = 10000;
+// The state family reported by the last cockpit refresh and the last
+// Pending Controls document drive the enable/disable gating. Controls stay
+// disabled whenever facts are unavailable or ambiguous.
+let lastCockpitFamily = null;
+let lastControls = null;
+let stopChallenge = null;
+let stopCountdownTimer = null;
+
+const CATEGORY_LABELS = {
+  pending: "pending",
+  consumed: "consumed",
+  needs_recovery: "needs recovery",
+  failed: "failed",
+  other: "unavailable",
+};
+
+function feedbackTone(text, isError) {
+  const banner = document.getElementById("hc-feedback");
+  banner.textContent = String(text);
+  banner.classList.toggle("hc-ok", !isError);
+  banner.classList.toggle("hc-error", !!isError);
+  banner.hidden = false;
+}
+
+function hideConfirm(id) {
+  document.getElementById(id).hidden = true;
+}
+
+function resetControlPanel() {
+  lastCockpitFamily = null;
+  lastControls = null;
+  stopChallenge = null;
+  if (stopCountdownTimer !== null) {
+    clearInterval(stopCountdownTimer);
+    stopCountdownTimer = null;
+  }
+  for (const id of ("hc-pause-confirm hc-resume-confirm hc-int-confirm "
+      + "hc-review-confirm hc-review-form hc-review-prepared "
+      + "hc-interrupt-confirm hc-stop-challenge hc-feedback").split(" ")) {
+    const node = document.getElementById(id);
+    if (node) { node.hidden = true; }
+  }
+  document.getElementById("hc-review-block").hidden = true;
+  document.getElementById("hc-feedback").hidden = true;
+  updateControlButtons();
+  renderPendingControlsUnavailable("Select a Runtime to see its pending "
+    + "controls.");
+}
+
+function controlsUnavailableReason() {
+  if (selectedRuntimeId === null) { return "no Runtime selected"; }
+  if (lastControls === null) { return "the Pending Controls document has "
+    + "not loaded yet"; }
+  const family = lastCockpitFamily;
+  if (family === "STATE_UNAVAILABLE") {
+    return "the reported state facts are contradictory or unusable";
+  }
+  if (family === "NO_PROJECT") { return "the Runtime reports no project"; }
+  return null;
+}
+
+function updateControlButtons() {
+  const pause = document.getElementById("hc-pause");
+  const resume = document.getElementById("hc-resume");
+  const intSubmit = document.getElementById("hc-int-submit");
+  const stopPrepare = document.getElementById("hc-stop-prepare");
+  const interruptTask = document.getElementById("hc-interrupt-task");
+  const reason = controlsUnavailableReason();
+  const family = lastCockpitFamily;
+  const pauseFacts = lastControls ? lastControls.pause : null;
+  const stopApplied = lastControls ? lastControls.stop.applied : false;
+  const reviewActive = lastControls
+    ? lastControls.human_review.active : false;
+
+  let pauseReason = reason;
+  if (!reason) {
+    if (family === "STOPPED") { pauseReason = "the Runtime is STOPPED"; }
+    else if (family === "COMPLETE") { pauseReason = "the project is COMPLETE"; }
+    else if (family === "HUMAN_REVIEW") {
+      pauseReason = "a human decision governs this state";
+    } else if (pauseFacts && pauseFacts.state !== "NONE") {
+      pauseReason = pauseFacts.state === "APPLIED"
+        ? "the Runtime is paused" : "a pause is already requested";
+    }
+  }
+  pause.disabled = pauseReason !== null;
+  pause.title = pauseReason || "";
+  interruptTask.disabled = !(pauseReason === null
+    && lastControls && lastControls.pause.state === "NONE");
+  interruptTask.title = pauseReason || "";
+
+  let resumeReason = reason;
+  if (!resumeReason) {
+    if (stopApplied) { resumeReason = "STOP is terminal"; }
+    else if (reviewActive) {
+      resumeReason = "HUMAN_REVIEW requires a Human Decision";
+    } else if (!pauseFacts || pauseFacts.state !== "APPLIED") {
+      resumeReason = "the Runtime is not paused";
+    }
+  }
+  resume.disabled = resumeReason !== null;
+  resume.title = resumeReason || "";
+
+  let intReason = reason;
+  if (!intReason && family === "STOPPED") {
+    intReason = "STOP is terminal";
+  }
+  intSubmit.disabled = intReason !== null;
+  intSubmit.title = intReason || "";
+
+  let stopReason = reason;
+  if (!stopReason && (stopApplied || family === "STOPPED")) {
+    stopReason = "STOP is already applied";
+  }
+  stopPrepare.disabled = stopReason !== null;
+  stopPrepare.title = stopReason || "";
+}
+
+function renderPendingControlsUnavailable(message) {
+  const list = document.getElementById("pc-list");
+  const status = document.getElementById("pc-status");
+  clear(list);
+  setPanel(status, message, "muted");
+}
+
+function renderPendingControls() {
+  const list = document.getElementById("pc-list");
+  const status = document.getElementById("pc-status");
+  if (selectedRuntimeId === null) {
+    renderPendingControlsUnavailable("Select a Runtime to see its pending "
+      + "controls.");
+    return;
+  }
+  clear(list);
+  if (lastControls === null) {
+    setPanel(status, "Loading…", "muted");
+    return;
+  }
+  const controls = lastControls;
+  const badges = [];
+  if (controls.pause.state === "PENDING") { badges.push("pending"); }
+  if (controls.pause.state === "APPLIED") { badges.push("paused"); }
+  if (controls.pause.superseded_by_completion) {
+    badges.push("superseded");
+  }
+  if (controls.stop.applied) { badges.push("stopped"); }
+  const summary = el("p", null, "Pause: " + (controls.pause.state === "NONE"
+      ? "none outstanding" : controls.pause.state.toLowerCase())
+    + (controls.pause.mode ? " · mode " + controls.pause.mode : "")
+    + (controls.pause.superseded_by_completion
+      ? " · superseded by a committed completion" : "")
+    + " · Formal STOP: " + (controls.stop.applied ? "applied" : "none")
+    + " · interventions pending " + controls.counts.pending
+    + " · consumed " + controls.counts.consumed
+    + " · superseded " + controls.counts.superseded
+    + " · failed " + controls.counts.failed
+    + " · needs recovery " + controls.counts.needs_recovery
+    + " · unavailable " + controls.counts.other);
+  summary.className = "muted";
+  list.append(summary);
+
+  if (!controls.interventions.available) {
+    list.append(el("p", "bad",
+      "Intervention facts are unavailable — the Runtime interventions query "
+      + "did not answer."));
+  } else if (controls.interventions.items.length === 0) {
+    list.append(el("p", "muted", "No outstanding intervention controls."));
+  } else {
+    for (const item of controls.interventions.items) {
+      const card = el("div", "hc-item");
+      const label = CATEGORY_LABELS[item.category] || "unavailable";
+      card.append(el("span", "badge " + item.category + " hc-cat", label));
+      card.append(el("span", null,
+        "  " + (item.intervention_id || "(id unavailable)")
+        + " · " + (item.mode || "mode unavailable")
+        + (item.target_message_id !== null && item.target_message_id !== undefined
+          ? " · target MESSAGE " + item.target_message_id
+          : " · project-level")
+        + (item.interrupt_current ? " · interrupt requested" : "")
+        + (item.status && item.category !== "pending" && item.category !== "consumed"
+          ? " · status " + item.status : "")
+        + (item.consumed_at ? " · consumed " + item.consumed_at : "")));
+      list.append(card);
+    }
+  }
+  for (const note of controls.honesty.notes) {
+    list.append(el("p", "muted", "Note: " + note));
+  }
+  setPanel(status, "Derived from the Runtime's own status and intervention "
+    + "records; nothing is inferred from UI state.", "muted");
+}
+
+async function loadControls() {
+  if (selectedRuntimeId === null) {
+    lastControls = null;
+    updateControlButtons();
+    renderPendingControlsUnavailable("Select a Runtime to see its pending "
+      + "controls.");
+    return;
+  }
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/controls");
+    if (!ok || !payload || payload.ok !== true) {
+      const code = payload && payload.error ? payload.error.code
+        : "HTTP error";
+      lastControls = null;
+      updateControlButtons();
+      renderPendingControlsUnavailable("Pending Controls unavailable — "
+        + code + ". Nothing is shown rather than a guess.");
+      return;
+    }
+    lastControls = payload.controls;
+    updateControlButtons();
+    renderPendingControls();
+    renderHumanReview(lastControls.human_review);
+  } catch (error) {
+    lastControls = null;
+    updateControlButtons();
+    renderPendingControlsUnavailable("Pending Controls request failed: "
+      + error);
+  }
+}
+
+async function controlAction(action, body, successText) {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const { ok, payload } = await postJson(
+      "/api/runtimes/" + selectedRuntimeId + action, body);
+    if (ok && payload && payload.ok === true) {
+      feedbackTone(successText(payload), false);
+    } else {
+      const error = payload && payload.error ? payload.error : {};
+      let text = "The Runtime refused or could not complete the action — "
+        + (error.code || "HTTP error") + ". " + (error.message || "");
+      if (error.detail && error.detail.reason) {
+        text += " Reason: " + error.detail.reason + ".";
+      }
+      if (error.detail && error.detail.control_error
+          && error.detail.control_error.error) {
+        text += " Runtime said: " + error.detail.control_error.error;
+      }
+      feedbackTone(text, true);
+    }
+  } catch (error) {
+    feedbackTone("Control request failed: " + error, true);
+  }
+  loadCockpit();
+  loadControls();
+}
+
+function pauseEffectText(interrupt) {
+  const base = interrupt
+    ? "The current task's authorization is revoked (it is retired and its "
+      + "dispatch quarantined), history is preserved, and the Runtime "
+      + "becomes PAUSED. The Executor is not killed; it stops at its next "
+      + "control boundary."
+    : "Safe Pause: the current valid task may finish and its completion "
+      + "stays valid; the Runtime stops before subsequent normal "
+      + "progression and becomes PAUSED. History is preserved.";
+  return base + " If a task is authorized but unclaimed, it is retired "
+    + "instead. The UI explains the effect before and after; the Runtime "
+    + "reports the actual disposition.";
+}
+
+function bindToggle(buttonId, confirmId) {
+  document.getElementById(buttonId).addEventListener("click", function () {
+    const confirmRow = document.getElementById(confirmId);
+    confirmRow.hidden = !confirmRow.hidden;
+  });
+}
+
+bindToggle("hc-pause", "hc-pause-confirm");
+document.getElementById("hc-pause-interrupt").addEventListener("change",
+  function () {
+    hideConfirm("hc-pause-confirm");
+  });
+document.getElementById("hc-pause-effect").textContent =
+  pauseEffectText(false);
+document.getElementById("hc-pause").addEventListener("click", function () {
+  document.getElementById("hc-pause-effect").textContent =
+    pauseEffectText(document.getElementById("hc-pause-interrupt").checked);
+  document.getElementById("hc-pause-confirm").hidden = false;
+});
+document.getElementById("hc-pause-confirm-button").addEventListener("click",
+  function () {
+    const interrupt =
+      document.getElementById("hc-pause-interrupt").checked;
+    hideConfirm("hc-pause-confirm");
+    controlAction("/controls/pause",
+      { mode: interrupt ? "INTERRUPT_CURRENT" : "SAFE" },
+      function (payload) {
+        const result = payload.control && payload.control.result
+          ? payload.control.result : {};
+        return "Pause request accepted by the Runtime. Disposition: "
+          + (result.disposition || JSON.stringify(result));
+      });
+  });
+document.getElementById("hc-pause-cancel-button").addEventListener("click",
+  function () { hideConfirm("hc-pause-confirm"); });
+
+bindToggle("hc-resume", "hc-resume-confirm");
+document.getElementById("hc-resume-confirm-button").addEventListener("click",
+  function () {
+    hideConfirm("hc-resume-confirm");
+    controlAction("/controls/resume", {},
+      function () {
+        return "Resume accepted by the Runtime; the pause record now shows "
+          + "RUNNING.";
+      });
+  });
+document.getElementById("hc-resume-cancel-button").addEventListener("click",
+  function () { hideConfirm("hc-resume-confirm"); });
+
+document.getElementById("hc-int-target").addEventListener("change",
+  function (event) {
+    document.getElementById("hc-int-message-id").disabled =
+      event.target.value !== "message";
+  });
+document.getElementById("hc-int-submit").addEventListener("click",
+  function () {
+    const comment = document.getElementById("hc-int-comment").value.trim();
+    if (!comment) {
+      feedbackTone("Write a comment before submitting an intervention.",
+        true);
+      return;
+    }
+    const target = document.getElementById("hc-int-target").value;
+    const messageId = document.getElementById("hc-int-message-id").value;
+    window.pendingIntervention = {
+      mode: document.getElementById("hc-int-mode").value,
+      comment: comment,
+      target_message_id:
+        target === "message" && messageId !== "" ? Number(messageId) : null,
+      interrupt_current:
+        document.getElementById("hc-int-interrupt").checked,
+    };
+    document.getElementById("hc-int-confirm").hidden = false;
+  });
+document.getElementById("hc-int-confirm-button").addEventListener("click",
+  function () {
+    hideConfirm("hc-int-confirm");
+    const body = window.pendingIntervention;
+    window.pendingIntervention = null;
+    document.getElementById("hc-int-comment").value = "";
+    controlAction("/controls/intervention", body, function (payload) {
+      const result = payload.control && payload.control.result
+        ? payload.control.result : {};
+      return "Intervention submitted. Id: "
+        + (result.intervention_id || "unavailable") + " · status: "
+        + (result.status || "unavailable") + " · disposition: "
+        + (result.disposition || "unavailable");
+    });
+  });
+document.getElementById("hc-int-cancel-button").addEventListener("click",
+  function () {
+    window.pendingIntervention = null;
+    hideConfirm("hc-int-confirm");
+  });
+
+bindToggle("hc-interrupt-task", "hc-interrupt-confirm");
+document.getElementById("hc-interrupt-confirm-button")
+  .addEventListener("click", function () {
+    hideConfirm("hc-interrupt-confirm");
+    controlAction("/controls/pause", { mode: "INTERRUPT_CURRENT" },
+      function (payload) {
+        const result = payload.control && payload.control.result
+          ? payload.control.result : {};
+        return "Interrupt accepted by the Runtime. Disposition: "
+          + (result.disposition || JSON.stringify(result))
+          + " — the Runtime is paused; resume when ready.";
+      });
+  });
+document.getElementById("hc-interrupt-cancel-button")
+  .addEventListener("click", function () {
+    hideConfirm("hc-interrupt-confirm");
+  });
+
+// -- Formal STOP: challenge prepare/confirm --------------------------------
+
+function cancelStopCountdown() {
+  if (stopCountdownTimer !== null) {
+    clearInterval(stopCountdownTimer);
+    stopCountdownTimer = null;
+  }
+}
+
+document.getElementById("hc-stop-prepare").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/controls/stop/prepare", {});
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        feedbackTone("The Console could not issue a STOP challenge — "
+          + (error.code || "HTTP error") + ". " + (error.message || ""), true);
+        return;
+      }
+      const challenge = payload.stop_challenge;
+      stopChallenge = challenge;
+      document.getElementById("hc-stop-challenge-id").textContent =
+        challenge.challenge_id;
+      document.getElementById("hc-stop-expires").textContent =
+        String(challenge.expires_in_seconds);
+      document.getElementById("hc-stop-token").value =
+        challenge.confirmation_token;
+      document.getElementById("hc-stop-project").value =
+        challenge.project_id;
+      document.getElementById("hc-stop-challenge").hidden = false;
+      let remaining = challenge.expires_in_seconds;
+      cancelStopCountdown();
+      stopCountdownTimer = setInterval(function () {
+        remaining -= 1;
+        if (remaining <= 0) {
+          cancelStopCountdown();
+          document.getElementById("hc-stop-challenge").hidden = true;
+          feedbackTone("The STOP challenge expired unconfirmed; nothing was "
+            + "applied.", true);
+          return;
+        }
+        document.getElementById("hc-stop-expires").textContent =
+          String(remaining);
+      }, 1000);
+    } catch (error) {
+      feedbackTone("STOP challenge request failed: " + error, true);
+    }
+  });
+document.getElementById("hc-stop-confirm").addEventListener("click",
+  function () {
+    if (!stopChallenge) { return; }
+    cancelStopCountdown();
+    const body = {
+      challenge_id: stopChallenge.challenge_id,
+      confirmation_token: document.getElementById("hc-stop-token").value,
+      project_id: document.getElementById("hc-stop-project").value,
+    };
+    document.getElementById("hc-stop-challenge").hidden = true;
+    const challengeId = stopChallenge.challenge_id;
+    stopChallenge = null;
+    controlAction("/controls/stop/confirm", body, function () {
+      return "Formal STOP applied through the Runtime's own STOP entry "
+        + "point (challenge " + challengeId + "). This is terminal; an "
+        + "ordinary Resume will not resurrect the stopped work.";
+    });
+  });
+document.getElementById("hc-stop-cancel").addEventListener("click",
+  function () {
+    stopChallenge = null;
+    cancelStopCountdown();
+    document.getElementById("hc-stop-challenge").hidden = true;
+    feedbackTone("STOP confirmation cancelled; nothing was applied.", false);
+  });
+
+// -- HUMAN_REVIEW presentation and the Human Decision flow ------------------
+
+function renderHumanReview(review) {
+  const block = document.getElementById("hc-review-block");
+  if (!review || !review.active) {
+    block.hidden = true;
+    return;
+  }
+  block.hidden = false;
+  const facts = document.getElementById("hc-review-facts");
+  clear(facts);
+  const task = review.authorized_task;
+  facts.append(el("span", null,
+    "Project status: " + (review.project_status || "unavailable") + ". "));
+  if (task && task.present) {
+    facts.append(el("span", null,
+      "A task (MESSAGE " + (task.message_id !== null
+        ? task.message_id : "unavailable") + ") is still "
+      + (task.claimed ? "claimed (possibly running)" : "authorized but not "
+        + "claimed") + "; its completion stays valid."));
+  } else {
+    facts.append(el("span", null, "No task is currently authorized."));
+  }
+  const reason = document.getElementById("hc-review-reason");
+  if (review.reason.available) {
+    reason.textContent = review.reason.text
+      + (review.reason.truncated ? "\n… (excerpt truncated at the "
+        + "documented bound)" : "");
+  } else {
+    reason.textContent = "Unavailable — the Runtime's HUMAN_REVIEW record "
+      + "could not be read.";
+  }
+}
+
+document.getElementById("hc-review-prepare-button").addEventListener("click",
+  function () {
+    document.getElementById("hc-review-form").hidden =
+      !document.getElementById("hc-review-form").hidden;
+  });
+document.getElementById("hc-review-prepare-submit").addEventListener("click",
+  function () {
+    const content = document.getElementById("hc-review-content").value;
+    const constraints = document.getElementById("hc-review-constraints")
+      .value.split("\n").map(function (line) {
+        return line.trim();
+      }).filter(function (line) { return line.length > 0; });
+    if (!content.trim() || constraints.length === 0) {
+      feedbackTone("A Human Decision needs decision content and at least "
+        + "one constraint (one per line).", true);
+      return;
+    }
+    controlAction("/controls/human-review/prepare",
+      { decision_content: content, constraints_verbatim: constraints },
+      function (payload) {
+        const decision = payload.human_decision || {};
+        const prepared = document.getElementById("hc-review-prepared");
+        clear(prepared);
+        prepared.append(el("p", null, "Decision prepared — it is NOT "
+          + "applied yet. Receipt id: " + (decision.receipt_id
+            || "unavailable")));
+        prepared.append(el("p", null, "Receipt SHA-256: "
+          + (decision.receipt_sha256 || "unavailable")));
+        prepared.append(el("p", null, "Bound to project-state hash: "
+          + (decision.previous_project_state_sha256 || "unavailable")));
+        prepared.hidden = false;
+        document.getElementById("hc-review-confirm").hidden = false;
+        document.getElementById("hc-review-form").hidden = true;
+        return "Human Decision prepared. Review it below, then apply to "
+          + "resume.";
+      });
+  });
+document.getElementById("hc-review-apply-button").addEventListener("click",
+  function () {
+    const prepared = document.getElementById("hc-review-prepared");
+    const text = prepared.textContent || "";
+    const idMatch = text.match(/Receipt id: (\S+)/);
+    if (!idMatch) {
+      feedbackTone("Prepare a Human Decision first.", true);
+      return;
+    }
+    hideConfirm("hc-review-confirm");
+    controlAction("/controls/human-review/apply",
+      { receipt_id: idMatch[1] }, function (payload) {
+        const result = payload.human_decision_result || {};
+        return "Human Decision applied: the project moved from "
+          + (result.previous_status || "HUMAN_REVIEW") + " to "
+          + (result.status || "SUPERVISOR_TURN") + ". The Supervisor will "
+          + "review the decision next. Receipt: " + (result.receipt_id
+            || "unavailable");
+      });
+  });
+document.getElementById("hc-review-apply-cancel-button")
+  .addEventListener("click", function () {
+    hideConfirm("hc-review-confirm");
+  });
+
+document.getElementById("pc-refresh").addEventListener("click",
+  function () {
+    loadControls();
+  });
+
+document.getElementById("td-close").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", function (event) {
+  if (event.key === "Escape"
+      && !document.getElementById("task-drawer").hidden) {
+    closeDrawer();
+  }
+});
+for (const button of document.querySelectorAll("#td-tabs button")) {
+  button.addEventListener("click", function () {
+    setTab(button.dataset.tab);
+    renderDrawer();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// P7 Setup Wizard
+// ---------------------------------------------------------------------------
+
+// Mirrors web_console_setup.GOAL_MAX_BYTES; the server enforces the real
+// bound, this is only the honest client-side pre-check.
+const SETUP_GOAL_MAX_BYTES = 256 * 1024;
+const SETUP_INPUT_MAX_SELECTIONS = 8;
+let setupStep = 1;
+let setupGoalText = null;
+let setupGoalName = null;
+
+function setSetupStatus(text, isError) {
+  const status = document.getElementById("setup-status");
+  status.textContent = String(text);
+  status.classList.toggle("bad", !!isError);
+  status.classList.toggle("muted", !isError);
+}
+
+function setupShowStep(step) {
+  setupStep = step;
+  for (const index of [1, 2, 3, 4]) {
+    document.getElementById("setup-step-" + index).hidden = index !== step;
+  }
+  document.getElementById("setup-back").disabled = step <= 1;
+  document.getElementById("setup-next").disabled = step >= 4;
+}
+
+function resetSetupWizard() {
+  setupGoalText = null;
+  setupGoalName = null;
+  document.getElementById("setup-project-id").value = "";
+  document.getElementById("setup-project-type").value = "GENERAL";
+  document.getElementById("setup-goal-file").value = "";
+  document.getElementById("setup-goal-summary").textContent =
+    "No Goal file loaded.";
+  document.getElementById("setup-goal-save").disabled = true;
+  clear(document.getElementById("setup-goal-validation"));
+  document.getElementById("setup-workshop-panel").hidden = true;
+  document.getElementById("setup-input-paths").value = "";
+  clear(document.getElementById("setup-input-inventory"));
+  document.getElementById("setup-sup-model").value = "";
+  document.getElementById("setup-sup-effort").value = "";
+  document.getElementById("setup-sup-mode").value = "COMPACT";
+  document.getElementById("setup-sup-note").textContent = "";
+  document.getElementById("setup-zcode-root").textContent = "—";
+  document.getElementById("setup-zcode-prompt").value = "";
+  document.getElementById("setup-zcode-copy").disabled = true;
+  document.getElementById("setup-zcode-ack").checked = false;
+  document.getElementById("setup-zcode-acknowledge").disabled = true;
+  clear(document.getElementById("setup-zcode-steps"));
+  clear(document.getElementById("setup-readiness-list"));
+  document.getElementById("setup-start").disabled = true;
+  hideConfirm("setup-start-confirm");
+  clear(document.getElementById("setup-start-result"));
+  document.getElementById("setup-open-cockpit").hidden = true;
+  setupShowStep(1);
+  setSetupStatus("Select a Runtime to configure a new project.", false);
+  loadSetupState();
+}
+
+function updateSetupGoalControls() {
+  const save = document.getElementById("setup-goal-save");
+  save.disabled = setupGoalText === null;
+  if (setupGoalText === null) {
+    document.getElementById("setup-goal-summary").textContent =
+      "No Goal file loaded.";
+    return;
+  }
+  const bytes = new TextEncoder().encode(setupGoalText).length;
+  document.getElementById("setup-goal-summary").textContent =
+    "Loaded: " + (setupGoalName || "unnamed") + " · " + bytes +
+    " bytes (bounded at " + SETUP_GOAL_MAX_BYTES + ").";
+}
+
+function readFileAsText(file) {
+  if (!file) { return; }
+  if (file.size > SETUP_GOAL_MAX_BYTES) {
+    setupGoalText = null;
+    document.getElementById("setup-goal-summary").textContent =
+      "Refused: " + file.name + " is " + file.size + " bytes, above the " +
+      SETUP_GOAL_MAX_BYTES + " byte bound. Nothing was loaded.";
+    updateSetupGoalControls();
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function () {
+    setupGoalText = String(reader.result);
+    setupGoalName = file.name;
+    updateSetupGoalControls();
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+async function loadSetupState() {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const { ok, payload } = await fetchJson(
+      "/api/runtimes/" + selectedRuntimeId + "/setup/state");
+    if (!ok || !payload || payload.ok !== true) { return; }
+    const setup = payload.setup;
+    if (setup.draft.goal_markdown !== null) {
+      setupGoalText = setup.draft.goal_markdown;
+      setupGoalName = setup.draft.goal_source_name || "draft Goal";
+      document.getElementById("setup-project-id").value =
+        setup.draft.project_id || "";
+      document.getElementById("setup-project-type").value =
+        setup.draft.project_type || "GENERAL";
+      updateSetupGoalControls();
+      renderGoalValidation(setup.goal_validation);
+    }
+    if (setup.draft.inputs !== null) {
+      renderInputInventory(setup.draft.inputs);
+    }
+    if (setup.draft.supervisor !== null) {
+      document.getElementById("setup-sup-model").value =
+        setup.draft.supervisor.model || "";
+      document.getElementById("setup-sup-effort").value =
+        setup.draft.supervisor.reasoning_effort || "";
+      document.getElementById("setup-sup-mode").value =
+        setup.draft.supervisor.explanation_mode || "COMPACT";
+      document.getElementById("setup-sup-note").textContent =
+        "A configuration draft is stored (draft only; nothing was applied "
+        + "to the Runtime and no active turn was changed).";
+    }
+    document.getElementById("setup-zcode-ack").checked =
+      setup.draft.zcode.acknowledged;
+    document.getElementById("setup-zcode-acknowledge").disabled =
+      !setup.draft.zcode.acknowledged;
+  } catch (error) {
+    setSetupStatus("Setup state request failed: " + error, true);
+  }
+}
+
+function renderGoalValidation(validation) {
+  const box = document.getElementById("setup-goal-validation");
+  clear(box);
+  if (!validation) {
+    box.append(el("p", "muted", "Not validated yet."));
+    return;
+  }
+  if (validation.valid) {
+    box.append(el("p", "ok", "Goal validation passed."));
+  } else {
+    box.append(el("p", "bad",
+      "Goal validation failed — nothing was stored:"));
+  }
+  for (const error of validation.errors) {
+    box.append(el("p", "bad", "Error " + error.code + ": " + error.message
+      + (error.matched ? " (matched: " + error.matched + ")" : "")));
+  }
+  for (const warning of validation.warnings) {
+    box.append(el("p", "muted", "Warning " + warning.code + ": "
+      + warning.message));
+  }
+}
+
+document.getElementById("setup-goal-file").addEventListener("change",
+  function (event) {
+    readFileAsText(event.target.files && event.target.files[0]);
+  });
+const goalDrop = document.getElementById("setup-goal-drop");
+goalDrop.addEventListener("dragover", function (event) {
+  event.preventDefault();
+  goalDrop.classList.add("dragover");
+});
+goalDrop.addEventListener("dragleave", function () {
+  goalDrop.classList.remove("dragover");
+});
+goalDrop.addEventListener("drop", function (event) {
+  event.preventDefault();
+  goalDrop.classList.remove("dragover");
+  readFileAsText(event.dataTransfer.files && event.dataTransfer.files[0]);
+});
+document.getElementById("setup-goal-save").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null || setupGoalText === null) { return; }
+    const projectId = document.getElementById("setup-project-id").value;
+    const projectType = document.getElementById("setup-project-type").value;
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/goal", {
+          project_id: projectId,
+          project_type: projectType,
+          goal_markdown: setupGoalText,
+          source_name: setupGoalName,
+        });
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Goal save refused — " + (error.code || "HTTP error")
+          + ". " + (error.message || ""), true);
+        return;
+      }
+      renderGoalValidation(payload.goal_validation);
+      setSetupStatus(payload.stored
+        ? "Goal validated and stored in the Console draft."
+        : "Goal validation failed; nothing was stored.", !payload.stored);
+    } catch (error) {
+      setSetupStatus("Goal save request failed: " + error, true);
+    }
+  });
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+document.getElementById("setup-workshop-open").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await fetchJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/goal-workshop");
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Goal Workshop pack unavailable — "
+          + (error.code || "HTTP error") + ". " + (error.message || ""),
+          true);
+        return;
+      }
+      document.getElementById("setup-workshop-pack").value =
+        payload.goal_workshop.context_pack;
+      document.getElementById("setup-startup-prompt").value =
+        payload.goal_workshop.startup_prompt;
+      document.getElementById("setup-workshop-panel").hidden = false;
+    } catch (error) {
+      setSetupStatus("Goal Workshop request failed: " + error, true);
+    }
+  });
+document.getElementById("setup-workshop-copy").addEventListener("click",
+  async function () {
+    const ok = await copyText(
+      document.getElementById("setup-workshop-pack").value);
+    setSetupStatus(ok ? "Context pack copied." : "Copy failed — select the "
+      + "text and copy it manually.", !ok);
+  });
+document.getElementById("setup-startup-copy").addEventListener("click",
+  async function () {
+    const ok = await copyText(
+      document.getElementById("setup-startup-prompt").value);
+    setSetupStatus(ok ? "Startup prompt copied." : "Copy failed — select "
+      + "the text and copy it manually.", !ok);
+  });
+
+function renderInputInventory(inputs) {
+  const list = document.getElementById("setup-input-inventory");
+  clear(list);
+  if (!inputs) {
+    list.append(el("li", null, "No inputs registered yet."));
+    return;
+  }
+  if (inputs.decision === "NONE_NEEDED") {
+    list.append(el("li", null,
+      "Recorded: no additional inputs are needed."));
+    return;
+  }
+  for (const entry of inputs.entries || []) {
+    list.append(el("li", null, entry.path + " (" + entry.kind
+      + (typeof entry.size_bytes === "number"
+        ? ", " + entry.size_bytes + " bytes" : "") + ")"));
+  }
+  for (const note of (inputs.honesty && inputs.honesty.notes) || []) {
+    list.append(el("li", "bad", "Note: " + note));
+  }
+}
+
+document.getElementById("setup-inputs-register").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    const paths = document.getElementById("setup-input-paths").value
+      .split("\n").map(function (line) { return line.trim(); })
+      .filter(function (line) { return line.length > 0; });
+    if (paths.length === 0) {
+      setSetupStatus("Type or paste at least one absolute path first.",
+        true);
+      return;
+    }
+    if (paths.length > SETUP_INPUT_MAX_SELECTIONS) {
+      setSetupStatus("At most " + SETUP_INPUT_MAX_SELECTIONS
+        + " paths can be registered per request.", true);
+      return;
+    }
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/inputs",
+        { paths: paths });
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        let text = "Input registration refused — "
+          + (error.code || "HTTP error") + ". " + (error.message || "");
+        if (error.detail && error.detail.rejections) {
+          for (const rejection of error.detail.rejections) {
+            text += " [" + rejection.code + ": " + rejection.reason + "]";
+          }
+        }
+        setSetupStatus(text, true);
+        return;
+      }
+      renderInputInventory(payload.inputs);
+      setSetupStatus("Input inventory registered (metadata only).", false);
+    } catch (error) {
+      setSetupStatus("Input registration request failed: " + error, true);
+    }
+  });
+document.getElementById("setup-inputs-none").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/inputs",
+        { decision: "NONE_NEEDED" });
+      if (ok && payload && payload.ok === true) {
+        renderInputInventory(payload.inputs);
+        setSetupStatus("Recorded: no additional inputs are needed.", false);
+      } else {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Refused — " + (error.code || "HTTP error") + ". "
+          + (error.message || ""), true);
+      }
+    } catch (error) {
+      setSetupStatus("Request failed: " + error, true);
+    }
+  });
+
+document.getElementById("setup-sup-save").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/supervisor", {
+          model: document.getElementById("setup-sup-model").value.trim()
+            || null,
+          reasoning_effort:
+            document.getElementById("setup-sup-effort").value || null,
+          explanation_mode:
+            document.getElementById("setup-sup-mode").value,
+        });
+      if (ok && payload && payload.ok === true) {
+        document.getElementById("setup-sup-note").textContent =
+          payload.supervisor.note;
+        setSetupStatus("Supervisor configuration draft saved.", false);
+      } else {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Refused — " + (error.code || "HTTP error") + ". "
+          + (error.message || ""), true);
+      }
+    } catch (error) {
+      setSetupStatus("Supervisor draft request failed: " + error, true);
+    }
+  });
+
+document.getElementById("setup-zcode-fetch").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await fetchJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/zcode");
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Canonical prompt unavailable — "
+          + (error.code || "HTTP error") + ". " + (error.message || ""),
+          true);
+        return;
+      }
+      const zcode = payload.zcode;
+      document.getElementById("setup-zcode-root").textContent =
+        zcode.runtime_root;
+      document.getElementById("setup-zcode-prompt").value = zcode.prompt;
+      document.getElementById("setup-zcode-copy").disabled = false;
+      const steps = document.getElementById("setup-zcode-steps");
+      clear(steps);
+      for (const step of zcode.steps) { steps.append(el("li", null, step)); }
+      document.getElementById("setup-zcode-ack").checked =
+        zcode.acknowledged;
+      document.getElementById("setup-zcode-acknowledge").disabled =
+        !zcode.acknowledged;
+      setSetupStatus("Canonical prompt rendered from the Runtime's own "
+        + "template. The Console cannot see ZCode Automation state; enable "
+        + "the Automation yourself only when you are ready.", false);
+    } catch (error) {
+      setSetupStatus("ZCode prompt request failed: " + error, true);
+    }
+  });
+document.getElementById("setup-zcode-copy").addEventListener("click",
+  async function () {
+    const ok = await copyText(
+      document.getElementById("setup-zcode-prompt").value);
+    setSetupStatus(ok ? "Canonical prompt copied." : "Copy failed — select "
+      + "the text and copy it manually.", !ok);
+  });
+document.getElementById("setup-zcode-ack").addEventListener("change",
+  function (event) {
+    document.getElementById("setup-zcode-acknowledge").disabled =
+      !event.target.checked;
+  });
+document.getElementById("setup-zcode-acknowledge").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/zcode/acknowledge",
+        {});
+      if (ok && payload && payload.ok === true) {
+        setSetupStatus("Acknowledgement recorded ("
+          + payload.zcode.acknowledged_at + "). The Console still cannot "
+          + "see ZCode Automation state.", false);
+      } else {
+        const error = payload && payload.error ? payload.error : {};
+        setSetupStatus("Refused — " + (error.code || "HTTP error") + ". "
+          + (error.message || ""), true);
+      }
+    } catch (error) {
+      setSetupStatus("Acknowledgement request failed: " + error, true);
+    }
+  });
+
+document.getElementById("setup-readiness-run").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    const list = document.getElementById("setup-readiness-list");
+    clear(list);
+    list.append(el("p", "muted", "Running readiness checks…"));
+    try {
+      const { ok, payload } = await fetchJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/readiness");
+      clear(list);
+      if (!ok || !payload || payload.ok !== true) {
+        const error = payload && payload.error ? payload.error : {};
+        list.append(el("p", "bad", "Readiness unavailable — "
+          + (error.code || "HTTP error") + ". " + (error.message || "")));
+        document.getElementById("setup-start").disabled = true;
+        return;
+      }
+      const readiness = payload.readiness;
+      for (const check of readiness.checks) {
+        list.append(el("p", "setup-check " +
+          (check.state === "PASS" ? "pass" : "bad"),
+          check.state + " · " + check.label +
+          (check.required ? " (required)" : "") + " — " + check.detail));
+      }
+      document.getElementById("setup-start").disabled = !readiness.ready;
+      setSetupStatus(readiness.ready
+        ? "All required readiness checks pass; start is available."
+        : "Start stays fail-closed until every required check passes.",
+        !readiness.ready);
+    } catch (error) {
+      clear(list);
+      list.append(el("p", "bad", "Readiness request failed: " + error));
+    }
+  });
+document.getElementById("setup-start").addEventListener("click",
+  function () {
+    document.getElementById("setup-start-confirm").hidden = false;
+  });
+document.getElementById("setup-start-cancel").addEventListener("click",
+  function () {
+    hideConfirm("setup-start-confirm");
+  });
+document.getElementById("setup-start-go").addEventListener("click",
+  async function () {
+    if (selectedRuntimeId === null) { return; }
+    hideConfirm("setup-start-confirm");
+    const result = document.getElementById("setup-start-result");
+    clear(result);
+    result.append(el("p", "muted", "Bootstrap and start in progress…"));
+    try {
+      const { ok, payload } = await postJson(
+        "/api/runtimes/" + selectedRuntimeId + "/setup/start", {});
+      clear(result);
+      if (ok && payload && payload.ok === true) {
+        const start = payload.start;
+        result.append(el("p", "ok",
+          "Bootstrap event: " + (start.bootstrap.event || "unavailable")
+          + " · project " + (start.bootstrap.project_id || "unavailable")
+          + " · next MESSAGE_ID "
+          + (start.bootstrap.next_message_id ?? "unavailable")));
+        result.append(el("p", start.verification === "STARTED_VERIFIED"
+          ? "ok" : "muted",
+          "Start entry point invoked; verification: " + start.verification
+          + " (runtime status: " + (start.runtime_status || "unavailable")
+          + ")."));
+        document.getElementById("setup-open-cockpit").hidden = false;
+        setSetupStatus("Project started. Open the Cockpit to watch it.",
+          false);
+      } else {
+        const error = payload && payload.error ? payload.error : {};
+        let text = "Start refused — " + (error.code || "HTTP error")
+          + ". " + (error.message || "");
+        if (error.detail && error.detail.failing_checks) {
+          text += " Failing checks: "
+            + error.detail.failing_checks.join(", ") + ".";
+        }
+        result.append(el("p", "bad", text));
+        setSetupStatus("Start was refused; nothing is running because of "
+          + "this request unless a previous start already succeeded.",
+          true);
+      }
+    } catch (error) {
+      clear(result);
+      result.append(el("p", "bad", "Start request failed: " + error));
+    }
+  });
+document.getElementById("setup-open-cockpit").addEventListener("click",
+  function () {
+    loadRuntimes();
+    loadCockpit();
+    document.getElementById("current-execution")
+      .scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+document.getElementById("setup-back").addEventListener("click", function () {
+  if (setupStep > 1) { setupShowStep(setupStep - 1); }
+});
+document.getElementById("setup-next").addEventListener("click", function () {
+  if (setupStep < 4) { setupShowStep(setupStep + 1); }
+});
+
+// -- P9: settings, operator note, alerts, notifications, Recent Artifacts --
+
+function decisionSummaryText(summary) {
+  if (!summary) { return "unavailable"; }
+  const entry = runtimeSettingsCache && runtimeSettingsCache.effective
+    ? runtimeSettingsCache.effective.decision_summary_mode : null;
+  const mode = entry ? entry.value : "compact";
+  if (mode === "full" || summary.length <= 280) { return summary; }
+  return summary.slice(0, 280)
+    + "… (truncated — decision summary mode: compact)";
+}
+
+function resetAlertsPanel() {
+  clear(document.getElementById("alerts-list"));
+  setPanel(document.getElementById("alerts-status"),
+    "Select a Runtime to observe it.", "muted");
+}
+
+function alertEvidencePairs(alert) {
+  const pairs = [];
+  const evidence = alert.evidence || {};
+  for (const key of Object.keys(evidence)) {
+    const value = evidence[key];
+    pairs.push([key,
+      value === null || value === undefined ? "unavailable"
+        : String(value)]);
+  }
+  return pairs;
+}
+
+function renderAlerts(meta, document_) {
+  const list = document.getElementById("alerts-list");
+  const status = document.getElementById("alerts-status");
+  clear(list);
+  const alerts = document_.alerts || [];
+  if (!alerts.length) {
+    status.textContent = "No soft alerts for this Runtime"
+      + (document_.honesty && document_.honesty.length
+        ? " — " + document_.honesty.join(" · ") : ".");
+    status.className = "muted";
+    return;
+  }
+  for (const alert of alerts) {
+    const item = el("li", "alert-item severity-" + alert.severity);
+    item.append(el("p", null,
+      "[" + alert.severity + "] " + alert.message));
+    const facts = document.createElement("dl");
+    fillDetails(facts, [
+      ["Rule", alert.rule],
+      ["Identity", alert.id],
+      ["Notification", alert.notification_class
+        + (alert.notification_kind
+          ? " (" + alert.notification_kind + ")" : "")],
+    ].concat(alertEvidencePairs(alert)));
+    item.append(facts);
+    list.append(item);
+  }
+  status.textContent = alerts.length + " alert(s) · attribution: "
+    + (meta ? (meta.label || meta.id) : "this Runtime")
+    + " · deterministic projections, no AI involved.";
+  status.className = "muted";
+}
+
+async function loadAlerts() {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const response = await fetchJson("/api/runtimes/"
+      + selectedRuntimeId + "/alerts");
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const code = response.payload && response.payload.error
+        ? response.payload.error.code : "HTTP error";
+      const list = document.getElementById("alerts-list");
+      clear(list);
+      list.append(el("p", "unavailable",
+        "Alerts unavailable — " + code
+        + ". Nothing is shown rather than a guess."));
+      return;
+    }
+    renderAlerts(response.payload.runtime,
+      response.payload.alerts_document);
+    maybeNotify(response.payload.runtime,
+      response.payload.alerts_document.alerts || []);
+  } catch (error) {
+    const list = document.getElementById("alerts-list");
+    clear(list);
+    list.append(el("p", "unavailable",
+      "Alerts request failed: " + error));
+  }
+}
+
+function notificationPrefEnabled(kind) {
+  const prefKey = NOTIFICATION_PREF_KEYS[kind];
+  if (!prefKey) { return false; }
+  const entry = runtimeSettingsCache && runtimeSettingsCache.effective
+    && runtimeSettingsCache.effective.notifications
+    ? runtimeSettingsCache.effective.notifications[prefKey] : null;
+  return entry ? entry.value === true : false;
+}
+
+function maybeNotify(runtime, alerts) {
+  if (!("Notification" in window)
+      || Notification.permission !== "granted") { return; }
+  for (const alert of alerts) {
+    const key = (runtime && runtime.id ? runtime.id : "?")
+      + ":" + alert.id;
+    const alreadySeen = notifiedAlertIds.has(key);
+    notifiedAlertIds.add(key);
+    if (alreadySeen) { continue; }
+    if (alert.notification_class === "none") { continue; }
+    if (alert.notification_class !== "must-attention"
+        && !notificationPrefEnabled(alert.notification_kind)) {
+      continue;
+    }
+    try {
+      new Notification((runtime && runtime.label
+        ? runtime.label + " — " : "") + alert.rule,
+        { body: alert.message });
+    } catch (error) {
+      // Notification construction failed; the visible in-Console
+      // attention state (alerts panel) remains the source of truth.
+    }
+  }
+}
+
+function resetRecentArtifacts() {
+  clear(document.getElementById("ra-list"));
+  setPanel(document.getElementById("ra-status"),
+    "Select a Runtime to observe it.", "muted");
+}
+
+async function loadRecentArtifacts() {
+  if (selectedRuntimeId === null) { return; }
+  const status = document.getElementById("ra-status");
+  try {
+    const response = await fetchJson("/api/runtimes/"
+      + selectedRuntimeId + "/artifacts?page=1&page_size=50");
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const code = response.payload && response.payload.error
+        ? response.payload.error.code : "HTTP error";
+      clear(document.getElementById("ra-list"));
+      setPanel(status, "Recent artifacts unavailable — " + code + ".",
+        "muted");
+      return;
+    }
+    const catalog = response.payload.artifacts || {};
+    const artifacts = catalog.artifacts || [];
+    const sorted = artifacts.slice().sort(function (left, right) {
+      const leftAt = left.provenance && left.provenance.committed_at
+        ? left.provenance.committed_at : "";
+      const rightAt = right.provenance && right.provenance.committed_at
+        ? right.provenance.committed_at : "";
+      return rightAt.localeCompare(leftAt);
+    }).slice(0, 5);
+    const list = document.getElementById("ra-list");
+    clear(list);
+    if (!sorted.length) {
+      setPanel(status, "No ledger-bound artifacts yet.", "muted");
+      return;
+    }
+    for (const artifact of sorted) {
+      const provenance = artifact.provenance || {};
+      const item = el("li", "recent-artifact");
+      item.append(el("span", null, artifact.name || artifact.path));
+      const messageId = provenance.message_id;
+      const open = el("button", null, "Preview / open");
+      open.addEventListener("click", function () {
+        openArtifactCenter(messageId === null || messageId === undefined
+          ? null : messageId);
+      });
+      item.append(open);
+      if (messageId !== null && messageId !== undefined) {
+        item.append(el("span", "muted", "MESSAGE " + messageId));
+      }
+      list.append(item);
+    }
+    setPanel(status, "Latest " + sorted.length + " of "
+      + (catalog.totals ? catalog.totals.artifacts : artifacts.length)
+      + " cataloged artifact(s).", "muted");
+  } catch (error) {
+    setPanel(status, "Recent artifacts request failed: " + error, "muted");
+  }
+}
+
+function resetSettingsPanel() {
+  document.getElementById("settings-global-model").value = "";
+  document.getElementById("settings-global-effort").value = "";
+  document.getElementById("settings-global-summary").value = "compact";
+  document.getElementById("settings-global-pagesize").value = "20";
+  fillThresholdInputs({});
+  document.getElementById("settings-runtime-model").value = "";
+  document.getElementById("settings-runtime-effort").value = "";
+  document.getElementById("settings-runtime-pagesize").value = "";
+  document.getElementById("settings-note").value = "";
+  setPanel(document.getElementById("settings-global-status"), "—", "muted");
+  setPanel(document.getElementById("settings-runtime-status"), "—", "muted");
+  setPanel(document.getElementById("settings-note-status"), "—", "muted");
+  runtimeSettingsCache = null;
+}
+
+function sourceSuffix(source) {
+  return source === "override"
+    ? " (override)" : " (global-default)";
+}
+
+function applyNotificationPrefsToForm(notifications) {
+  for (const key of Object.keys(NOTIFY_CHECKBOX_IDS)) {
+    const entry = notifications ? notifications[key] : null;
+    document.getElementById(NOTIFY_CHECKBOX_IDS[key]).checked =
+      entry ? entry.value === true : false;
+  }
+}
+
+function applyTimelinePageSizeSetting(entry) {
+  if (!entry) { return; }
+  const select = document.getElementById("tl-page-size");
+  for (const option of select.options) {
+    if (option.value === String(entry.value)) {
+      select.value = String(entry.value);
+      break;
+    }
+  }
+}
+
+function fillThresholdInputs(thresholds) {
+  for (const key of Object.keys(THRESHOLD_INPUT_IDS)) {
+    const value = thresholds ? thresholds[key] : null;
+    document.getElementById(THRESHOLD_INPUT_IDS[key]).value =
+      value === null || value === undefined ? "" : String(value);
+  }
+}
+
+function collectThresholds() {
+  const payload = {};
+  for (const key of Object.keys(THRESHOLD_INPUT_IDS)) {
+    const raw =
+      document.getElementById(THRESHOLD_INPUT_IDS[key]).value.trim();
+    if (raw !== "") { payload[key] = Number(raw); }
+  }
+  return payload;
+}
+
+async function loadSettingsPanel() {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const [globalResp, runtimeResp] = await Promise.all([
+      fetchJson("/api/settings"),
+      fetchJson("/api/runtimes/" + selectedRuntimeId + "/settings"),
+    ]);
+    if (!globalResp.ok || !globalResp.payload
+        || globalResp.payload.ok !== true || !runtimeResp.ok
+        || !runtimeResp.payload || runtimeResp.payload.ok !== true) {
+      const code = globalResp.payload && globalResp.payload.error
+        ? globalResp.payload.error.code
+        : (runtimeResp.payload && runtimeResp.payload.error
+          ? runtimeResp.payload.error.code : "HTTP error");
+      setPanel(document.getElementById("settings-global-status"),
+        "Settings unavailable — " + code
+        + ". Nothing is shown rather than a guess.", "muted");
+      return;
+    }
+    const globalSettings = globalResp.payload.global_settings.settings;
+    const view = runtimeResp.payload.runtime_settings;
+    runtimeSettingsCache = view;
+    document.getElementById("settings-global-model").value =
+      globalSettings.supervisor_model || "";
+    document.getElementById("settings-global-effort").value =
+      globalSettings.supervisor_reasoning_effort || "";
+    document.getElementById("settings-global-summary").value =
+      globalSettings.decision_summary_mode || "compact";
+    document.getElementById("settings-global-pagesize").value =
+      String(globalSettings.timeline_page_size);
+    fillThresholdInputs(globalSettings.alert_thresholds);
+    const effective = view.effective;
+    document.getElementById("settings-runtime-model").value =
+      effective.supervisor_model.source === "override"
+        ? effective.supervisor_model.value : "";
+    document.getElementById("settings-runtime-effort").value =
+      effective.supervisor_reasoning_effort.source === "override"
+        ? effective.supervisor_reasoning_effort.value : "";
+    document.getElementById("settings-runtime-pagesize").value =
+      effective.timeline_page_size.source === "override"
+        ? String(effective.timeline_page_size.value) : "";
+    const note = view.operator_note;
+    document.getElementById("settings-note").value = note
+      ? note.text : "";
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Effective: model "
+      + (effective.supervisor_model.value || "(Runtime policy)")
+      + sourceSuffix(effective.supervisor_model.source)
+      + " · effort "
+      + (effective.supervisor_reasoning_effort.value || "(Runtime policy)")
+      + sourceSuffix(effective.supervisor_reasoning_effort.source)
+      + " · page size " + effective.timeline_page_size.value
+      + sourceSuffix(effective.timeline_page_size.source)
+      + ". Queuing applies next Supervisor turn; it never interrupts an "
+      + "active call.", "muted");
+    applyNotificationPrefsToForm(effective.notifications || {});
+    applyTimelinePageSizeSetting(effective.timeline_page_size);
+    setPanel(document.getElementById("settings-global-status"),
+      "Global defaults loaded (updated "
+      + (globalResp.payload.global_settings.updated_at || "never")
+      + ").", "muted");
+  } catch (error) {
+    setPanel(document.getElementById("settings-global-status"),
+      "Settings request failed: " + error, "muted");
+  }
+}
+
+async function saveGlobalSettings() {
+  const pagesize = Number(
+    document.getElementById("settings-global-pagesize").value);
+  try {
+    const response = await postJson("/api/settings", { settings: {
+      supervisor_model:
+        document.getElementById("settings-global-model").value.trim(),
+      supervisor_reasoning_effort:
+        document.getElementById("settings-global-effort").value,
+      decision_summary_mode:
+        document.getElementById("settings-global-summary").value,
+      timeline_page_size: pagesize,
+      alert_thresholds: collectThresholds(),
+    } });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(document.getElementById("settings-global-status"),
+        "Refused — " + (error.code || "HTTP error") + ": "
+        + (error.message || ""), "bad");
+      return;
+    }
+    setPanel(document.getElementById("settings-global-status"),
+      "Global defaults saved. They are Console-owned defaults; "
+      + "per-Runtime overrides win.", "ok");
+    loadSettingsPanel();
+  } catch (error) {
+    setPanel(document.getElementById("settings-global-status"),
+      "Save failed: " + error, "bad");
+  }
+}
+
+async function saveRuntimeOverrides() {
+  if (selectedRuntimeId === null) { return; }
+  const pagesizeText =
+    document.getElementById("settings-runtime-pagesize").value.trim();
+  const modelValue =
+    document.getElementById("settings-runtime-model").value.trim();
+  const effortValue =
+    document.getElementById("settings-runtime-effort").value;
+  try {
+    const response = await postJson("/api/runtimes/"
+      + selectedRuntimeId + "/settings", { overrides: {
+      supervisor_model: modelValue === "" ? null : modelValue,
+      supervisor_reasoning_effort: effortValue === ""
+        ? null : effortValue,
+      timeline_page_size: pagesizeText === "" ? null
+        : Number(pagesizeText),
+    } });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(document.getElementById("settings-runtime-status"),
+        "Refused — " + (error.code || "HTTP error") + ": "
+        + (error.message || ""), "bad");
+      return;
+    }
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Overrides saved. Empty fields cleared back to the global default.",
+      "ok");
+    loadSettingsPanel();
+  } catch (error) {
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Save failed: " + error, "bad");
+  }
+}
+
+async function queueConfigFromSettings() {
+  if (selectedRuntimeId === null) { return; }
+  const view = runtimeSettingsCache;
+  const modelEntry = view && view.effective
+    ? view.effective.supervisor_model : null;
+  const effortEntry = view && view.effective
+    ? view.effective.supervisor_reasoning_effort : null;
+  const model = modelEntry ? String(modelEntry.value || "").trim() : "";
+  const effort = effortEntry ? String(effortEntry.value || "").trim() : "";
+  if (!model || !effort) {
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Nothing to queue: the effective value inherits the Runtime's "
+      + "fixed Supervisor policy. Queue an explicit model/effort from "
+      + "the Supervisor panel instead.", "muted");
+    return;
+  }
+  try {
+    const response = await postJson("/api/runtimes/"
+      + selectedRuntimeId + "/supervisor/config",
+      { model: model, reasoning_effort: effort });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(document.getElementById("settings-runtime-status"),
+        "Queue refused — " + (error.code || "HTTP error") + ": "
+        + (error.message || ""), "bad");
+      return;
+    }
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Model change queued — applies next Supervisor turn; it never "
+      + "interrupts an active call.", "ok");
+    loadSupervisorPanel();
+  } catch (error) {
+    setPanel(document.getElementById("settings-runtime-status"),
+      "Queue request failed: " + error, "bad");
+  }
+}
+
+async function saveOperatorNote() {
+  if (selectedRuntimeId === null) { return; }
+  try {
+    const response = await postJson("/api/runtimes/"
+      + selectedRuntimeId + "/notes",
+      { text: document.getElementById("settings-note").value });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(document.getElementById("settings-note-status"),
+        "Refused — " + (error.code || "HTTP error") + ": "
+        + (error.message || ""), "bad");
+      return;
+    }
+    setPanel(document.getElementById("settings-note-status"),
+      "Operator note saved. It is UI-only and never enters Codex "
+      + "context automatically.", "ok");
+  } catch (error) {
+    setPanel(document.getElementById("settings-note-status"),
+      "Save failed: " + error, "bad");
+  }
+}
+
+async function clearOperatorNote() {
+  document.getElementById("settings-note").value = "";
+  await saveOperatorNote();
+}
+
+function convertNoteToIntervention() {
+  const note = document.getElementById("settings-note").value;
+  if (!note.trim()) {
+    setPanel(document.getElementById("settings-note-status"),
+      "The note is empty; nothing to convert.", "muted");
+    return;
+  }
+  document.getElementById("hc-int-comment").value = note;
+  setPanel(document.getElementById("settings-note-status"),
+    "Handed to the formal Human Control intervention form. Submitting "
+    + "it there is your explicit action; the note itself is never sent "
+    + "automatically.", "ok");
+  document.getElementById("human-control-section")
+    .scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function collectNotificationPrefs() {
+  const payload = {};
+  for (const key of Object.keys(NOTIFY_CHECKBOX_IDS)) {
+    payload[key] =
+      document.getElementById(NOTIFY_CHECKBOX_IDS[key]).checked;
+  }
+  return payload;
+}
+
+async function saveNotificationPreferences() {
+  try {
+    const response = await postJson("/api/settings",
+      { settings: { notifications: collectNotificationPrefs() } });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(document.getElementById("settings-notify-status"),
+        "Refused — " + (error.code || "HTTP error") + ": "
+        + (error.message || ""), "bad");
+      return;
+    }
+    setPanel(document.getElementById("settings-notify-status"),
+      "Notification preferences saved as global defaults.", "ok");
+    loadSettingsPanel();
+  } catch (error) {
+    setPanel(document.getElementById("settings-notify-status"),
+      "Save failed: " + error, "bad");
+  }
+}
+
+async function loadRuntimeTemplates() {
+  const select = document.getElementById("rc-template");
+  try {
+    const response = await fetchJson("/api/runtime-templates");
+    clear(select);
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      select.append(el("option", null, "templates unavailable"));
+      return;
+    }
+    for (const template of response.payload.templates) {
+      const option = el("option", null, template.title
+        + (template.available ? "" : " (unavailable)"));
+      option.value = template.template_id;
+      option.disabled = !template.available;
+      select.append(option);
+    }
+  } catch (error) {
+    clear(select);
+    select.append(el("option", null, "templates unavailable"));
+  }
+}
+
+async function submitRuntimeCreate() {
+  const destination =
+    document.getElementById("rc-destination").value.trim();
+  const label = document.getElementById("rc-label").value.trim();
+  const template = document.getElementById("rc-template").value;
+  const status = document.getElementById("rc-status");
+  if (!destination || !label || !template) {
+    setPanel(status,
+      "Choose a template and fill in the destination and label.", "muted");
+    return;
+  }
+  try {
+    const response = await postJson("/api/runtimes/create",
+      { template_id: template, destination: destination, label: label });
+    if (!response.ok || !response.payload
+        || response.payload.ok !== true) {
+      const error = response.payload && response.payload.error
+        ? response.payload.error : {};
+      setPanel(status, "Creation refused — "
+        + (error.code || "HTTP error") + ": " + (error.message || ""),
+        "bad");
+      return;
+    }
+    setPanel(status, "Runtime created and registered"
+      + (response.payload.runtime
+        ? " as “" + response.payload.runtime.label + "”" : "")
+      + ". Nothing was overwritten and the created Runtime was not "
+      + "started.", "ok");
+    loadRuntimes();
+  } catch (error) {
+    setPanel(status, "Creation failed: " + error, "bad");
+  }
+}
+
+loadHealth();
+loadRuntimes();
+resetControlPanel();
+resetArtifactCenter();
+resetSetupWizard();
+resetSupervisorPanel();
+resetAlertsPanel();
+resetRecentArtifacts();
+resetSettingsPanel();
+loadRuntimeTemplates();
+document.getElementById("sv-config-submit").addEventListener(
+  "click", submitSupervisorConfig);
+document.getElementById("settings-global-save").addEventListener(
+  "click", saveGlobalSettings);
+document.getElementById("settings-runtime-save").addEventListener(
+  "click", saveRuntimeOverrides);
+document.getElementById("settings-queue-config").addEventListener(
+  "click", queueConfigFromSettings);
+document.getElementById("settings-note-save").addEventListener(
+  "click", saveOperatorNote);
+document.getElementById("settings-note-clear").addEventListener(
+  "click", clearOperatorNote);
+document.getElementById("settings-note-to-intervention").addEventListener(
+  "click", convertNoteToIntervention);
+document.getElementById("settings-notify-save").addEventListener(
+  "click", saveNotificationPreferences);
+// Browser notification permission is requested ONLY here, from this
+// explicit user gesture. Refusal or unavailability degrades to the
+// visible in-Console attention state; nothing ever navigates the user.
+document.getElementById("settings-notify-enable").addEventListener(
+  "click", function () {
+    if (!("Notification" in window)) {
+      setPanel(document.getElementById("settings-notify-status"),
+        "This browser does not support notifications; alerts stay "
+        + "visible in-Console.", "muted");
+      return;
+    }
+    Notification.requestPermission().then(function (permission) {
+      const status = document.getElementById("settings-notify-status");
+      if (permission === "granted") {
+        status.textContent = "Browser notifications enabled for "
+          + "must-attention and opted-in events; they never navigate "
+          + "you anywhere.";
+      } else {
+        status.textContent = "Browser notifications refused or "
+          + "unavailable; the Console degrades to the visible "
+          + "in-Console attention state.";
+      }
+      status.className = "muted";
+    });
+  });
+document.getElementById("ra-view-all").addEventListener(
+  "click", function () { openArtifactCenter(null); });
+document.getElementById("rc-submit").addEventListener(
+  "click", submitRuntimeCreate);
+setInterval(loadCockpit, COCKPIT_POLL_MS);
+setInterval(loadSupervisorPanel, COCKPIT_POLL_MS);
+setInterval(loadAlerts, COCKPIT_POLL_MS);
+setInterval(loadRecentArtifacts, COCKPIT_POLL_MS);
+setInterval(loadRuntimes, RUNTIMES_POLL_MS);
+setInterval(loadHealth, HEALTH_POLL_MS);
+// Periodic Timeline refresh preserves the user's browsing position; it never
+// forcibly moves pages or scroll.
+setInterval(function () {
+  selectionPreserved = true;
+  loadTimeline();
+}, TIMELINE_POLL_MS);
+// Periodic Pending Controls refresh; after any control action the panel and
+// the button gating refresh immediately.
+setInterval(loadControls, CONTROLS_POLL_MS);
+</script>
+</body>
+</html>
