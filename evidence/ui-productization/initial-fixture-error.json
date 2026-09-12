@@ -1,0 +1,9 @@
+{
+  "expression": "document.getElementById('rr-status').classList.contains('ok')",
+  "diagnostics": {
+    "register": "注册被拒绝：the candidate Runtime did not answer a bounded read-only status probe",
+    "state": "请先在左侧选择 Runtime。",
+    "html": "跳到主内容\nG\nAgent Operations\nGeneral Agent Runtime v1.3\n项目控制台\n时间线\n产物中心\n项目设置\n设置\n+ 创建 Runtime\n+ 注册已有 Runtime\n已注册 RUNTIME\n\n刷新列表\n\n还没有 Runtime\n\n本地运行 · v1.3\n未选择 Runtime\n未选择项目\n未连接\n语言\n简体中文\nEnglish\n\nAGENT OPERATIONS\n\n注册已有 Runtime\n\n连接本机已有 Runtime，保留其现有项目与状态。\n\n新建项目\n注册已有 Runtime\n\n填写本机已有 Runtime 的目录。注册不会启动 Runtime，也不会修改其中的文件。\n\nRuntime 目录（绝对路径）\n显示名称\n\n注册已有 Runtime\n\n注册被拒绝：the candidate Runtime did not answer a bounded read-only status probe"
+  },
+  "consoleErrors": []
+}

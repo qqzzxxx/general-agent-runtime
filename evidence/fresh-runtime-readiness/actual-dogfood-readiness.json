@@ -1,0 +1,82 @@
+{
+  "runtime_root": "C:\\general-agent-runtime-v13-dogfood",
+  "http_status": 200,
+  "readiness": {
+    "schema_version": 1,
+    "ready": true,
+    "checks": [
+      {
+        "key": "goal_loaded",
+        "label": "Goal loaded and valid",
+        "state": "PASS",
+        "required": true,
+        "detail": "the draft Goal passed the deterministic validator"
+      },
+      {
+        "key": "goal_anchor",
+        "label": "Goal Anchor ready or creatable",
+        "state": "PASS",
+        "required": true,
+        "detail": "the formal bootstrap binds the Goal Anchor (GOAL-ANCHOR-V1) at project creation"
+      },
+      {
+        "key": "inputs_registered",
+        "label": "Inputs registered",
+        "state": "PASS",
+        "required": true,
+        "detail": "an input inventory or an explicit none-needed decision exists"
+      },
+      {
+        "key": "project_type_valid",
+        "label": "ProjectType valid",
+        "state": "PASS",
+        "required": true,
+        "detail": "GENERAL profile is present in the Runtime"
+      },
+      {
+        "key": "supervisor_config_valid",
+        "label": "Supervisor configuration valid (draft)",
+        "state": "PASS",
+        "required": true,
+        "detail": "the setup draft is recorded; it applies only when a supported Runtime interface consumes it \u2014 no active turn was changed"
+      },
+      {
+        "key": "runtime_healthy",
+        "label": "Runtime healthy",
+        "state": "PASS",
+        "required": true,
+        "detail": "the control plane answered the read-only status probe"
+      },
+      {
+        "key": "python_requirements",
+        "label": "Python/runtime requirements",
+        "state": "PASS",
+        "required": true,
+        "detail": "server Python 3.12.10"
+      },
+      {
+        "key": "control_plane_v12",
+        "label": "v1.2 control plane available",
+        "state": "PASS",
+        "required": true,
+        "detail": "supervisor_control.py answers with status schema_version 1"
+      },
+      {
+        "key": "zcode_acknowledged",
+        "label": "ZCode setup acknowledged",
+        "state": "PASS",
+        "required": true,
+        "detail": "a human acknowledged the ZCode Automation steps in this Console"
+      },
+      {
+        "key": "preflight",
+        "label": "Preflight",
+        "state": "PASS",
+        "required": true,
+        "detail": "Fresh release verified: eligible for first-project bootstrap; START_PROJECT will create lifecycle state."
+      }
+    ]
+  },
+  "start_requested": false,
+  "runtime_files_unchanged": true
+}

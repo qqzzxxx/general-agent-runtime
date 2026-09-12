@@ -1,0 +1,139 @@
+{
+  "renderer": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "checks": [
+    {
+      "name": "empty-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1366,
+      "scroll": 1366,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "create-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1366,
+      "scroll": 1366,
+      "views": [
+        "view-create"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "cockpit-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "cockpit-1440",
+      "width": 1440,
+      "height": 900,
+      "client": 1425,
+      "scroll": 1425,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "cockpit-1920",
+      "width": 1920,
+      "height": 1080,
+      "client": 1905,
+      "scroll": 1905,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "settings-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-settings"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "artifacts-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-artifacts"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "timeline-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1366,
+      "scroll": 1366,
+      "views": [
+        "view-timeline"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "setup-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-setup"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "paused-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "human-control-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    },
+    {
+      "name": "english-1366",
+      "width": 1366,
+      "height": 768,
+      "client": 1351,
+      "scroll": 1351,
+      "views": [
+        "view-cockpit"
+      ],
+      "narrow": 0
+    }
+  ],
+  "consoleErrors": [],
+  "result": "PASS"
+}

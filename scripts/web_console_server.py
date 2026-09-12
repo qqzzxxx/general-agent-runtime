@@ -3865,6 +3865,10 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             status_failure = None
             status_doc = payload["control_plane"]["status"]
         preflight = self._run_setup_preflight(root)
+        from web_console_fresh_install import interpret_fresh_install_preflight
+        preflight = interpret_fresh_install_preflight(
+            root=root, installation=self.config.console_root,
+            preflight=preflight, status_doc=status_doc)
         python_check = {
             "ok": sys.version_info[:2] >= MIN_PYTHON_VERSION,
             "python_version": sys.version.split()[0]}

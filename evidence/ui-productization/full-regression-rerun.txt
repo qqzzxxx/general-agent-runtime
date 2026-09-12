@@ -1,0 +1,1328 @@
+CLAIM_ERROR message_id=700105 error=malformed ZCODE_LAST_PROCESSED.txt: line 1 is not KEY=VALUE: 'not-a-pointer'
+CLAIM_NOT_AUTHORIZED message_id=700001 reason=runtime_state_unavailable:FileNotFoundError
+CLAIM_ACQUIRED message_id=700006 claim=C:\Users\qzxAl\AppData\Local\Temp\tmp_2ibquka\handoff\executor_claims\700006-0284272e910ab6c72bda2a2a.claim claim_token=7_-GNGum6_penyE9ndAbZJ4dqdej4IXlpMPbylRHS-s
+CLAIM_EXISTS message_id=700006 claim=C:\Users\qzxAl\AppData\Local\Temp\tmp_2ibquka\handoff\executor_claims\700006-0284272e910ab6c72bda2a2a.claim
+ALREADY_PROCESSED message_id=700005 last_processed=700005
+EXECUTOR_CLAIM_CONCURRENCY_TEST: OK
+EXECUTOR_CLAIM_LAST_PROCESSED_PARSER_TEST: OK
+[2026-09-12T18:57:23+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-8n0vzozw\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:23+00:00] Repaired completion compatibility artifacts
+[2026-09-12T18:57:23+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:23+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:23+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-945jt92r\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:24+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:24+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:24+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:24+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-u4sl4rkt\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+[2026-09-12T18:57:24+00:00] Raw Executor completion signal rejected (fail closed)
+>>> COMPLETION_REJECTED: classification=UNKNOWN_RAW_COMPLETION, message_id=800777, detail=no authoritative completion record for MESSAGE_ID 800777
+[2026-09-12T18:57:24+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-zavbvjbh\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:24+00:00] Raw Executor completion signal rejected (fail closed)
+>>> COMPLETION_REJECTED: classification=COMPLETION_BINDING_MISMATCH, message_id=800100, detail=record exists for this MESSAGE_ID but the raw signal identity/project/commit_id does not bind to it
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-6lpk7bgz\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:24+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:24+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:24+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+[2026-09-12T18:57:24+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-mc1yqtpk\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+CLAIM_EXISTS message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-mc1yqtpk\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+ALREADY_PROCESSED message_id=800099 last_processed=800099
+[2026-09-12T18:57:28+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-ktztequp\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:28+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:28+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:32+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-_msgfv39\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:32+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-863jx2ju\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:32+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:32+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-zdofe22n\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:32+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:32+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-artfb3ng\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:32+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:32+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:32+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:32+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-o26h_cnr\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:33+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:33+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:33+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:33+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-tdj1hghs\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:33+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:33+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:33+00:00] Active project scope activated
+...................C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:589: ResourceWarning: unclosed file <_io.TextIOWrapper name=5 encoding='cp936'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:589: ResourceWarning: unclosed file <_io.TextIOWrapper name=6 encoding='cp936'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:589: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='cp936'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:589: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='cp936'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-eptcqi16\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+[2026-09-12T18:57:33+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-jgzrylgp\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+[2026-09-12T18:57:33+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=800100 claim=C:\Users\qzxAl\AppData\Local\Temp\completion-seal-4bsum6jr\handoff\executor_claims\800100-396dcde84e9c67eaada840f8.claim
+COMPLETION_COMMITTED commit_id=completion-800100-396dcde84e9c67eaada840f8 receipt_sha256=cb1ba795fbf734d40c04231e58aaa39307802fcb97dd4c6ea466496d6adcd19e brief_sha256=392a19d8244a512643bb7bce133dfcb9402887f87bb2936c01752fc09452a8d2
+[2026-09-12T18:57:33+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=800100, task_id=T-SEAL, stage_id=S-SEAL, commit_id=completion-800100-396dcde84e9c67eaada840f8, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:33+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=800100, commit_id=completion-800100-396dcde84e9c67eaada840f8
+[2026-09-12T18:57:33+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=800100, detail=raw signal bound to the committed record
+CLAIM_ACQUIRED message_id=700962 claim=C:\Users\qzxAl\AppData\Local\Temp\console-view-tests-lttgntfl\handoff\executor_claims\700962-7a91d45ed845d74ea9856aa8.claim
+CLAIM_EXISTS message_id=700962 claim=C:\Users\qzxAl\AppData\Local\Temp\console-view-tests-lttgntfl\handoff\executor_claims\700962-7a91d45ed845d74ea9856aa8.claim
+COMPLETION_COMMITTED commit_id=completion-700962-7a91d45ed845d74ea9856aa8 receipt_sha256=4712d791a2831ca9049eb780a811ec42524cc52b32262a8363da24c31de6961e brief_sha256=7c8b6f2860f03188c4d24b71cf6bd5df7f0410c81a97628cc91d1e880b4a4240
+CLAIM_ACQUIRED message_id=700960 claim=C:\Users\qzxAl\AppData\Local\Temp\console-view-tests-qqx4clwx\handoff\executor_claims\700960-54be841253f9a30e99207278.claim
+COMPLETION_COMMITTED commit_id=completion-700960-54be841253f9a30e99207278 receipt_sha256=477c5a3629dc55c08383609dee95690e2d5833bd512148ffcad253cc4686a016 brief_sha256=aef4e6c4324f3bf1b153f7044f29f405e558b65b535c59bc9836716ec77339db
+[2026-09-12T18:57:34+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700960, task_id=T-VIEW, stage_id=S-VIEW, commit_id=completion-700960-54be841253f9a30e99207278, status=COMPLETED, final_verification=False
+CLAIM_ACQUIRED message_id=700961 claim=C:\Users\qzxAl\AppData\Local\Temp\console-view-tests-qqx4clwx\handoff\executor_claims\700961-33c3086f7e5733ec3a62121f.claim
+COMPLETION_COMMITTED commit_id=completion-700961-33c3086f7e5733ec3a62121f receipt_sha256=505d3e17679e24ece98639c6d7c0f95976303fa79c1504c039efbd03ebd31dec brief_sha256=21717b655f62e4f9ec21a7b42f62b328b47c0d72db5c7a1ea56e3fd140353d32
+[2026-09-12T18:57:34+00:00] COMPLETE blocked by Final Verification Gate
+CLAIM_ACQUIRED message_id=700960 claim=C:\Users\qzxAl\AppData\Local\Temp\console-view-tests-jx0xoqdx\handoff\executor_claims\700960-54be841253f9a30e99207278.claim
+COMPLETION_COMMITTED commit_id=completion-700960-54be841253f9a30e99207278 receipt_sha256=b33a7811972c210464a9c1e35e2f65dbcc162e71fd33ff283188ce6b70499048 brief_sha256=92b85c5f1494abc609eca52744f2e52d5238d949edfef6551bc11d9c321bbe4d
+[2026-09-12T18:57:34+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700960, task_id=T-VIEW, stage_id=S-VIEW, commit_id=completion-700960-54be841253f9a30e99207278, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:35+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+.....................CLAIM_NOT_AUTHORIZED message_id=700017 reason=authorization_message_id_mismatch
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-xaxwg48r\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=FOTQKi1NLktNsSum15Z95gI2aLg-GdZ8nu-DFXChTEw
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-xaxwg48r\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+ALREADY_PROCESSED message_id=700014 last_processed=700015
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+..CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:35+00:00] Starting Codex supervisor turn
+[2026-09-12T18:57:35+00:00] Codex supervisor profile fixed
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:57:35+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:57:35+00:00] Starting Codex supervisor turn
+[2026-09-12T18:57:35+00:00] Codex supervisor profile fixed
+[2026-09-12T18:57:35+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : CONTINUE
+Scope    : -
+Status   : WAITING_EXECUTOR
+Turn     : EXECUTOR_RESULT_READY (0.0s)
+Reason   : fixture dispatch decision
+[2026-09-12T18:57:35+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T18:57:35+00:00] Fresh Executor task published
+>>> EXECUTOR_TASK_PUBLISHED: message_id=700015, task_id=task-final-verification, stage_id=final-verification-attempt-1, attempt=1
+[2026-09-12T18:57:35+00:00] Starting Codex supervisor turn
+[2026-09-12T18:57:35+00:00] Codex supervisor profile fixed
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:57:35+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:57:35+00:00] Starting Codex supervisor turn
+[2026-09-12T18:57:35+00:00] Codex supervisor profile fixed
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-12T18:57:35+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:57:35+00:00] Dispatch repair also exhausted after final invalid Supervisor result
+[2026-09-12T18:57:35+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+...CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:35+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+.CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:35+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:36+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+.CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:36+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:36+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:57:36+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-09sufd5b\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=Q2IzqsNIu29RZ_1lphaCuehKTp9RBB1WhIQ1YRmoQEg
+[2026-09-12T18:57:36+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:36+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:57:36+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:57:36+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-12T18:57:36+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-asd4rkok\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=L-zYyECsnvXAC2Xrwziq5lIE___4ea_A1FcoOH6Gx5g
+COMPLETION_COMMITTED commit_id=completion-700111-376f1c1f0c83021983ffb5f3 receipt_sha256=df1156221bcc582462aea008153bae3fd7e315e0ff99cbfc3d44d1753eed1ac8 brief_sha256=de4d73f871c8e7be4a95097dc8f68cf11995cb14682f787f1aaf4e7cf06616c8
+COMPLETION_COMMITTED commit_id=completion-700110-6a81e095e081ec37057f92b5 receipt_sha256=49a12538a041018773fa76ad63eaf893b4d4a649b50bd28e86f175c8799b8c1f brief_sha256=1844c969c963043fd8d25aeec4ec5ad09a5650b865a5d00a85a626d00069e3de
+[2026-09-12T18:57:38+00:00] Repaired completion compatibility artifacts
+[2026-09-12T18:57:38+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T20:12:39+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T18:57:38+00:00] Active project scope activated
+[2026-09-12T18:57:38+00:00] Orchestrator v2 started
+[2026-09-12T18:57:38+00:00] Interrupted by console
+[2026-09-12T18:57:38+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T20:12:39+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T18:57:38+00:00] Active project scope activated
+[2026-09-12T18:57:38+00:00] Orchestrator v2 started
+[2026-09-12T18:57:38+00:00] Interrupted by console
+COMPLETION_COMMITTED commit_id=completion-700110-6a81e095e081ec37057f92b5 receipt_sha256=49a12538a041018773fa76ad63eaf893b4d4a649b50bd28e86f175c8799b8c1f brief_sha256=1844c969c963043fd8d25aeec4ec5ad09a5650b865a5d00a85a626d00069e3de
+[2026-09-12T18:57:39+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700110, task_id=U1-U3, stage_id=BUILD-1, commit_id=completion-700110-6a81e095e081ec37057f92b5, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:39+00:00] Active project scope activated
+[2026-09-12T18:57:39+00:00] Orchestrator v2 started
+[2026-09-12T18:57:39+00:00] Resuming existing Executor wait; Codex was not invoked
+WAITING_EXECUTOR �� waiting for Executor (task U1-U3 stage BUILD-1; message 700110, attempt 1) elapsed 00:00, polls 0
+[2026-09-12T18:57:39+00:00] Repaired completion compatibility artifacts
+[2026-09-12T18:57:39+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700110, task_id=U1-U3, stage_id=BUILD-1, commit_id=completion-700110-6a81e095e081ec37057f92b5, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:39+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=700110, commit_id=completion-700110-6a81e095e081ec37057f92b5
+[2026-09-12T18:57:39+00:00] Project reached terminal STOPPED; pending Supervisor events retained
+[2026-09-12T18:57:39+00:00] User terminal notification emitted
+[2026-09-12T18:57:41+00:00] Active project scope activated
+[2026-09-12T18:57:41+00:00] Orchestrator v2 started
+[2026-09-12T18:57:41+00:00] Interrupted by console
+COMPLETION_COMMITTED commit_id=completion-700110-6a81e095e081ec37057f92b5 receipt_sha256=49a12538a041018773fa76ad63eaf893b4d4a649b50bd28e86f175c8799b8c1f brief_sha256=1844c969c963043fd8d25aeec4ec5ad09a5650b865a5d00a85a626d00069e3de
+[2026-09-12T18:57:42+00:00] COMPLETE blocked by Final Verification Gate
+[2026-09-12T18:57:44+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:44+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:44+00:00] Final Verification binding reconciled from receipt ledger
+[2026-09-12T18:57:44+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:45+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:45+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=8d2400add03d08e3360e39a03568b800e9e5a5ac2830bc7fe84d4a45de1c0287 brief_sha256=f98d45071acfdd7bb521384a38b7dac65fe067c685041cfc72440e38fcf76cc8
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=task-ordinary, stage_id=stage-ordinary, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:45+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:45+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700024-8177896f3aa79cac4ff47f32 receipt_sha256=47c35c5968dc05800a614f3b8a99d8a9cd554b025ffcedd60780b45ded021b81 brief_sha256=959c3d4e3a42f5253871778f7c161075a46469942058808748e824edf378452c
+[2026-09-12T18:57:45+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700024, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700024-8177896f3aa79cac4ff47f32, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:46+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:46+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:46+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:46+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:46+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:46+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:46+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:46+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:46+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700015-b1bd7bd330ad8ae30df17110 receipt_sha256=e93f6f83de7ae28d85e868cbab3c6cac8fe8225ce064cd0dc1debc57500bbc2d brief_sha256=56dc7bd80d426715de2904d2696217e661a9d46d10f66219905064d18ad9ac33
+[2026-09-12T18:57:46+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700015, task_id=task-ordinary, stage_id=stage-ordinary, commit_id=completion-700015-b1bd7bd330ad8ae30df17110, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:47+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:47+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:47+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:47+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:47+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:47+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:47+00:00] Final Verification binding reconciled from receipt ledger
+[2026-09-12T18:57:47+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:47+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:47+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+COMPLETION_COMMITTED commit_id=completion-700014-811fa7441ce92c85ab24f64e receipt_sha256=3b10a65cca85d336a64472c33ed5829b8b1362e9801b56d68f0be06dbe436718 brief_sha256=4547a7ac9e4cd4c1564ae02178a271eab52ac143a120d3eb00b43cad47d1e66d
+[2026-09-12T18:57:47+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700014, task_id=COLD_START_FINAL_VERIFICATION, stage_id=FINAL_VERIFICATION_ATTEMPT_1, commit_id=completion-700014-811fa7441ce92c85ab24f64e, status=COMPLETED, final_verification=True
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Orchestrator v2 started
+[2026-09-12T18:57:49+00:00] User terminal notification emitted
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] User terminal notification emitted
+[2026-09-12T18:57:49+00:00] Active project scope activated
+[2026-09-12T18:57:49+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=700100 claim=C:\Users\qzxAl\AppData\Local\Temp\g3-1ytrivm9\handoff\executor_claims\700100-6b4b7f647ba186f5f88c2f53.claim
+COMPLETION_COMMITTED commit_id=completion-700100-6b4b7f647ba186f5f88c2f53 receipt_sha256=e461f862304be2f1ca8cc74bf497c3872ac1fc4e1c0f88c5fb61a1633b20917a brief_sha256=0a955d66fd020ccf35af289606602711a57bfabdabf12d9a840359f1bc32ca34
+[2026-09-12T18:57:49+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700100, task_id=T-proj-a, stage_id=S1, commit_id=completion-700100-6b4b7f647ba186f5f88c2f53, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:49+00:00] Active project scope activated
+CLAIM_ACQUIRED message_id=700100 claim=C:\Users\qzxAl\AppData\Local\Temp\g3-fxcjkfje\handoff\executor_claims\700100-6b4b7f647ba186f5f88c2f53.claim
+COMPLETION_COMMITTED commit_id=completion-700100-6b4b7f647ba186f5f88c2f53 receipt_sha256=e461f862304be2f1ca8cc74bf497c3872ac1fc4e1c0f88c5fb61a1633b20917a brief_sha256=0a955d66fd020ccf35af289606602711a57bfabdabf12d9a840359f1bc32ca34
+[2026-09-12T18:57:49+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700100, task_id=T-proj-a, stage_id=S1, commit_id=completion-700100-6b4b7f647ba186f5f88c2f53, status=COMPLETED, final_verification=False
+[2026-09-12T18:57:50+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=700100, detail=raw signal bound to the committed record
+[2026-09-12T18:57:50+00:00] Raw Executor completion signal rejected (fail closed)
+>>> COMPLETION_REJECTED: classification=COMPLETION_BINDING_MISMATCH, message_id=700100, detail=record exists for this MESSAGE_ID but the raw signal identity/project/commit_id does not bind to it
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] COMPLETE blocked by Final Verification Gate
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+[2026-09-12T18:57:50+00:00] Active project scope activated
+........................................................................................................................................................ss..s.CLAIM_NOT_AUTHORIZED message_id=700014 reason=authorization_missing
+ALREADY_PROCESSED message_id=700015 last_processed=700015
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+..CLAIM_NOT_AUTHORIZED message_id=700015 reason=inbox_unavailable_or_malformed:FileNotFoundError
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=inbox_hash_mismatch
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=o54LZKAtY2BJuAx_7KE4L0dHrEvblr5Ju46pHxR6tdk
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-svuoi9vo\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-yyop3dfn\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=sEsJBnItxqPhEiV9SzUwgF86KGQ7H9ohX8Bx_1JprBo
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+.....CLAIM_NOT_AUTHORIZED message_id=700014 reason=message_id_retired
+..CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-eww4_zk2\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=HbRgptqh87C_I8K1WJj1f0h9KGUPppcjahxIrWdwBmY
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\g5a5-3-eww4_zk2\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+[2026-09-12T18:57:51+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+..CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_nonce_mismatch
+[2026-09-12T18:57:52+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+.CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_task_id_mismatch
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_stage_id_mismatch
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_attempt_mismatch
+[2026-09-12T18:57:58+00:00] Active project scope activated
+[2026-09-12T18:57:59+00:00] Active project scope activated
+[2026-09-12T18:57:59+00:00] Active project scope activated
+[2026-09-12T18:57:59+00:00] Active project scope activated
+[2026-09-12T18:57:59+00:00] Active project scope activated
+[2026-09-12T18:57:59+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_HASH_MISMATCH
+[2026-09-12T18:58:00+00:00] User terminal notification emitted
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_HASH_MISMATCH
+[2026-09-12T18:58:00+00:00] User terminal notification emitted
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:00+00:00] Orchestrator v2 started
+[2026-09-12T18:58:00+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_HASH_MISMATCH
+[2026-09-12T18:58:00+00:00] User terminal notification emitted
+[2026-09-12T18:58:00+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_HASH_MISMATCH
+[2026-09-12T18:58:01+00:00] User terminal notification emitted
+[2026-09-12T18:58:01+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MISSING
+[2026-09-12T18:58:01+00:00] User terminal notification emitted
+[2026-09-12T18:58:01+00:00] Active project scope activated
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:01+00:00] User terminal notification emitted
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:01+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_PATH_ESCAPE
+[2026-09-12T18:58:02+00:00] User terminal notification emitted
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_PATH_ESCAPE
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:02+00:00] User terminal notification emitted
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_MALFORMED
+[2026-09-12T18:58:02+00:00] Active project scope activated
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_FILE_MISSING
+[2026-09-12T18:58:02+00:00] User terminal notification emitted
+[2026-09-12T18:58:02+00:00] Active project scope activated
+[2026-09-12T18:58:02+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_REBIND_REJECTED
+[2026-09-12T18:58:02+00:00] User terminal notification emitted
+[2026-09-12T18:58:02+00:00] Active project scope activated
+[2026-09-12T18:58:02+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:02+00:00] Active project scope activated
+[2026-09-12T18:58:02+00:00] Goal anchor verification failed; fail-closed into HUMAN_REVIEW
+>>> GOAL_ANCHOR_FAIL_CLOSED: reason=GOAL_ANCHOR_UNREADABLE
+[2026-09-12T18:58:02+00:00] User terminal notification emitted
+[2026-09-12T18:58:03+00:00] Removing stale orchestrator lock left by a dead process
+[2026-09-12T18:58:03+00:00] Orchestrator v2 started
+[2026-09-12T18:58:03+00:00] User terminal notification emitted
+CLAIM_ACQUIRED message_id=700001 claim=C:\Users\qzxAl\AppData\Local\Temp\agent-orchestrator-v2-6wimhuu2\handoff\executor_claims\700001-e0f5d528756fc4ff08935427.claim
+COMPLETION_COMMITTED commit_id=completion-700001-e0f5d528756fc4ff08935427 receipt_sha256=e351425c9c2ddb4c91779d1543bd77ea825e3c692ce59a1afa106c158bde7524 brief_sha256=451e67ac9c548d8cdfba0070021c056e361f89f48981cb6a6cc64e09dbb6eebe
+[2026-09-12T18:58:03+00:00] Raw Executor completion signal rejected (fail closed)
+>>> COMPLETION_REJECTED: classification=COMPLETION_BINDING_MISMATCH, message_id=700001, detail=record exists for this MESSAGE_ID but the raw signal identity/project/commit_id does not bind to it
+CLAIM_ACQUIRED message_id=700001 claim=C:\Users\qzxAl\AppData\Local\Temp\agent-orchestrator-v2-zwjnjd9n\handoff\executor_claims\700001-e0f5d528756fc4ff08935427.claim
+COMPLETION_COMMITTED commit_id=completion-700001-e0f5d528756fc4ff08935427 receipt_sha256=e351425c9c2ddb4c91779d1543bd77ea825e3c692ce59a1afa106c158bde7524 brief_sha256=451e67ac9c548d8cdfba0070021c056e361f89f48981cb6a6cc64e09dbb6eebe
+[2026-09-12T18:58:03+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700001, task_id=T-A, stage_id=INFRA-A-NORMAL, commit_id=completion-700001-e0f5d528756fc4ff08935427, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:03+00:00] Ignored late republish of an already consumed/sealed completion
+>>> COMPLETION_REJECTED: classification=KNOWN_SEALED_REPLAY, message_id=700001, detail=raw signal bound to the committed record
+[2026-09-12T18:58:03+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-12T18:58:03+00:00] Orchestrator v2 started
+[2026-09-12T18:58:03+00:00] Project deadline already reached; Codex was not invoked
+[2026-09-12T18:58:04+00:00] User terminal notification emitted
+CLAIM_ACQUIRED message_id=700001 claim=C:\Users\qzxAl\AppData\Local\Temp\agent-orchestrator-v2-q934oyos\handoff\executor_claims\700001-e0f5d528756fc4ff08935427.claim
+COMPLETION_COMMITTED commit_id=completion-700001-e0f5d528756fc4ff08935427 receipt_sha256=d29ab8b3b28d6017b7f983b7c62d474d2d49b1dd9c3b1ef2d6cf7321f2afff55 brief_sha256=961a2bcc6a556a97b02a4c2d08edb43c03d6f0a72c9fb2a2114b7043793f7926
+[2026-09-12T18:58:04+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700001, task_id=T-A, stage_id=INFRA-A-NORMAL, commit_id=completion-700001-e0f5d528756fc4ff08935427, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:04+00:00] Orchestrator v2 started
+[2026-09-12T18:58:04+00:00] Human review present before startup; Codex was not invoked
+[2026-09-12T18:58:04+00:00] User terminal notification emitted
+[2026-09-12T18:58:04+00:00] Orchestrator v2 started
+[2026-09-12T18:58:04+00:00] control/STOP detected before startup; Codex was not invoked
+[2026-09-12T18:58:04+00:00] User terminal notification emitted
+[2026-09-12T18:58:04+00:00] Orchestrator v2 started
+[2026-09-12T18:58:04+00:00] Resuming existing Executor wait; Codex was not invoked
+WAITING_EXECUTOR �� waiting for Executor (task T-A stage INFRA-A-NORMAL; message 700001, attempt 1) elapsed 00:00, polls 0
+[2026-09-12T18:58:04+00:00] Interrupted by console
+[2026-09-12T18:58:04+00:00] Promoted validated staged Executor task
+[2026-09-12T18:58:04+00:00] User terminal notification emitted
+[2026-09-12T18:58:04+00:00] Raw Executor completion signal rejected (fail closed)
+>>> COMPLETION_REJECTED: classification=UNKNOWN_RAW_COMPLETION, detail=DONE flag carries no parseable MESSAGE_ID
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Active project scope activated
+[2026-09-12T18:58:07+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:07+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:07+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:08+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:08+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:08+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:09+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:09+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:09+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : CONTINUE
+Scope    : fixture-stage
+Status   : WAITING_EXECUTOR
+Turn     : HUMAN_DECISION_RESUME (0.0s)
+Reason   : The explicit Human Decision permits one bounded fixture stage.
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Orchestrator v2 started
+[2026-09-12T18:58:09+00:00] Resuming existing Executor wait; Codex was not invoked
+WAITING_EXECUTOR �� waiting for Executor (task fixture-assumption-safe-stage stage fixture-stage-attempt-1; message 700100, attempt 1) elapsed 00:00, polls 0
+[2026-09-12T18:58:09+00:00] Interrupted by console
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:09+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:09+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:09+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:10+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:10+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Orchestrator v2 started
+[2026-09-12T18:58:10+00:00] Interrupted by console
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Active project scope activated
+[2026-09-12T18:58:10+00:00] Goal anchor binding registered in Runtime-owned state
+[2026-09-12T18:58:10+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:10+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:10+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : CONTINUE
+Scope    : fixture-stage
+Status   : WAITING_EXECUTOR
+Turn     : HUMAN_DECISION_RESUME (0.0s)
+Reason   : The explicit Human Decision permits one bounded fixture stage.
+[2026-09-12T18:58:10+00:00] Fresh Executor task published
+>>> EXECUTOR_TASK_PUBLISHED: message_id=700100, task_id=fixture-assumption-safe-stage, stage_id=fixture-stage-attempt-1, attempt=1
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+[2026-09-12T18:58:11+00:00] Active project scope activated
+..........................................................................................................................CLAIM_NOT_AUTHORIZED message_id=700120 reason=message_id_retired
+[2026-09-12T18:58:14+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700120, task_id=T-700120, stage_id=S-700120, commit_id=completion-700120-658873d76bedc4bcadd90908, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:14+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700120, task_id=T-700120, stage_id=S-700120, commit_id=completion-700120-658873d76bedc4bcadd90908, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:17+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700120, task_id=T-700120, stage_id=S-700120, commit_id=completion-700120-658873d76bedc4bcadd90908, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:17+00:00] Active project scope activated
+[2026-09-12T18:58:17+00:00] Orchestrator v2 started
+[2026-09-12T18:58:17+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=700120, commit_id=completion-700120-658873d76bedc4bcadd90908
+[2026-09-12T18:58:17+00:00] Project reached terminal state
+.........CLAIM_NOT_AUTHORIZED message_id=700120 reason=dispatch_archive_binding_missing
+COMPLETION_COMMITTED commit_id=completion-700120-658873d76bedc4bcadd90908 receipt_sha256=e99c13dcd056839f0236f582ce534faa12a4528680c3455234974377a934b080 brief_sha256=37499c2144d0e6e47b789d92b79dfc115cac7f4bebce4652a6a866ce6f78c243
+[2026-09-12T18:58:27+00:00] Active project scope activated
+[2026-09-12T18:58:27+00:00] Orchestrator v2 started
+[2026-09-12T18:58:27+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700120, task_id=T-700120, stage_id=S-700120, commit_id=completion-700120-658873d76bedc4bcadd90908, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:27+00:00] Committed owned completion recovered before startup dispatch registration
+[2026-09-12T18:58:27+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:27+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:27+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : BLOCKED
+Scope    : -
+Status   : BLOCKED
+Turn     : EXECUTOR_RESULT_READY (0.0s)
+Reason   : boundary intervention applied
+[2026-09-12T18:58:27+00:00] Completion sealed
+>>> COMPLETION_SEALED: message_id=700120, commit_id=completion-700120-658873d76bedc4bcadd90908
+[2026-09-12T18:58:27+00:00] Active project scope activated
+[2026-09-12T18:58:27+00:00] Orchestrator v2 started
+[2026-09-12T18:58:27+00:00] Active project scope activated
+[2026-09-12T18:58:27+00:00] Orchestrator v2 started
+[2026-09-12T18:58:27+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:27+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:27+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:27+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:58:27+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:58:27+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:27+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:27+00:00] Active project scope activated
+[2026-09-12T18:58:28+00:00] Recovered interrupted Supervisor control transaction
+[2026-09-12T18:58:28+00:00] Orchestrator v2 started
+[2026-09-12T18:58:28+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:28+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-12T18:58:28+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:58:28+00:00] Dispatch repair also exhausted after final invalid Supervisor result
+[2026-09-12T18:58:28+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:58:28+00:00] Human review present before startup; Codex was not invoked
+[2026-09-12T18:58:28+00:00] Active project scope activated
+[2026-09-12T18:58:28+00:00] Orchestrator v2 started
+[2026-09-12T18:58:28+00:00] Human review present before startup; Codex was not invoked
+[2026-09-12T18:58:28+00:00] Active project scope activated
+[2026-09-12T18:58:28+00:00] Orchestrator v2 started
+[2026-09-12T18:58:28+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:28+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:28+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:28+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:58:28+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:58:28+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:28+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:28+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:28+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-12T18:58:28+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:58:28+00:00] Dispatch repair also exhausted after final invalid Supervisor result
+[2026-09-12T18:58:28+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:58:28+00:00] Human review requested; orchestration stopped
+[2026-09-12T18:58:28+00:00] Active project scope activated
+[2026-09-12T18:58:28+00:00] Orchestrator v2 started
+[2026-09-12T18:58:28+00:00] Human review present before startup; Codex was not invoked
+[2026-09-12T18:58:30+00:00] Active project scope activated
+[2026-09-12T18:58:30+00:00] Orchestrator v2 started
+[2026-09-12T18:58:30+00:00] Project is terminal STOPPED before startup; Codex was not invoked
+[2026-09-12T18:58:30+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:30+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:30+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:58:30+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:30+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:30+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:58:30+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:58:30+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:30+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:30+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:58:30+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:30+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:30+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:58:30+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:58:30+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:30+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:31+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:31+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-12T18:58:31+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-12T18:58:31+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:31+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:31+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-12T18:58:31+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-12T18:58:31+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-12T18:58:31+00:00] Dispatch repair also exhausted after final invalid Supervisor result
+[2026-09-12T18:58:31+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-12T18:58:31+00:00] Fresh Executor completion consumed from the authoritative ledger
+>>> COMPLETION_CONSUMED: message_id=700120, task_id=T-700120, stage_id=S-700120, commit_id=completion-700120-658873d76bedc4bcadd90908, status=COMPLETED, final_verification=False
+[2026-09-12T18:58:31+00:00] Supervisor turn deferred because Runtime is paused
+[2026-09-12T18:58:31+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:31+00:00] Codex supervisor profile fixed
+[2026-09-12T18:58:31+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : BLOCKED
+Scope    : -
+Status   : BLOCKED
+Turn     : EXECUTOR_RESULT_READY (0.0s)
+Reason   : completion accounted
+[2026-09-12T18:58:39+00:00] Starting Codex supervisor turn
+[2026-09-12T18:58:39+00:00] Codex supervisor profile applied from queued configuration
+[2026-09-12T18:58:39+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : CONTINUE
+Scope    : -
+Status   : COMPLETE
+Turn     : EXECUTOR_RESULT_READY (0.0s)
+Reason   : queued-config observability probe
+.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:669: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='utf-8'>
+  function, args, kwargs = self._cleanups.pop()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\case.py:669: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='utf-8'>
+  function, args, kwargs = self._cleanups.pop()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.........C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 22360 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 39336 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+....C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 49796 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+...........................................................................................................Exception in thread Thread-2244 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 42824 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+Exception in thread Thread-2258 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2280 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2288 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2296 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+Exception in thread Thread-2301 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2303 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2308 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2314 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2322 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2330 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2341 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2347 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2359 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 34024 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+Exception in thread Thread-2364 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2390 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2403 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2413 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2422 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 42908 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+Exception in thread Thread-2432 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\subprocess.py:1127: ResourceWarning: subprocess 24508 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+Exception in thread Thread-2454 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2478 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2488 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2497 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2502 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2508 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2514 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2522 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2529 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2536 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2543 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.Exception in thread Thread-2548 (serve_forever):
+Traceback (most recent call last):
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\socketserver.py", line 235, in serve_forever
+    ready = selector.select(poll_interval)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 323, in select
+    r, w, _ = self._select(self._readers, self._writers, [], timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\selectors.py", line 314, in _select
+    r, w, x = select.select(r, w, w, timeout)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] ��һ�����׽����ϳ�����һ��������
+.....................................................................................................................C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2724, family=2, type=1, proto=0, laddr=('127.0.0.1', 63562)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\json\encoder.py:414: ResourceWarning: unclosed <socket.socket fd=2700, family=2, type=1, proto=0, laddr=('127.0.0.1', 63568)>
+  def _iterencode(o, _current_indent_level):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2632, family=2, type=1, proto=0, laddr=('127.0.0.1', 63571)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2776, family=2, type=1, proto=0, laddr=('127.0.0.1', 63574)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2752, family=2, type=1, proto=0, laddr=('127.0.0.1', 63583)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2612, family=2, type=1, proto=0, laddr=('127.0.0.1', 63586)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2772, family=2, type=1, proto=0, laddr=('127.0.0.1', 63591)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\general-agent-runtime-v13-builder\projects\v13-web-console-dev-001\workspace\v1.3-dev\scripts\test_web_console_supervisor_http.py:121: ResourceWarning: unclosed <socket.socket fd=2944, family=2, type=1, proto=0, laddr=('127.0.0.1', 63597)>
+  self.server = wcs.WebConsoleServer.create(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2408, family=2, type=1, proto=0, laddr=('127.0.0.1', 63600)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2912, family=2, type=1, proto=0, laddr=('127.0.0.1', 63603)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2920, family=2, type=1, proto=0, laddr=('127.0.0.1', 63609)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=1352, family=2, type=1, proto=0, laddr=('127.0.0.1', 63612)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2412, family=2, type=1, proto=0, laddr=('127.0.0.1', 63618)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2492, family=2, type=1, proto=0, laddr=('127.0.0.1', 63623)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:107: ResourceWarning: unclosed <socket.socket fd=2512, family=2, type=1, proto=0, laddr=('127.0.0.1', 63626)>
+  for index, test in enumerate(self):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\qzxAl\AppData\Local\Programs\Python\Python312\Lib\unittest\suite.py:84: ResourceWarning: unclosed <socket.socket fd=3020, family=2, type=1, proto=0, laddr=('127.0.0.1', 63629)>
+  return self.run(*args, **kwds)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..............................................
+----------------------------------------------------------------------
+Ran 1249 tests in 318.614s
+
+OK (skipped=3)

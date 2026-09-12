@@ -1,0 +1,16 @@
+test_created_runtime_first_project_is_ready (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_created_runtime_first_project_is_ready) ... ok
+test_even_empty_project_or_history_directories_are_ambiguous (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_even_empty_project_or_history_directories_are_ambiguous) ... ok
+test_existing_project_missing_state_stays_blocked_with_or_without_pointer (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_existing_project_missing_state_stays_blocked_with_or_without_pointer) ... ok
+test_lifecycle_footprints_and_ambiguous_state_fail_closed (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_lifecycle_footprints_and_ambiguous_state_fail_closed) ... ok
+test_missing_setup_requirements_never_enable_bootstrap (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_missing_setup_requirements_never_enable_bootstrap) ... ok
+test_modified_or_incomplete_release_cannot_claim_freshness (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_modified_or_incomplete_release_cannot_claim_freshness) ... ok
+test_pre_fix_created_runtime_does_not_need_new_console_files (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_pre_fix_created_runtime_does_not_need_new_console_files) ... ok
+test_reparse_product_entry_fails_closed (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_reparse_product_entry_fails_closed) ... ok
+test_start_gate_runs_real_bootstrap_and_binds_goal_anchor (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_start_gate_runs_real_bootstrap_and_binds_goal_anchor) ... ok
+test_start_rechecks_freshness_after_readiness (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_start_rechecks_freshness_after_readiness) ... ok
+test_unrecognized_truncated_or_failed_preflight_never_passes (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_unrecognized_truncated_or_failed_preflight_never_passes) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 37.724s
+
+OK

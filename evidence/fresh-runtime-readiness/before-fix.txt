@@ -1,0 +1,89 @@
+test_created_runtime_first_project_is_ready (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_created_runtime_first_project_is_ready) ... FAIL
+
+======================================================================
+FAIL: test_created_runtime_first_project_is_ready (scripts.test_web_console_fresh_readiness.FreshReadinessTests.test_created_runtime_first_project_is_ready)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\general-agent-runtime-v13-builder\projects\v13-web-console-dev-001\workspace\v1.3-dev\scripts\test_web_console_fresh_readiness.py", line 93, in test_created_runtime_first_project_is_ready
+    self.assertTrue(readiness["ready"], json.dumps(readiness, indent=2))
+AssertionError: False is not true : {
+  "schema_version": 1,
+  "ready": false,
+  "checks": [
+    {
+      "key": "goal_loaded",
+      "label": "Goal loaded and valid",
+      "state": "PASS",
+      "required": true,
+      "detail": "the draft Goal passed the deterministic validator"
+    },
+    {
+      "key": "goal_anchor",
+      "label": "Goal Anchor ready or creatable",
+      "state": "PASS",
+      "required": true,
+      "detail": "the formal bootstrap binds the Goal Anchor (GOAL-ANCHOR-V1) at project creation"
+    },
+    {
+      "key": "inputs_registered",
+      "label": "Inputs registered",
+      "state": "PASS",
+      "required": true,
+      "detail": "an input inventory or an explicit none-needed decision exists"
+    },
+    {
+      "key": "project_type_valid",
+      "label": "ProjectType valid",
+      "state": "PASS",
+      "required": true,
+      "detail": "GENERAL profile is present in the Runtime"
+    },
+    {
+      "key": "supervisor_config_valid",
+      "label": "Supervisor configuration valid (draft)",
+      "state": "PASS",
+      "required": true,
+      "detail": "the setup draft is recorded; it applies only when a supported Runtime interface consumes it \u2014 no active turn was changed"
+    },
+    {
+      "key": "runtime_healthy",
+      "label": "Runtime healthy",
+      "state": "PASS",
+      "required": true,
+      "detail": "the control plane answered the read-only status probe"
+    },
+    {
+      "key": "python_requirements",
+      "label": "Python/runtime requirements",
+      "state": "PASS",
+      "required": true,
+      "detail": "server Python 3.12.10"
+    },
+    {
+      "key": "control_plane_v12",
+      "label": "v1.2 control plane available",
+      "state": "PASS",
+      "required": true,
+      "detail": "supervisor_control.py answers with status schema_version 1"
+    },
+    {
+      "key": "zcode_acknowledged",
+      "label": "ZCode setup acknowledged",
+      "state": "PASS",
+      "required": true,
+      "detail": "a human acknowledged the ZCode Automation steps in this Console"
+    },
+    {
+      "key": "preflight",
+      "label": "Preflight",
+      "state": "FAIL",
+      "required": true,
+      "detail": "PREFLIGHT: BLOCKED\r\nMode: legacy\r\nRuntime Root: C:\\Users\\qzxAl\\AppData\\Local\\Temp\\fresh-readiness-gkhwgvwe\\fresh-runtime\r\n- missing: C:\\Users\\qzxAl\\AppData\\Local\\Temp\\fresh-readiness-gkhwgvwe\\fresh-runtime\\control\\project_state.json\r\n- missing: C:\\Users\\qzxAl\\AppData\\Local\\Temp\\fresh-readiness-gkhwgvwe\\fresh-runtime\\RESEARCH_STATE.md\r\n- missing: C:\\Users\\qzxAl\\AppData\\Local\\Temp\\fresh-readiness-gkhwgvwe\\fresh-runtime\\ZCODE_LAST_PROCESSED.txt\r\n- project_state is missing or invalid: C:\\Users\\qzxAl\\AppData\\Local\\Temp\\fresh-readiness-gkhwgvwe\\fresh-runtime\\control\\project_state.json: [Errno 2] No such file or directory: 'C:\\\\Users\\\\qzxAl\\\\AppData\\\\Local\\\\Temp\\\\fresh-readiness-gkhwgvwe\\\\fresh-runtime\\\\control\\\\project_state.json'\r\n"
+    }
+  ]
+}
+
+----------------------------------------------------------------------
+Ran 1 test in 2.229s
+
+FAILED (failures=1)

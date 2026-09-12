@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "project_id": "v13-dogfood-001",
+  "project_type": "GENERAL",
+  "goal_markdown": "# v1.3 Dogfood Project Goal\n\n## Objective\n\nRun a small, real end-to-end project through General Agent Runtime v1.3 to verify that the Runtime, Supervisor, Executor, Web Console, Timeline, Artifact Center, and human-control workflow can be used together in normal operation.\n\nThe project work itself should remain intentionally small and bounded.\n\n## Source\n\nUse the Runtime's existing:\n\n`docs/ARCHITECTURE.md`\n\nas the primary source material.\n\n## Deliverables\n\nCreate exactly these user-facing deliverables:\n\n1. `workspace/dogfood-note.md`\n   - A concise Markdown note summarizing the Runtime's public protocol flow described in `docs/ARCHITECTURE.md`.\n   - It should be understandable to a technically literate reader who has not read the full architecture document.\n   - Keep it short and focused on the normal project flow and major agent/control roles.\n\n2. `evidence/dogfood-rounds.csv`\n   - A CSV recording the completed Runtime rounds relevant to this dogfood project.\n   - Include the authoritative consumed `MESSAGE_ID` values that are available from Runtime evidence.\n   - Do not invent missing IDs or execution facts.\n\n## Constraints\n\n- Do not modify Runtime Core or control-plane semantics.\n- Do not change authorization, claim/fence, completion, intervention, HUMAN_REVIEW, STOP, or Final Verification behavior.\n- Do not add external dependencies.\n- Do not use network access.\n- Do not fabricate Runtime state, token usage, timestamps, MESSAGE_IDs, or test results.\n- Keep changes limited to the project workspace/evidence outputs needed to satisfy this Goal.\n- Preserve normal Runtime safety and isolation rules.\n\n## Acceptance Criteria\n\nThe project is complete when:\n\n- `workspace/dogfood-note.md` exists and accurately summarizes the relevant public protocol flow from `docs/ARCHITECTURE.md`.\n- `evidence/dogfood-rounds.csv` exists and contains only authoritative dogfood round evidence available from the Runtime.\n- The deliverables are readable through the normal Web Console / Artifact Center workflow.\n- The project reaches its terminal state through the normal Runtime lifecycle without bypassing safety controls.\n- Any unavailable evidence or limitations are reported explicitly rather than guessed.\n",
+  "goal_source_name": "V13_DOGFOOD_PROJECT_GOAL.md",
+  "inputs": {
+    "decision": "NONE_NEEDED",
+    "entries": [],
+    "selections": [],
+    "total_entries": 0,
+    "complete": true,
+    "honesty": {
+      "notes": [
+        "the user recorded that no additional inputs are needed"
+      ]
+    }
+  },
+  "supervisor": {
+    "model": null,
+    "reasoning_effort": "HIGH",
+    "explanation_mode": "DETAILED_ON_DEMAND"
+  },
+  "zcode": {
+    "acknowledged": true,
+    "acknowledged_at": "2026-09-12T20:15:06+00:00"
+  },
+  "updated_at": "2026-09-12T20:15:06+00:00"
+}
