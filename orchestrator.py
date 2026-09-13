@@ -1846,6 +1846,8 @@ def validate_final_verification_dispatch(state: dict, task: dict) -> None:
         active, _ = _resolve_fv_policy_for_state(state)
         if pinned != active:
             raise RuntimeError("FINAL_VERIFICATION pinned policy differs from active dispatch policy")
+        if gate.get("EXECUTION_MODE") != final_verification_policy_execution_mode(pinned):
+            raise RuntimeError("FINAL_VERIFICATION EXECUTION_MODE differs from Runtime policy binding")
     if int(gate.get("POLICY_VERSION") or 0) != FINAL_VERIFICATION_POLICY_VERSION:
         raise RuntimeError("FINAL_VERIFICATION_GATE policy version mismatch")
     # FV-SANDBOX-ISOLATION-V1: optional execution-mode pinning. Absent keeps the
@@ -2406,32 +2408,35 @@ def parse_time(value: str | None) -> datetime | None:
 
 def _lock_owner_dead(payload: dict) -> bool:
     """FIX-F04: True when the recorded lock owner no longer exists on this machine."""
+    import runtime_lifecycle
     pid = payload.get("pid")
     if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
         return False
-    try:
-        import ctypes
-        k32 = ctypes.windll.kernel32
-        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if not handle:
-            return True
-        try:
-            code = ctypes.c_ulong()
-            if k32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return code.value != 259  # STILL_ACTIVE
-            return False
-        finally:
-            k32.CloseHandle(handle)
-    except Exception:
-        return False
+    if runtime_lifecycle.process_alive(pid) is False:
+        return True
+    if payload.get("process_identity") is not None:
+        actual = runtime_lifecycle.process_identity(pid)
+        return actual is not None and actual != payload["process_identity"]
+    return False
+
 
 
 def acquire_lock() -> None:
+    # Serialize stale-owner reclamation as well as exclusive create. Two delayed
+    # starters must never unlink a newly acquired owner's lock.
+    with _fence_helper().runtime_lock(ROOT):
+        _acquire_lock_locked()
+
+
+def _acquire_lock_locked() -> None:
+    import runtime_lifecycle
     CONTROL.mkdir(parents=True, exist_ok=True)
     for attempt in range(2):
         try:
             with LOCK_FILE.open("x", encoding="utf-8") as f:
-                f.write(json.dumps({"pid": os.getpid(), "started_at": stamp()}))
+                f.write(json.dumps({"pid": os.getpid(), "started_at": stamp(),
+                                    "owner_id": uuid.uuid4().hex,
+                                    "process_identity": runtime_lifecycle.process_identity(os.getpid())}))
             return
         except FileExistsError:
             payload = read_json(LOCK_FILE, {}) or {}
@@ -2448,10 +2453,10 @@ def acquire_lock() -> None:
 
 
 def release_lock() -> None:
-    try:
-        LOCK_FILE.unlink()
-    except FileNotFoundError:
-        pass
+    with _fence_helper().runtime_lock(ROOT):
+        owner = read_json(LOCK_FILE, {}) or {}
+        if owner.get("pid") == os.getpid():
+            LOCK_FILE.unlink(missing_ok=True)
 
 
 def safe_read_text(path: Path, max_chars: int = 24000) -> str:
@@ -2575,14 +2580,27 @@ def _read_profile_text(path: Path, what: str) -> str:
     return text
 
 
+def final_verification_policy_execution_mode(policy: dict) -> str:
+    """Policy owns permissions; pre-field policies retain read-only semantics.
+
+    Keep bootstrap policy validation standalone: it also runs before optional
+    completion/dispatch helpers are installed in a Runtime skeleton.
+    """
+    mode = policy.get("execution_mode", "LIVE_READ_ONLY")
+    if not isinstance(mode, str) or mode not in FINAL_VERIFICATION_EXECUTION_MODES:
+        raise RuntimeError(f"FV policy execution_mode is invalid: {mode!r}")
+    return mode
+
+
 def _validate_policy_document(doc, expected_policy_id: str) -> dict:
     """G4: strict mechanical validation of one declarative FV policy; fail closed."""
     if not isinstance(doc, dict):
         raise RuntimeError("Final Verification policy is missing or invalid")
-    unknown = sorted(set(doc) - POLICY_REQUIRED_KEYS)
+    unknown = sorted(set(doc) - POLICY_REQUIRED_KEYS - {"execution_mode"})
     missing = sorted(POLICY_REQUIRED_KEYS - set(doc))
     if unknown or missing:
         raise RuntimeError(f"policy schema mismatch (missing={missing}, unknown={unknown})")
+    final_verification_policy_execution_mode(doc)
     if doc.get("policy_schema_version") != POLICY_SCHEMA_VERSION:
         raise RuntimeError("policy_schema_version mismatch")
     policy_id = doc.get("policy_id")
@@ -3739,7 +3757,8 @@ def build_codex_prompt(
             "select 3-8 decision-critical claims within the Profile taxonomy, dispatch ONE "
             "bounded TASK_KIND=FINAL_VERIFICATION stage. Record decision=FINAL_VERIFICATION "
             "in last_supervisor_decision and decision_history. Supply FINAL_VERIFICATION_REQUEST "
-            "with CRITICAL_CLAIMS and optional EXECUTION_MODE; omit FINAL_VERIFICATION_GATE. "
+            "with CRITICAL_CLAIMS; Runtime binds EXECUTION_MODE from the FV policy. "
+            "Omit EXECUTION_MODE and FINAL_VERIFICATION_GATE. "
             "Runtime establishes PENDING, POLICY_ID, POLICY_VERSION, CLAIMS_HASH, CLAIM_COUNT, "
             "and the immutable FINAL_VERIFICATION_GATE policy snapshot before committing the decision. "
             "CRITICAL_CLAIMS element schema is mechanically enforced: EVERY element must be "
@@ -5021,6 +5040,13 @@ def main() -> int:
         # Recovery/control commands may have advanced monotonic Runtime fields while
         # the initial snapshot was being acquired. Continue from the fresh merge.
         runtime = load_runtime()
+        import runtime_lifecycle
+        resume_token = os.environ.pop("GAR_RESUME_TICKET", None)
+        if resume_token:
+            runtime_lifecycle.validate_resumable(ROOT)
+            if not goal_anchor_gate(runtime, read_project_state()):
+                raise RuntimeError("Resume startup failed goal validation")
+        runtime_lifecycle.scheduler_startup(ROOT, runtime, resume_token)
     except BaseException:
         release_lock()
         raise

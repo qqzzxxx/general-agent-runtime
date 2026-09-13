@@ -216,8 +216,9 @@ verification receipt and one FINAL_ACCEPTANCE turn may you set
 `final_verification.status=PASS` and `COMPLETE`.
 
 For new decisions, record `decision=FINAL_VERIFICATION` in both decision records
-and publish `FINAL_VERIFICATION_REQUEST` with `CRITICAL_CLAIMS` and optional
-`EXECUTION_MODE`. Omit `FINAL_VERIFICATION_GATE`. Initial FV state may be
+and publish `FINAL_VERIFICATION_REQUEST` with `CRITICAL_CLAIMS`.
+Runtime binds execution permissions from the FV policy; omit `EXECUTION_MODE`
+and `FINAL_VERIFICATION_GATE`. Initial FV state may be
 `NOT_STARTED`; after substantive revision use `REVERIFY`. Runtime prepares PENDING,
 the canonical hash/count and immutable policy snapshot before the decision commit.
 Any state claims/hash/policy already supplied must agree exactly with the request.
@@ -277,7 +278,7 @@ When the commercial goal is otherwise satisfied:
    winner-vs-rejected claims.
 4. Record a `FINAL_VERIFICATION` decision and choose the exact claims.
 5. Publish one bounded `TASK_KIND=FINAL_VERIFICATION` task with
-   `FINAL_VERIFICATION_REQUEST.CRITICAL_CLAIMS` and optional `EXECUTION_MODE`, using
+   `FINAL_VERIFICATION_REQUEST.CRITICAL_CLAIMS` (Runtime binds execution mode), using
    a fresh MESSAGE_ID/NONCE and the ordinary claim protocol. Runtime prepares and
    validates PENDING, claims hash/count and policy snapshot before authorization.
 6. The verifier must be adversarial and should try to falsify first. Do not reopen broad research.

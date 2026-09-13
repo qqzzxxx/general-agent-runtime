@@ -8,6 +8,9 @@ checks the P3/P4 suites apply, extended to the P5 surface.
 from __future__ import annotations
 
 import re
+import json
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -168,6 +171,53 @@ class ApiContractTests(unittest.TestCase):
 
 
 class RenderingSafetyTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node is required for DOM rendering smoke test")
+    def test_review_reason_renders_summary_and_literal_diagnostics_in_both_languages(self):
+        source = index_text()
+        script = source.split("<script>", 1)[1].split("</script>", 1)[0]
+        checked = subprocess.run(["node", "--check"], input=script, text=True,
+                                 encoding="utf-8", capture_output=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        function = source.split("function renderHumanReview(review) {", 1)[1].split(
+            'document.getElementById("hc-review-prepare-button").addEventListener', 1)[0]
+        harness = r'''
+const assert = require('node:assert/strict');
+class Element {
+  constructor(tag) { this.tag = tag; this.children = []; this._text = ''; }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
+  append(...children) { this.children.push(...children); }
+}
+const nodes = new Map();
+const document = {getElementById(id) { if (!nodes.has(id)) nodes.set(id,new Element('div')); return nodes.get(id); }};
+let uiLanguage = 'zh-CN';
+function el(tag, cls, text) { const n = new Element(tag); if(text !== undefined)n.textContent=text; return n; }
+function clear(n) { n.textContent = ''; }
+function productCopy(zh,en) {return uiLanguage === 'en' ? en : zh;}
+'''
+        harness += "\nfunction renderHumanReview(review) {" + function
+        harness += r'''
+const review = {active:true, authorized_task:{present:false}, project_status:'HUMAN_REVIEW',
+  reason:{available:true, summary:'最终验证在授权前失败，需要人工决策。',
+          summary_en:'Verification failed before authorization; human review required.',
+          raw_error:'<img src=x onerror=alert(1)> EXECUTION_MODE REVERIFY', truncated:false}};
+for (const lang of ['zh-CN','en']) {
+  uiLanguage = lang;
+  renderHumanReview(review);
+  renderHumanReview(review);
+  const reason = nodes.get('hc-review-reason');
+  assert(reason._text.includes(lang === 'en' ? 'before authorization' : '授权前'));
+  assert.equal(reason.children.length,1);
+  assert.equal(reason.children[0].tag,'details');
+  assert.equal(reason.children[0].children[1].tag,'pre');
+  assert.equal(reason.children[0].children[1].textContent,review.reason.raw_error);
+}
+renderHumanReview({active:false});
+assert.equal(nodes.get('hc-review-block').hidden,true);
+'''
+        result = subprocess.run(["node"], input=harness, text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_no_html_injection_primitives(self):
         text = index_text()
         for forbidden in ("innerHTML", "document.write", "outerHTML",

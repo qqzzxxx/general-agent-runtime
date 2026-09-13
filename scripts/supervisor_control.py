@@ -50,6 +50,10 @@ class ControlError(RuntimeError):
     pass
 
 
+class CandidateValidationError(ControlError):
+    """Candidate preparation failed before the dispatch validator callback."""
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -1160,24 +1164,9 @@ def set_pause(root: Path, interrupt_current: bool = False) -> dict:
         return _apply_pause_transaction_locked(root)
 
 
-def resume(root: Path) -> dict:
-    root = Path(root).resolve()
-    import executor_fence
-    with executor_fence.runtime_lock(root):
-        reconcile_control_transactions_locked(root)
-        _, _, _, state, _ = _load_live(root)
-        if (root / "control" / "STOP").exists() or state.get("status") == "STOPPED":
-            raise ControlError("STOP is terminal; remove/recover it through the documented STOP path")
-        if ((root / "control" / "HUMAN_REVIEW").exists()
-                or state.get("status") == "HUMAN_REVIEW"):
-            raise ControlError("HUMAN_REVIEW requires RESUME_HUMAN_REVIEW.ps1")
-        control = load_control(root)
-        previous = dict(control.get("pause") or {})
-        control["revision"] += 1
-        control["pause"] = {"status": "RUNNING", "requested_at": previous.get("requested_at"),
-                            "mode": previous.get("mode"), "resumed_at": now_iso()}
-        save_control(root, control)
-        return {"previous": previous, "current": control["pause"]}
+def resume(root: Path, *, start: bool = True) -> dict:
+    from runtime_lifecycle import resume as resume_runtime
+    return resume_runtime(root, start=start)
 
 
 def pause_status(root: Path) -> str:
@@ -1475,7 +1464,10 @@ def _decision_transaction(root: Path, turn: dict) -> tuple[dict, dict | None]:
             raise ControlError("Supervisor dispatch/current_task identity mismatch")
         if "FINAL_VERIFICATION_REQUEST" in payload:
             import final_verification_contract as fv_contract
-            state, payload = fv_contract.prepare(root, state, payload)
+            try:
+                state, payload = fv_contract.prepare(root, state, payload)
+            except Exception as exc:
+                raise CandidateValidationError(f"FV dispatch preparation: {exc}") from exc
             data = ("```json\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n```\n").encode("utf-8")
             # Neither file is claimable before the decision receipt and archive
             # seal. State first: a crash retains the explicit request and can
@@ -2069,6 +2061,8 @@ def _finish_supervisor_turn_locked(root: Path, turn: dict, *, processed: bool,
             committed = True
         except Exception as exc:
             error = str(exc)
+            if isinstance(exc, CandidateValidationError):
+                candidate_validation_failed = True
     if committed:
         _set_turn_interventions(root, turn, consumed=True,
                                 receipt_file=receipt_file, receipt_hash=receipt_hash,
@@ -2185,7 +2179,11 @@ def _bounded_inflight_view(inflight) -> dict | None:
     started_at = inflight.get("started_at")
     if not isinstance(turn_id, str) or not isinstance(started_at, str):
         return None
-    return {"turn_id": turn_id, "started_at": started_at}
+    view = {"turn_id": turn_id, "started_at": started_at}
+    invocation = inflight.get("invocation")
+    if isinstance(invocation, dict) and isinstance(invocation.get("reason"), str):
+        view["reason"] = invocation["reason"][:120]
+    return view
 
 
 def _read_status_object(path: Path) -> dict:
@@ -2305,6 +2303,7 @@ def current_status(root: Path) -> dict:
         "last_consumed_message_id": runtime.get("last_consumed_message_id"),
         "human_review": ((root / "control" / "HUMAN_REVIEW").exists()
                          or state.get("status") == "HUMAN_REVIEW"),
+        "human_review_reason": _human_review_reason(state, runtime),
         "stop": (root / "control" / "STOP").exists(),
         "supervisor_turn_inflight": _bounded_inflight_view(
             control.get("inflight_supervisor_turn")),
@@ -2312,6 +2311,31 @@ def current_status(root: Path) -> dict:
         "terminal_completion": _terminal_completion_view(
             root, project_id, state, runtime, control),
     }
+
+
+def _human_review_reason(state: dict, runtime: dict) -> dict | None:
+    """Read-only projection of durable review facts, including flag-less stops."""
+    if state.get("status") != "HUMAN_REVIEW":
+        return None
+    failure = state.get("supervisor_retry_failure")
+    source = "project_state.supervisor_retry_failure"
+    if not isinstance(failure, dict):
+        failure = runtime.get("last_supervisor_retry_failure")
+        source = "orchestrator_runtime.last_supervisor_retry_failure"
+    failure = failure if isinstance(failure, dict) else {}
+    raw = failure.get("last_error") or state.get("blocked_reason")
+    if not failure.get("last_error"):
+        source = "project_state.blocked_reason"
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    candidate_failure = bool(failure) and runtime.get("last_dispatch_validation_error") is not None
+    # Old states lacked candidate classification; retain their recorded FV cause.
+    fv_failure = bool(failure) and ("FINAL_VERIFICATION" in raw or "FV dispatch preparation" in raw or "FV request" in raw)
+    stage = ("FINAL_VERIFICATION_DISPATCH" if fv_failure else
+             "DISPATCH_CANDIDATE_VALIDATION" if candidate_failure else "SUPERVISOR_DECISION")
+    return {"source": source,
+            "stage": stage, "decision_attempts": failure.get("decision_attempts"),
+            "requires_human_action": True, "raw_error": raw[:8192]}
 
 
 def combined_timeline(root: Path, project_id: str | None) -> list[dict]:
@@ -2365,6 +2389,7 @@ def main(argv=None) -> int:
     pause.add_argument("--json", action="store_true")
     resume_parser = sub.add_parser("resume")
     resume_parser.add_argument("--json", action="store_true")
+    resume_parser.add_argument("--no-start", action="store_true")
     config_parser = sub.add_parser("queue-supervisor-config")
     config_parser.add_argument("--model", required=True)
     # No argparse `choices`: an invalid value must surface through the JSON
@@ -2418,7 +2443,7 @@ def main(argv=None) -> int:
             _emit(set_pause(root, ns.interrupt_current_task), ns.json)
             return 0
         elif ns.command == "resume":
-            _emit(resume(root), ns.json)
+            _emit(resume(root, start=not ns.no_start), ns.json)
             return 0
         elif ns.command == "queue-supervisor-config":
             _emit({"ok": True,
@@ -2443,4 +2468,7 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # Sibling lifecycle helpers must share this producer's exception class and
+    # control module when this file is invoked as the public CLI.
+    sys.modules["supervisor_control"] = sys.modules[__name__]
     raise SystemExit(main())

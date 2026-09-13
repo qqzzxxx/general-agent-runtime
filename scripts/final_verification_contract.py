@@ -53,6 +53,14 @@ def prepare(root, state, task):
         raise RuntimeError("Malformed FV request or conflicting authored gate")
     o = engine(root)
     policy, _ = o._resolve_fv_policy_for_state(state)
+    mode = o.final_verification_policy_execution_mode(policy)
+    # Compatibility input is an assertion, never a model-controlled permission.
+    # Unknown, empty, null, or conflicting values fail before any files change.
+    if "EXECUTION_MODE" in request and request["EXECUTION_MODE"] != mode:
+        raise RuntimeError(
+            f"FV request EXECUTION_MODE {request['EXECUTION_MODE']!r} conflicts with "
+            f"Runtime policy binding {mode!r}; omit EXECUTION_MODE from the request. "
+            "Keep verification method in OBJECTIVE and lifecycle in final_verification.status.")
     claims = request.get("CRITICAL_CLAIMS")
     ok, detail = o.validate_critical_claims(claims, policy["claim_count"]["min"], policy["claim_count"]["max"])
     if not ok:
@@ -73,7 +81,7 @@ def prepare(root, state, task):
     gate = {"CONTRACT_VERSION": 1, "POLICY_ID": policy["policy_id"],
             "POLICY_VERSION": policy["policy_version"], "CLAIMS_HASH": claims_hash,
             "CLAIM_COUNT": len(claims), "CRITICAL_CLAIMS": claims,
-            "EXECUTION_MODE": request.get("EXECUTION_MODE", "LIVE_READ_ONLY"),
+            "EXECUTION_MODE": mode,
             "POLICY_SNAPSHOT": policy, "POLICY_SHA256": digest(policy)}
     fv.update(required=True, status="PENDING", policy_id=policy["policy_id"],
               policy_version=policy["policy_version"], critical_claims=claims, claims_hash=claims_hash,

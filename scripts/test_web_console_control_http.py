@@ -126,7 +126,8 @@ if subcommand == "resume":
              "mode": previous.get("mode"), "resumed_at": "2026-09-12T03:00:00+00:00"}
     (root / "stub_control_pause.json").write_text(
         json.dumps(pause, ensure_ascii=False, indent=2), encoding="utf-8")
-    emit({"previous": previous, "current": pause})
+    emit({"previous": previous, "current": pause,
+          "startup": {"status": "READY", "verified": True}})
     sys.exit(0)
 if subcommand == "intervene":
     record = {"intervention_id": "intervention-stub-1", "mode": "STEER",
@@ -394,6 +395,14 @@ class PauseResumeInterventionTests(ControlEndpointTestsBase):
         self.assertEqual(argv[0], "--root")
         self.assertIn("resume", argv)
         self.assertIn("--json", argv)
+
+    def test_resume_without_startup_proof_is_not_reported_as_success(self):
+        script = self.fixture.runtime_a / "scripts" / "supervisor_control.py"
+        script.write_text(STUB_CONTROL.replace('"verified": True', '"verified": False'),
+                          encoding="utf-8")
+        status, payload, _ = self.post_control(self.runtime_a["id"], "resume", {})
+        self.assertEqual(status, 502)
+        self.assertEqual(payload["error"]["code"], "RESUME_UNVERIFIED")
 
     def test_intervention_with_unicode_comment_target_and_interrupt(self):
         comment = "请优先修复回归 ✅ café <script>x</script>"
@@ -804,6 +813,21 @@ class HumanDecisionTests(ControlEndpointTestsBase):
     def review_status(self):
         return dict(STATUS_A, human_review=True,
                     project_status="HUMAN_REVIEW", active_task=None)
+
+    def test_flagless_runtime_failure_reason_is_available_over_console_http(self):
+        import supervisor_control as sc
+        raw = "FV dispatch preparation: FV request EXECUTION_MODE 'REVERIFY' conflicts with Runtime policy binding"
+        state = {"status": "HUMAN_REVIEW", "supervisor_retry_failure": {
+            "decision_attempts": 2, "last_error": raw}}
+        status_doc = self.review_status() | {"human_review_reason": sc._human_review_reason(state, {})}
+        (self.fixture.runtime_a / "stub_status.json").write_text(json.dumps(status_doc), encoding="utf-8")
+        code, payload, _ = self.fixture.request("GET", f"/api/runtimes/{self.runtime_a['id']}/controls")
+        self.assertEqual(code, 200)
+        reason = payload["controls"]["human_review"]["reason"]
+        self.assertTrue(reason["available"])
+        self.assertIn("授权前", reason["summary"])
+        self.assertEqual(reason["raw_error"], raw)
+        self.assertEqual(reason["stage"], "FINAL_VERIFICATION_DISPATCH")
 
     def activate_review(self, root):
         (root / "stub_status.json").write_text(

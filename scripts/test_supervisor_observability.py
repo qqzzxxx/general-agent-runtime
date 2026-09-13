@@ -269,7 +269,12 @@ class SupervisorObservabilityTests(unittest.TestCase):
         self.assertIsNotNone(doc["pending"],
                              "a deferred turn is not an eligible turn")
         self.assertIsNone(doc["active"])
-        sc.resume(self.root)
+        # This fixture has no scheduler installation. Resume cannot merely
+        # clear the pause flag, and must preserve the queued configuration.
+        with self.assertRaisesRegex(sc.ControlError, "orchestrator.py is missing"):
+            sc.resume(self.root)
+        self.assertEqual(sc.pause_status(self.root), "PAUSED")
+        self.assertEqual(sc.load_supervisor_config(self.root), doc)
 
     # -- turn records ----------------------------------------------------------
 

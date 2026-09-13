@@ -365,6 +365,64 @@
   @media (max-width: 850px) { .app-sidebar { width: 190px; padding: 18px 10px; } .app-workspace { margin-left: 190px; } .brand { font-size: 12px; } .brand small { font-size: 8px; } #column-current { padding: 20px 16px; } .topbar { padding: 12px 16px; gap: 10px; } #column-control { display: block; } .language-control { font-size: 0; } }
   @media (max-width: 600px) { .app-sidebar { position: static; width: auto; } .brand, .sidebar-foot, #runtime-section { display: none; } #primary-nav { grid-template-columns: repeat(3,1fr); } .runtime-actions { display: flex; margin: 12px 0 0; padding-top: 10px; } .app-workspace { margin: 0; } .topbar { position: static; flex-wrap: wrap; } .page-heading > button { flex-shrink: 0; } #empty-state { padding: 30px 18px; } #settings-notify-prefs { grid-template-columns: 1fr; } }
 
+  /* Fix 05: shared reading scale; compact metadata stays readable. */
+  :root { --text-body: 16px; --text-secondary: 14px; --text-small: 13px; --muted: #506575; }
+  body { font-size: var(--text-body); line-height: 1.65; }
+  h1 { font-size: 28px; line-height: 1.3; }
+  h2 { font-size: 20px; line-height: 1.4; }
+  h3 { font-size: 16px; line-height: 1.5; }
+  .hint, .muted, dl, .round-meta, #rh-errors, .setup-check,
+  #settings-section label[for], #setup-wizard-section label,
+  #hc-int-form label, #hc-review-form label { font-size: var(--text-secondary); }
+  .badge, .technical-notes, .technical-notes > summary, .technical-notes .hint,
+  #ce-milestones li, #active-project, .language-control, #runtimes-hint,
+  #runtime-section h2, #runtime-section #refresh, .sidebar-foot,
+  #runtime-health #refresh-health, .recent-artifact button, #empty-state .hint,
+  #setup-progress li { font-size: var(--text-small); }
+  .brand small, .eyebrow, .runtime-item .rid, footer { font-size: 12px; }
+  .runtime-item { font-size: var(--text-secondary); }
+  #td-tabs button, .hc-confirm, #hc-feedback, #setup-status, .hc-item,
+  #setup-goal-drop, .ac-preview table { font-size: var(--text-secondary); }
+  #td-body pre, .ac-preview pre, #setup-zcode-prompt, #setup-workshop-pack,
+  #setup-startup-prompt { font-size: var(--text-small); line-height: 1.7; }
+  section { padding: 24px; border-radius: 12px; }
+  #ce-state-label { font-size: 26px; color: var(--ink); font-weight: 650; }
+  #ce-state-label.ok { color: #17682f; }
+  #ce-state-label.bad { color: #a4262c; }
+  #ce-overview { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 18px 0; }
+  .overview-fact { padding: 12px 14px; border-radius: 8px; background: #f3f6f7; min-width: 0; }
+  .overview-fact span { display: block; color: var(--muted); font-size: var(--text-secondary); }
+  .overview-fact strong { display: block; margin-top: 4px; font-size: 16px; overflow-wrap: anywhere; }
+  #ce-action { font-size: 16px; padding: 14px; }
+  .technical-notes { margin-top: 16px; }
+  .technical-notes summary { padding: 4px 0; }
+  .technical-notes[open] > summary { margin-bottom: 12px; }
+  .alert-item { list-style: none; border-left: 3px solid #aebdc7; background: #f5f8fa; border-radius: 7px; padding: 14px 16px; margin: 12px 0; }
+  .alert-item.severity-warning { border-color: #b47b1b; background: #fff9ec; }
+  .alert-item.severity-needs-attention { border-color: #b0463f; background: #fff3f1; }
+  .alert-item h3 { margin: 7px 0; color: var(--ink); }
+  .alert-item p { margin: 5px 0; }
+  .setup-check { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .setup-check > p { margin: 0; }
+  .setup-check .technical-notes { border: 0; margin-top: 6px; padding: 0; }
+  .setup-check.warn { color: #795411; }
+  .ac-head { align-items: center; }
+  .ac-name { text-align: left; overflow-wrap: anywhere; }
+  .ac-publication { font-size: var(--text-secondary); margin-bottom: 0; }
+  #hc-pause-row label { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; font-size: var(--text-secondary); }
+  #hc-pause-row label input { flex-shrink: 0; margin-top: 5px; }
+  #ce-overview .overview-fact:last-child { grid-column: 1/-1; }
+  .timeline-round, .ac-item { border-radius: 9px; padding: 16px 18px; }
+  #runtime-health dl { grid-template-columns: 100px minmax(0,1fr); }
+  @media (max-width: 850px) { .brand small { font-size: 11px; } .topbar { flex-wrap: wrap; } }
+  @media (max-width: 600px) {
+    section { padding: 18px; } #ce-overview { grid-template-columns: 1fr; }
+    #primary-nav button { padding: 10px 6px; } .runtime-actions { flex-wrap: wrap; }
+    .page-heading { align-items: flex-start; gap: 10px; } h1 { font-size: 25px; }
+    #setup-progress { flex-wrap: wrap; } #setup-progress li { flex: 1 1 40%; }
+    dl { grid-template-columns: minmax(90px,.7fr) minmax(0,1.3fr); }
+    #task-drawer { width: 96vw; padding: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -579,7 +637,7 @@
         HUMAN_REVIEW record):</p>
         <details id="hc-review-reason-details" open>
           <summary>View Full Reason</summary>
-          <pre id="hc-review-reason"></pre>
+          <div id="hc-review-reason"></div>
         </details>
         <p class="hint">Data and history are preserved. The Runtime does not
         resume automatically from HUMAN_REVIEW; a Human Decision you submit
@@ -1188,10 +1246,10 @@ state, the history, or the artifacts.</footer></details></div>
     <h2 id="td-title">Task Detail</h2>
     <button id="td-close" type="button">Close</button>
   </div>
-  <p class="hint">Read-only inspection of one round. The Codex Full Dispatch
+  <details class="technical-notes"><summary>Details and safety notes</summary><p class="hint">Read-only inspection of one round. The Codex Full Dispatch
   tab relays the exact archived TO_ZCODE bytes; the ZCode Feedback tab shows
   the authoritative completion receipt; the Context tab shows the Supervisor
-  decision receipt only when its recorded hash verifies.</p>
+  decision receipt only when its recorded hash verifies.</p></details>
   <div id="td-tabs">
     <button type="button" data-tab="overview" class="active">Overview</button>
     <button type="button" data-tab="dispatch">Codex Full Dispatch</button>
@@ -1268,6 +1326,16 @@ function uiText(value) {
   if (claim) { return "等待 ZCode 认领 MESSAGE " + claim[1]; }
   const artifacts = key.match(/^Latest (\d+) of (\d+) cataloged artifact\(s\)\.$/);
   if (artifacts) { return "最近 " + artifacts[1] + " 个产物，共 " + artifacts[2] + " 个。"; }
+  const artifactCount = key.match(/^(\d+) artifact\(s\) ·/);
+  if (artifactCount) return "共 " + artifactCount[1] + " 个产物 · 可查看只读预览与发布来源";
+  const rounds = key.match(/^(\d+) round\(s\), (\d+) page\(s\)/);
+  if (rounds) return "共 " + rounds[1] + " 轮，" + rounds[2] + " 页 · 按所选时间顺序显示";
+  if (key.startsWith("Global defaults loaded")) return "全局默认值已加载。";
+  if (key.startsWith("Pause request accepted by the Runtime.")) return "Runtime 已接受暂停请求；实际暂停进度请查看项目状态与详细控制记录。";
+  if (key.startsWith("Intervention accepted")) return "干预已提交，请在待处理控制中查看处理进度。";
+  if (key.startsWith("No rounds are recorded")) return "暂无符合筛选条件的历史轮次。";
+  const refusal = key.match(/^(Refused|Save failed|Request failed|Readiness request failed|Settings request failed)(?: — |: )(.*)$/);
+  if (refusal) return "操作未完成，请检查输入或连接后重试。详细原因：" + refusal[2];
   return text;
 }
 Object.assign(UI_ZH, {
@@ -1309,6 +1377,119 @@ function relativeTime(value) {
   const abs = Math.abs(seconds), unit = abs >= 86400 ? "day" : abs >= 3600 ? "hour" : abs >= 60 ? "minute" : "second";
   const divisor = { day: 86400, hour: 3600, minute: 60, second: 1 }[unit];
   return new Intl.RelativeTimeFormat(uiLanguage, {numeric: "auto"}).format(Math.round(seconds / divisor), unit);
+}
+// Presentation only: keep the interpreter and all raw facts authoritative.
+function productCopy(zh, en) { return uiLanguage === "en" ? en : zh; }
+function diagnosticBlock(label = "Developer diagnostics") {
+  const details = el("details", "technical-notes");
+  details.append(el("summary", null, label));
+  return details;
+}
+Object.assign(UI_ZH, {
+  "Developer diagnostics": "开发者诊断", "Project summary": "项目状态总览",
+  "Execution details": "执行详细信息", "Publication details": "发布来源与技术详情",
+  "Readiness details": "检查详细信息", "Reported usage details": "用量来源与详细信息",
+  "PASS": "通过", "FAIL": "未通过", "WARNING": "需关注", "BLOCKED": "受阻",
+  "Not reported": "未报告", "usage not reported": "未提供使用量数据",
+  "Orchestrator": "任务调度", "Provenance": "发布来源",
+  "Preview (bounded, read-only)": "文件预览（只读）", "Loading detail…": "正在加载详情…",
+  "verified — current bytes match this publication hash": "当前文件与此发布版本一致，可查看预览。",
+  "HASH MISMATCH — current bytes differ from this publication; historical preview is unavailable": "当前文件已变化；此历史版本的内容未保留，无法预览。当前文件不代表这个历史版本。",
+  "unavailable — the hash was not computed within the bounded cap": "尚未验证文件与此版本是否一致，暂无法确认内容。",
+  "unverified — no authoritative publication binds this file": "此文件尚未绑定已验证的发布记录。",
+  "Historical bytes are not retained; preview requires current bytes to match this publication.": "历史版本内容未单独保留；只有当前文件与此发布版本完全一致时才能预览。",
+  "Running readiness checks…": "正在检查启动条件…",
+  "All required readiness checks pass; start is available.": "所有必要检查均已通过，可以启动 Agent 协作。",
+  "Start stays fail-closed until every required check passes.": "尚未满足启动条件，请先处理未通过的检查项。",
+  "Goal loaded and valid": "项目目标已验证", "Goal Anchor ready or creatable": "项目目标可绑定",
+  "Inputs registered": "输入材料已确认", "ProjectType valid": "项目类型可用",
+  "Supervisor configuration valid (draft)": "Supervisor 配置已保存",
+  "Runtime healthy": "Runtime 连接正常", "Python/runtime requirements": "运行环境符合要求",
+  "v1.2 control plane available": "任务控制服务可用", "ZCode setup acknowledged": "ZCode 配置已确认",
+  "Preflight": "启动前检查",
+  "STEER — Give feedback to Codex (you know what should change)": "调整方向 · 告诉 Codex 如何修改",
+  "Cached input tokens (reported)": "缓存输入 token（已报告）", "Reasoning output tokens (reported)": "推理输出 token（已报告）"
+});
+Object.assign(UI_ZH, {
+  "No configuration change is queued.": "暂无排队中的配置变更。",
+  "No outstanding intervention controls.": "暂无待处理的人工干预。",
+  "Derived from the Runtime's own status and intervention records; nothing is inferred from UI state.": "以 Runtime 最新回报的控制状态为准。",
+  "STEER — you know what should change": "调整方向 — 指定修改内容",
+  "HUMAN_REVIEW — human decision required": "等待你的决策",
+  "View Full Reason": "查看完整原因",
+  "Why automation stopped (from the Runtime's own HUMAN_REVIEW record):": "自动执行暂停的原因（由 Runtime 提供）：",
+  "Data and history are preserved. The Runtime does not resume automatically from HUMAN_REVIEW; a Human Decision you submit below is required before the Supervisor can continue. Resume alone will not clear this state.": "数据和历史记录均已保留。请先提交下方人工决策，Supervisor 才能继续；仅点击“恢复”无法解除此状态。",
+  "Global defaults saved. They are Console-owned defaults; they do not mutate an active Runtime call.": "全局默认值已保存，不影响正在执行的调用。",
+  "Overrides saved. Empty fields cleared back to the global default.": "当前 Runtime 的覆盖值已保存；留空项已恢复为全局默认值。",
+  "Enter a Supervisor model to queue a change.": "请先填写 Supervisor 模型，再提交变更。"
+});
+Object.assign(UI_ZH, {
+  "Resume clears the pause. The Runtime returns to RUNNING and the Orchestrator may start the next Supervisor turn. A HUMAN_REVIEW is not cleared by Resume — it needs a Human Decision below.": "恢复后，Runtime 将继续运行，任务调度可开始下一轮 Supervisor。若正在等待人工决策，请先提交下方决定；“恢复”无法解除该状态。",
+  "Write a comment before submitting an intervention.": "请先填写希望调整的内容或需要检查的问题。",
+  "Resume accepted by the Runtime; the pause record now shows RUNNING.": "Runtime 已接受恢复请求，暂停状态已解除。",
+  "STOP confirmation cancelled; nothing was applied.": "已取消停止确认，未执行停止操作。",
+  "This browser does not support notifications; alerts stay visible in-Console.": "此浏览器不支持桌面通知，提醒仍会显示在控制台中。"
+});
+function initializePolish() {
+  const execution = document.getElementById("current-execution");
+  execution.querySelector("h2").textContent = uiText("Project summary");
+  const overview = el("div"); overview.id = "ce-overview";
+  document.getElementById("ce-state-label").after(overview);
+  const output = el("button", null, "View all artifacts"); output.type = "button";
+  output.addEventListener("click", () => openArtifactCenter(null));
+  document.getElementById("ce-action").after(output);
+  const diagnostics = diagnosticBlock("Execution details");
+  diagnostics.id = "ce-diagnostics";
+  const raw = document.getElementById("ce-detail"), worker = document.getElementById("ce-worker").parentElement;
+  const next = document.getElementById("ce-next-label"), nextHeading = next.previousElementSibling;
+  const milestones = document.getElementById("ce-milestones"), milestoneHeading = milestones.previousElementSibling;
+  diagnostics.append(raw, worker, nextHeading, next, document.getElementById("ce-next-detail"), milestoneHeading, milestones);
+  [...execution.querySelectorAll(":scope > details"), document.getElementById("ce-terminal")].forEach(node => diagnostics.append(node));
+  execution.append(diagnostics);
+  const health = document.getElementById("runtime-health");
+  const healthDetails = diagnosticBlock();
+  const healthFacts = el("dl");
+  for (const id of ["rh-zcode", "rh-authorization", "rh-claim"]) {
+    const value = document.getElementById(id); healthFacts.append(value.previousElementSibling, value);
+  }
+  const errors = document.getElementById("rh-errors");
+  healthDetails.append(healthFacts, errors.previousElementSibling, errors); health.append(healthDetails);
+  const usage = document.getElementById("sv-usage-summary");
+  const usageDetails = diagnosticBlock("Reported usage details");
+  const compact = el("p", "muted"); compact.id = "sv-usage-brief";
+  usage.before(compact, usageDetails); usageDetails.append(usage);
+  usageDetails.append(el("p", "muted", productCopy("Supervisor 仅显示实际捕获的 Codex telemetry。ZCode 当前集成未提供可信使用量；未知值不会作为 0 或估算值显示。", "Supervisor usage comes only from captured Codex telemetry. ZCode does not provide trusted usage; unknown values are never shown as zero or estimates.")));
+}
+function renderProjectOverview(interpretation) {
+  const state = interpretation.state, terminal = interpretation.terminal_completion || {};
+  const complete = state.family === "COMPLETE";
+  const verification = interpretation.final_verification || {};
+  const nextLabels = {
+    COMPLETE: ["无待执行任务", "No pending tasks"], ZCODE_EXECUTING: ["等待执行结果，随后由 Codex 评估", "Await the result, then Codex evaluates it"],
+    CODEX_THINKING: ["Codex 正在规划下一步", "Codex is planning the next step"],
+    WAITING_FOR_ZCODE_CLAIM: ["等待 ZCode 接手任务", "Waiting for ZCode to pick up the task"],
+    COMPLETION_COMMITTED: ["结果已提交，等待 Codex 评估", "Result submitted; awaiting Codex evaluation"],
+    RESULT_EVALUATION: ["Codex 正在评估结果", "Codex is evaluating the result"],
+    PAUSED: ["准备好后可恢复执行", "Resume when ready"], HUMAN_REVIEW: ["请查看原因并提交人工决策", "Review the reason and submit a human decision"],
+    STOPPED: ["已停止；恢复需按停止恢复流程操作", "Stopped; follow the documented recovery process"],
+    ERROR: ["请查看运行提醒与诊断信息", "Check alerts and diagnostics"],
+    NO_PROJECT: ["请在项目设置中准备目标", "Prepare a goal in Project Setup"],
+    IDLE: ["等待 Codex 安排下一步", "Waiting for Codex to plan"],
+    PAUSE_REQUESTED: ["将在安全边界暂停", "Will pause at a safe boundary"],
+    FINAL_VERIFICATION_EXECUTING: ["正在进行最终验收", "Final Verification is running"],
+    FINAL_VERIFICATION_WAITING_CLAIM: ["等待 ZCode 开始最终验收", "Waiting for ZCode to begin Final Verification"]
+  };
+  const next = nextLabels[state.family] || ["状态暂无法确认，请查看详细信息", "State cannot be confirmed; inspect details"];
+  const overview = document.getElementById("ce-overview"); clear(overview);
+  const facts = [
+    [productCopy("Agent 当前工作", "Agent activity"), ["WAITING_FOR_ZCODE_CLAIM", "FINAL_VERIFICATION_WAITING_CLAIM"].includes(state.family) ? productCopy("等待接手，尚未开始执行", "Awaiting pickup; not executing yet") : complete ? productCopy("当前无人执行", "Nobody is executing") : state.family === "HUMAN_REVIEW" && interpretation.health.current_claim.running ? productCopy("ZCode 已认领，可能仍在执行", "ZCode has claimed a task and may still be executing") : state.worker.available ? uiText(state.worker.who) : productCopy("未报告当前执行者", "Current worker not reported")],
+    ["Final Verification", terminal.available && terminal.final_verification_status === "PASS" ? productCopy("通过", "Passed") : verification.available && verification.is_final_verification ? productCopy("验收阶段（尚未确认通过）", "Verification stage (pass not confirmed)") : productCopy("尚未确认通过", "Pass not confirmed")],
+    [productCopy("下一步", "Next step"), next[uiLanguage === "en" ? 1 : 0]]
+  ];
+  for (const [label, value] of facts) { const fact = el("div", "overview-fact"); fact.append(el("span", null, label), el("strong", null, value)); overview.append(fact); }
+  if (complete) setPanel(document.getElementById("ce-state-label"), productCopy("项目已完成", "Project completed"), "ok");
+  const action = document.getElementById("ce-action"); action.title = state.user_action_reason || "";
+  setPanel(action, state.user_action_required ? productCopy("需要你处理：", "Action needed: ") + next[uiLanguage === "en" ? 1 : 0] : productCopy("无需人工操作", "No action needed"), state.user_action_required ? "bad" : "ok");
 }
 const VIEW_TITLES = {cockpit: "Project Cockpit", timeline: "Timeline", artifacts: "Artifact Center", setup: "Project Setup", settings: "Settings", create: "Create Runtime", register: "Register Existing Runtime"};
 const VIEW_SUBTITLES = {
@@ -1408,6 +1589,7 @@ function initializeShell() {
     } catch (error) { setPanel(status, (uiLanguage === "en" ? "Registration failed: " : "注册失败：") + error, "bad"); }
     finally { button.disabled = false; }
   });
+  initializePolish();
   // Localize static product copy once. Runtime payloads and preview bytes are never traversed.
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = []; while (walker.nextNode()) { nodes.push(walker.currentNode); }
@@ -1666,6 +1848,7 @@ function resetSupervisorPanel() {
   clear(latest);
   latest.append(el("p", "muted", "—"));
   clear(document.getElementById("sv-usage-summary"));
+  document.getElementById("sv-usage-brief").textContent = "—";
   clear(document.getElementById("sv-config-state"));
   document.getElementById("sv-config-model").value = "";
   document.getElementById("sv-config-effort").value = "HIGH";
@@ -1706,12 +1889,13 @@ async function loadSupervisorPanel() {
 
 function renderSupervisorTurns(document_) {
   const latest = document.getElementById("sv-latest-turn");
+  const wasOpen = latest.querySelector("details")?.open || false;
   clear(latest);
   if (!document_.turns.length) {
     const note = document_.honesty.length
       ? document_.honesty[0]
       : "no Supervisor turn records exist yet";
-    latest.append(el("p", "muted", note));
+    latest.append(el("p", "muted", uiText(note)));
     return;
   }
   const turn = document_.turns[0];
@@ -1728,8 +1912,11 @@ function renderSupervisorTurns(document_) {
     ["Resulting dispatch", turn.dispatch_linkage
       ? "MESSAGE " + turn.dispatch_linkage.MESSAGE_ID : "none this turn"],
   ]);
-  latest.append(facts);
-  latest.append(el("p", "muted",
+  latest.append(el("p", null, decisionSummaryText(turn.decision.summary)));
+  const diagnostics = diagnosticBlock(); diagnostics.open = wasOpen;
+  diagnostics.append(facts);
+  latest.append(diagnostics);
+  diagnostics.append(el("p", "muted",
     document_.totals.total_records + " turn record(s) · "
     + document_.totals.total_unusable + " unusable record(s) surfaced"));
 }
@@ -1758,6 +1945,12 @@ function renderSupervisorUsage(usage) {
     ? "unavailable" : "0 of " + executor.rounds_total + " authorized rounds"]);
   if (usage.unusable_records) { facts.push(["Unusable turn records", usage.unusable_records]); }
   fillDetails(summary, facts);
+  const brief = document.getElementById("sv-usage-brief");
+  if (brief) brief.textContent = productCopy("Supervisor：", "Supervisor: ")
+    + (usage.turns_with_reported_usage && usage.totals.total_tokens !== null && usage.totals.total_tokens !== undefined
+      ? usage.totals.total_tokens + productCopy(" token（已报告部分合计）", " tokens (reported partial sum)")
+      : productCopy("未提供总使用量数据", "Total usage not reported"))
+    + productCopy(" · ZCode：未提供使用量数据", " · ZCode: usage not reported");
 }
 
 function renderSupervisorConfig(view) {
@@ -1770,6 +1963,7 @@ function renderSupervisorConfig(view) {
          + (view.active.applied_at || "unknown") + ")")
       : "Runtime fixed policy — model/effort not reported"));
   container.append(active);
+  if (uiLanguage !== "en") active.textContent = "当前配置：" + (view.active.configured ? view.active.model + " · " + uiText(view.active.reasoning_effort) : "使用 Runtime 固定策略（模型与推理强度未报告）");
   if (view.pending) {
     container.append(el("p", "unavailable",
       "Pending: " + view.pending.model + " · " + view.pending.reasoning_effort
@@ -1777,14 +1971,14 @@ function renderSupervisorConfig(view) {
       + " (queued " + (view.pending.queued_at || "unknown") + ")"));
   } else {
     container.append(el("p", "muted",
-      "No configuration change is queued."));
+      uiText("No configuration change is queued.")));
   }
   const efforts = document.getElementById("sv-config-effort");
   clear(efforts);
   for (const effort of view.supported_reasoning_efforts) {
     const option = document.createElement("option");
     option.value = effort;
-    option.textContent = effort;
+    option.textContent = uiText(effort);
     efforts.append(option);
   }
   const draftNote = view.draft.available
@@ -1957,6 +2151,7 @@ function renderInterpretation(interpretation) {
       interpretation.honesty.contradictions.join(", ") || "none"],
     ["Notes", interpretation.honesty.notes.join(" ") || "—"],
   ]);
+  renderProjectOverview(interpretation);
 }
 
 function renderHealth(health) {
@@ -2094,7 +2289,7 @@ function renderRound(round) {
     el("span", statusClass(round.status), uiText(round.status)));
   const duration = durationText(round.duration_seconds);
   head.append(el("span", "round-meta",
-    (duration ? " · duration " + duration : "")
+    (duration ? productCopy(" · 耗时 ", " · duration ") + duration : "")
     + (round.identity.task_id ? " · " + round.identity.task_id : "")
     + (round.identity.stage_id ? " · " + round.identity.stage_id : "")));
   summary.append(head);
@@ -2104,11 +2299,11 @@ function renderRound(round) {
   const badges = el("div", "round-head");
   if (round.has_dispatch) {
     badges.append(el("span", "badge",
-      "dispatch · " + (round.dispatch_integrity || "unknown integrity")));
+      productCopy("任务派发 · ", "dispatch · ") + (round.dispatch_integrity || "unknown integrity")));
   }
   if (round.has_completion) {
     badges.append(el("span", "badge",
-      "completion · " + (round.completion_status || "unknown status")));
+      productCopy("执行结果 · ", "completion · ") + (round.completion_status || "unknown status")));
   }
   if (round.intervention_count > 0) {
     badges.append(el("span", "badge warn",
@@ -2118,10 +2313,10 @@ function renderRound(round) {
     badges.append(el("span", "badge bad", "contradiction · " + problem));
   }
   body.append(badges);
-  body.append(el("p", null, "Executor usage: Not reported"));
+  body.append(el("p", null, productCopy("ZCode：未提供使用量数据", "Executor usage: Not reported")));
   const stamps = [];
-  if (round.archived_at) { stamps.push("dispatch archived " + round.archived_at); }
-  if (round.committed_at) { stamps.push("completion committed " + round.committed_at); }
+  if (round.archived_at) { stamps.push(productCopy("派发记录 ", "dispatch archived ") + round.archived_at); }
+  if (round.committed_at) { stamps.push(productCopy("结果提交 ", "completion committed ") + round.committed_at); }
   body.append(el("p", null, stamps.length ? stamps.join(" · ")
     : "The Runtime reported no timestamp for this round."));
   const svTurn = svTurnForRound(round.message_id);
@@ -2245,7 +2440,7 @@ async function openTaskDetail(messageId) {
   const drawer = document.getElementById("task-drawer");
   drawer.hidden = false;
   document.getElementById("td-title").textContent =
-    "Task Detail — MESSAGE " + messageId;
+    productCopy("任务详情 · MESSAGE ", "Task Detail — MESSAGE ") + messageId;
   setTab("overview");
   const body = document.getElementById("td-body");
   clear(body);
@@ -2709,6 +2904,7 @@ function renderArtifact(item) {
   const head = el("div", "ac-head");
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
+  checkbox.setAttribute("aria-label", productCopy("选择产物：", "Select artifact: ") + item.name);
   checkbox.dataset.artifactPath = item.path;
   checkbox.checked = acSelectedPaths.has(item.path);
   checkbox.disabled = item.provenance.class !== "ledger"
@@ -2743,8 +2939,9 @@ function renderArtifact(item) {
     uiText(AC_FORMAT_LABELS[item.format] || item.format)));
   head.append(el("span", "badge", uiText(acAvailabilityLabel(item))));
   if (item.provenance.class === "ledger") {
-    head.append(el("span", "badge",
-      "MESSAGE " + item.provenance.message_id));
+    const publication = el("span", "ac-publication", productCopy("发布于 ", "Published ") + (item.provenance.published_at ? relativeTime(item.provenance.published_at) : productCopy("时间未报告", "time not reported")));
+    publication.title = (item.provenance.published_at || "") + " · MESSAGE " + item.provenance.message_id;
+    head.append(publication);
   }
   card.append(head);
   card.append(el("p", "muted", item.path));
@@ -2768,6 +2965,8 @@ function renderAcProvenance(artifact) {
   const block = el("div", "ac-provenance");
   block.append(el("h3", null, "Provenance"));
   const prov = artifact.provenance;
+  block.append(el("p", artifact.verification === "hash_mismatch" ? "bad" : "muted", uiText(acVerificationLabel(artifact.verification))));
+  if (prov.class === "ledger") block.append(el("p", "muted", productCopy("发布记录：", "Publication: ") + (prov.published_at || productCopy("时间未报告", "time not reported")) + productCopy(" · 历史内容未单独保存", " · Historical bytes are not retained separately")));
   const pairs = [["Path", artifact.path]];
   if (prov.class === "ledger") {
     pairs.push(["Producing MESSAGE", prov.message_id]);
@@ -2801,7 +3000,7 @@ function renderAcProvenance(artifact) {
     acVerificationLabel(artifact.verification)]);
   const dl = document.createElement("dl");
   fillDetails(dl, pairs);
-  block.append(dl);
+  const details = diagnosticBlock("Publication details"); details.append(dl); block.append(details);
   if (prov.class === "ledger" && prov.message_id !== null
       && prov.message_id !== undefined) {
     const openRound = el("button", "round-detail-open",
@@ -2810,7 +3009,7 @@ function renderAcProvenance(artifact) {
     openRound.addEventListener("click", function () {
       openTaskDetail(prov.message_id);
     });
-    block.append(openRound);
+    details.append(openRound);
   }
   return block;
 }
@@ -2822,9 +3021,12 @@ function renderAcPreview(item, previewResp) {
       || previewResp.payload.ok !== true) {
     const error = previewResp.payload && previewResp.payload.error
       ? previewResp.payload.error : {};
-    block.append(el("p", "bad", "Preview unavailable — "
+    block.append(el("p", "bad", productCopy("暂时无法预览此版本。当前文件可能已变化、缺失或未通过验证；不会用当前内容代替历史版本。", "This version cannot be previewed. Current bytes may be changed, missing or unverified; they will not substitute for historical content.")));
+    const diagnostics = diagnosticBlock();
+    diagnostics.append(el("p", "muted", "Preview unavailable — "
       + (error.code || "HTTP error") + ". " + (error.message || "")
       + " Nothing is shown rather than a guess."));
+    block.append(diagnostics);
     return block;
   }
   const preview = previewResp.payload.preview;
@@ -3093,7 +3295,8 @@ const CATEGORY_LABELS = {
 
 function feedbackTone(text, isError) {
   const banner = document.getElementById("hc-feedback");
-  banner.textContent = String(text);
+  banner.textContent = uiText(text);
+  banner.title = String(text);
   banner.classList.toggle("hc-ok", !isError);
   banner.classList.toggle("hc-error", !!isError);
   banner.hidden = false;
@@ -3234,14 +3437,18 @@ function renderPendingControls() {
     + " · needs recovery " + controls.counts.needs_recovery
     + " · unavailable " + controls.counts.other);
   summary.className = "muted";
-  list.append(summary);
+  const controlDetails = diagnosticBlock(); controlDetails.append(summary);
+  list.append(el("p", "muted", productCopy("待处理干预：", "Pending interventions: ") + controls.counts.pending
+    + (controls.pause.state === "PENDING" ? productCopy(" · 暂停请求等待生效", " · Pause requested") : controls.pause.state === "APPLIED" ? productCopy(" · 已暂停", " · Paused") : "")
+    + (controls.stop.applied ? productCopy(" · 已停止", " · Stopped") : "")));
+  list.append(controlDetails);
 
   if (!controls.interventions.available) {
     list.append(el("p", "bad",
       "Intervention facts are unavailable — the Runtime interventions query "
       + "did not answer."));
   } else if (controls.interventions.items.length === 0) {
-    list.append(el("p", "muted", "No outstanding intervention controls."));
+    list.append(el("p", "muted", uiText("No outstanding intervention controls.")));
   } else {
     for (const item of controls.interventions.items) {
       const card = el("div", "hc-item");
@@ -3261,7 +3468,7 @@ function renderPendingControls() {
     }
   }
   for (const note of controls.honesty.notes) {
-    list.append(el("p", "muted", "Note: " + note));
+    controlDetails.append(el("p", "muted", "Note: " + note));
   }
   setPanel(status, "Derived from the Runtime's own status and intervention "
     + "records; nothing is inferred from UI state.", "muted");
@@ -3327,6 +3534,10 @@ async function controlAction(action, body, successText) {
 }
 
 function pauseEffectText(interrupt) {
+  if (uiLanguage !== "en") return (interrupt
+    ? "当前任务将撤销授权并退役，Runtime 随即暂停。执行器不会被强制终止，会在下一控制边界停止。"
+    : "当前已接手的有效任务可先完成，其结果仍有效；Runtime 随后在安全边界暂停。")
+    + "若任务已授权但尚未接手，该任务会退役。历史记录保留，实际结果以 Runtime 回报为准。";
   const base = interrupt
     ? "The current task's authorization is revoked (it is retired and its "
       + "dispatch quarantined), history is preserved, and the Runtime "
@@ -3552,14 +3763,22 @@ function renderHumanReview(review) {
   } else {
     facts.append(el("span", null, "No task is currently authorized."));
   }
+  if (uiLanguage !== "en") facts.textContent = "项目正在等待人工决策。" + (task && task.present
+    ? (task.claimed ? "ZCode 已接手任务，可能仍在执行；该任务的结果仍有效。" : "已有任务授权，尚未接手；该任务的结果仍有效。")
+    : "当前没有已授权的任务。");
   const reason = document.getElementById("hc-review-reason");
   if (review.reason.available) {
-    reason.textContent = review.reason.text
+    reason.textContent = (uiLanguage === "en" ? review.reason.summary_en : review.reason.summary) || review.reason.text;
+    const diagnostic = el("details", "developer-diagnostics");
+    diagnostic.append(el("summary", null, productCopy("开发者诊断：原始原因", "Developer diagnostics: original reason")));
+    diagnostic.append(el("pre", null, (review.reason.raw_error || review.reason.text)
       + (review.reason.truncated ? "\n… (excerpt truncated at the "
-        + "documented bound)" : "");
+        + "documented bound)" : "")));
+    reason.append(diagnostic);
   } else {
     reason.textContent = "Unavailable — the Runtime's HUMAN_REVIEW record "
       + "could not be read.";
+    if (uiLanguage !== "en") reason.textContent = "暂时无法读取人工决策原因，请刷新后重试或查看 Runtime 诊断。";
   }
 }
 
@@ -4090,10 +4309,15 @@ document.getElementById("setup-readiness-run").addEventListener("click",
       }
       const readiness = payload.readiness;
       for (const check of readiness.checks) {
-        list.append(el("p", "setup-check " +
-          (check.state === "PASS" ? "pass" : "bad"),
-          check.state + " · " + check.label +
-          (check.required ? " (required)" : "") + " — " + check.detail));
+        const row = el("div", "setup-check " + (check.state === "PASS" ? "pass" : check.state === "WARNING" ? "warn" : "bad"));
+        row.append(el("p", null, uiText(check.state) + " · " + uiText(check.label)));
+        if (check.state !== "PASS") {
+          const actions = {goal_loaded: "请返回第 1 步上传并验证项目目标。", goal_anchor: "请检查第 1 步的目标与项目 ID，避免使用已有项目的 ID。", inputs_registered: "请在第 1 步登记材料，或确认不需要输入材料。", project_type_valid: "请在第 1 步选择可用的项目类型。", supervisor_config_valid: "请在第 2 步保存 Supervisor 配置。", zcode_acknowledged: "请在第 3 步确认 ZCode 自动化配置状态。"};
+          row.append(el("p", "muted", productCopy(actions[check.key] || "请展开检查详情，处理原因后重新检查。", "Review the check details, resolve the issue, then run the checks again.")));
+        }
+        const details = diagnosticBlock("Readiness details");
+        details.append(el("p", "muted", check.key + " · " + check.state + " — " + check.detail));
+        row.append(details); list.append(row);
       }
       document.getElementById("setup-start").disabled = !readiness.ready;
       setSetupStatus(readiness.ready
@@ -4201,9 +4425,34 @@ function alertEvidencePairs(alert) {
   return pairs;
 }
 
+function alertPresentation(alert) {
+  const copy = {
+    "runtime-offline": ["无法连接 Runtime", "暂时无法确认任务进展。请检查 Runtime 是否可访问，再刷新状态。", "Runtime is unreachable", "Progress cannot be confirmed. Check the Runtime connection, then refresh."],
+    "zcode-pickup": ["任务等待接手的时间较长", "尚未观察到 ZCode 开始执行。可先等待；持续无进展时，请检查 ZCode 自动化配置。", "Task pickup is taking longer", "ZCode has not started yet. You can wait; check its automation configuration if this persists."],
+    "authorization-expiry": ["任务执行授权即将到期", "可能影响本轮结果提交。请查看任务进展和详细信息，确认是否需要调整。", "Task authorization is near expiry", "This may affect result submission. Review task progress and details to decide whether to intervene."],
+    "codex-turn-long": ["Codex 本轮处理时间较长", "尚未收到本轮完成结果；耗时较长并不代表失败。可继续等待或查看诊断。", "Codex is taking longer this turn", "No completion has been reported yet. A long turn is not proof of failure; wait or inspect diagnostics."],
+    "completion-unconsumed": ["执行结果正在等待处理", "ZCode 已提交结果，Codex 尚未接收处理。可先等待，持续无变化时查看诊断。", "A result is waiting for processing", "ZCode submitted a result that Codex has not consumed. Wait, or inspect diagnostics if it persists."],
+    "human-review": ["需要你的决策", "自动执行已等待人工决策。请在人工控制中查看完整原因并提交决定。", "Your decision is needed", "Automation is waiting for a human decision. Review the full reason in Human Control and submit your decision."],
+    "stop-flag": ["Runtime 已收到停止指令", "后续工作受到停止指令限制。若需继续，请按停止恢复流程操作。", "A stop instruction is recorded", "Further work is restricted. Follow the documented stop recovery process if you need to continue."],
+    "orchestrator-error": ["任务调度发生异常", "自动推进可能受影响。请查看开发者诊断中的错误原因后再决定恢复方式。", "Task scheduling reported an error", "Automatic progress may be affected. Inspect the error in diagnostics before deciding how to recover."],
+    "deadline-reached": ["已到计划截止时间", "任务可能不再自动推进。请检查当前结果与截止时间设置。", "The scheduled deadline was reached", "Automatic progress may stop. Review current results and the deadline settings."],
+    "project-blocked": ["项目遇到阻碍", "当前阶段无法继续。请查看详细原因，并提供所需信息或调整方向。", "The project is blocked", "The current stage cannot continue. Review the reason and provide the needed information or guidance."],
+    "task-retired": ["历史任务授权已结束", "这是任务授权记录，不代表有任务正在执行。当前工作状态以项目总览为准。", "A previous task authorization ended", "This is an authorization record, not an active task. See the project overview for current activity."],
+    "project-complete": ["项目已完成", "可在产物中心查看交付结果，无需人工操作。", "Project completed", "View the deliverables in Artifact Center. No action is needed."],
+    "safe-pause": ["已安全暂停", "Runtime 已停在安全边界。若需人工决策，请先提交决定；其余情况准备好后可恢复。", "Safely paused", "The Runtime is holding at a safe boundary. Resolve any human decision request first; otherwise resume when ready."],
+    "usage-outlier": ["最近一轮 token 用量较高", "此提示来自已报告用量的比较，不代表任务失败；可按需查看用量详情。", "Recent token usage is higher", "This compares reported usage and does not indicate task failure. Inspect usage details if needed."]
+  };
+  const text = copy[alert.rule] || ["Runtime 有新的提醒", "请展开详细信息了解原因与影响。", "A new Runtime notice", "Expand diagnostics to understand its cause and impact."];
+  // History is informational; retain the original severity in diagnostics.
+  const severity = alert.rule === "task-retired" ? "informational" : alert.severity;
+  return {title: text[uiLanguage === "en" ? 2 : 0], detail: text[uiLanguage === "en" ? 3 : 1], severity,
+    level: severity === "needs-attention" ? productCopy("需要处理", "Action required") : severity === "warning" ? productCopy("值得关注", "Attention") : productCopy("状态信息", "Information")};
+}
+
 function renderAlerts(meta, document_) {
   const list = document.getElementById("alerts-list");
   const status = document.getElementById("alerts-status");
+  const expanded = new Set([...list.querySelectorAll("details[open][data-alert-id]")].map(node => node.dataset.alertId));
   clear(list);
   const alerts = document_.alerts || [];
   if (!alerts.length) {
@@ -4220,9 +4469,13 @@ function renderAlerts(meta, document_) {
     return;
   }
   for (const alert of alerts) {
-    const item = el("li", "alert-item severity-" + alert.severity);
-    item.append(el("p", null,
-      "[" + alert.severity + "] " + alert.message));
+    const presentation = alertPresentation(alert);
+    const item = el("div", "alert-item severity-" + presentation.severity);
+    item.append(el("span", "badge", presentation.level), el("h3", null, presentation.title), el("p", null, presentation.detail));
+    const diagnostics = diagnosticBlock();
+    diagnostics.dataset.alertId = alert.id;
+    diagnostics.open = expanded.has(alert.id);
+    diagnostics.append(el("p", "muted", "[" + alert.severity + "] " + alert.message));
     const facts = document.createElement("dl");
     fillDetails(facts, [
       ["Rule", alert.rule],
@@ -4231,12 +4484,11 @@ function renderAlerts(meta, document_) {
         + (alert.notification_kind
           ? " (" + alert.notification_kind + ")" : "")],
     ].concat(alertEvidencePairs(alert)));
-    item.append(facts);
+    diagnostics.append(facts); item.append(diagnostics);
     list.append(item);
   }
-  status.textContent = alerts.length + " alert(s) · attribution: "
-    + (meta ? (meta.label || meta.id) : "this Runtime")
-    + " · deterministic projections, no AI involved.";
+  const actionable = alerts.filter(alert => alertPresentation(alert).severity === "needs-attention").length;
+  status.textContent = productCopy("共 " + alerts.length + " 条提醒，" + actionable + " 条需要处理。", alerts.length + " notices; " + actionable + " require attention.");
   status.className = "muted";
 }
 
@@ -4293,8 +4545,8 @@ function maybeNotify(runtime, alerts) {
     }
     try {
       new Notification((runtime && runtime.label
-        ? runtime.label + " — " : "") + alert.rule,
-        { body: alert.message });
+        ? runtime.label + " — " : "") + alertPresentation(alert).title,
+        { body: alertPresentation(alert).detail });
     } catch (error) {
       // Notification construction failed; the visible in-Console
       // attention state (alerts panel) remains the source of truth.
@@ -4350,7 +4602,7 @@ async function loadRecentArtifacts() {
       });
       item.append(open);
       if (messageId !== null && messageId !== undefined) {
-        item.append(el("span", "muted", "MESSAGE " + messageId));
+        item.title = "MESSAGE " + messageId;
       }
       list.append(item);
     }
@@ -4475,6 +4727,10 @@ async function loadSettingsPanel() {
       + sourceSuffix(effective.timeline_page_size.source)
       + ". Queuing applies next Supervisor turn; it never interrupts an "
       + "active call.", "muted");
+    if (uiLanguage !== "en") setPanel(document.getElementById("settings-runtime-status"),
+      "当前生效：模型 " + (effective.supervisor_model.value || "Runtime 固定策略")
+      + " · 推理强度 " + (effective.supervisor_reasoning_effort.value ? uiText(effective.supervisor_reasoning_effort.value) : "Runtime 固定策略")
+      + " · 每页 " + effective.timeline_page_size.value + " 条。模型变更加入队列后在下一轮生效，不中断当前调用。", "muted");
     applyNotificationPrefsToForm(effective.notifications || {});
     applyTimelinePageSizeSetting(effective.timeline_page_size);
     setPanel(document.getElementById("settings-global-status"),
@@ -4773,10 +5029,12 @@ document.getElementById("settings-notify-enable").addEventListener(
         status.textContent = "Browser notifications enabled for "
           + "must-attention and opted-in events; they never navigate "
           + "you anywhere.";
+        if (uiLanguage !== "en") status.textContent = "浏览器通知已启用，将提醒你处理必要事项及已勾选的事件。";
       } else {
         status.textContent = "Browser notifications refused or "
           + "unavailable; the Console degrades to the visible "
           + "in-Console attention state.";
+        if (uiLanguage !== "en") status.textContent = "浏览器通知未获授权或暂不可用；请在控制台查看提醒。";
       }
       status.className = "muted";
     });

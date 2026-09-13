@@ -21,10 +21,19 @@ New Supervisor decisions use the one-pass preparation contract. Record
 `TASK_KIND=FINAL_VERIFICATION`, and supply:
 
 ```json
-{"FINAL_VERIFICATION_REQUEST": {"CRITICAL_CLAIMS": [], "EXECUTION_MODE": "LIVE_READ_ONLY"}}
+{"FINAL_VERIFICATION_REQUEST": {"CRITICAL_CLAIMS": []}}
 ```
 
 Fill the list with the policy's required claims. Do not also author a gate.
+Runtime binds the exact `EXECUTION_MODE` from the bound policy's optional
+`execution_mode`: `LIVE_READ_ONLY` or `SANDBOX_DESTRUCTIVE`. A policy without
+this field retains `LIVE_READ_ONLY`; malformed policy values fail closed.
+Destructive verification requires an explicit `SANDBOX_DESTRUCTIVE` policy and
+the existing sandbox/isolation evidence gates; model text cannot grant it.
+Omit execution mode from model requests. For compatibility, an explicitly
+supplied mode is accepted only if it exactly equals the policy binding; unknown
+or conflicting values are rejected, never coerced. Verification method belongs
+in the task objective; `REVERIFY` belongs in lifecycle state.
 Before the decision receipt is committed, Runtime validates this explicit request,
 establishes `PENDING`, computes the exact claim hash/count, and snapshots the bound
 policy into `FINAL_VERIFICATION_GATE` with `CONTRACT_VERSION=1`. It archives and

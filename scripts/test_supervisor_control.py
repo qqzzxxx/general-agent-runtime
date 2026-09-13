@@ -457,7 +457,8 @@ class SupervisorControlTests(unittest.TestCase):
     def test_pause_idle_and_resume(self):
         result = sc.set_pause(self.root)
         self.assertEqual(result["status"], "PAUSED")
-        resumed = sc.resume(self.root)
+        from resume_lifecycle_fixture import simulated_resume
+        resumed = simulated_resume(self)
         self.assertEqual(resumed["current"]["status"], "RUNNING")
         self.assertFalse((self.control / "STOP").exists())
 
@@ -892,7 +893,8 @@ class SupervisorControlTests(unittest.TestCase):
         runtime["paused_deferred_event"] = event
         o.save_runtime(runtime)
         self.assertFalse(sc.current_status(self.root)["active_task_claimed"])
-        self.assertEqual(sc.resume(self.root)["current"]["status"], "RUNNING")
+        from resume_lifecycle_fixture import simulated_resume
+        self.assertEqual(simulated_resume(self)["current"]["status"], "RUNNING")
 
         calls = []
 
@@ -1064,7 +1066,7 @@ class SupervisorControlTests(unittest.TestCase):
         resume_wrapper = REPO / "RESUME_AGENT_SYSTEM.ps1"
         (self.root / "scripts").mkdir(exist_ok=True)
         for name in ("supervisor_control.py", "executor_fence.py", "executor_completion.py",
-                     "executor_claim.py"):
+                     "executor_claim.py", "runtime_lifecycle.py"):
             shutil.copy2(SCRIPTS / name, self.root / "scripts" / name)
         shutil.copy2(wrapper, self.root / wrapper.name)
         shutil.copy2(resume_wrapper, self.root / resume_wrapper.name)
@@ -1107,8 +1109,9 @@ class SupervisorControlTests(unittest.TestCase):
             result = subprocess.run(
                 [shell, "-NoProfile", "-File", str(self.root / resume_wrapper.name),
                  "-Json", "-NoStart"], cwd=self.root, capture_output=True, timeout=30)
-            self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-            self.assertIsInstance(json.loads(result.stdout.decode("ascii")), dict)
+            self.assertEqual(result.returncode, 2, result.stderr.decode(errors="replace"))
+            self.assertFalse(json.loads(result.stdout.decode("ascii"))["ok"])
+            self.assertEqual(sc.pause_status(self.root), "PAUSED")
 
             # Error paths retain the same one-document machine contract.
             review_flag = self.root / "control" / "HUMAN_REVIEW"
@@ -1210,7 +1213,12 @@ class SupervisorControlTests(unittest.TestCase):
         pending = o.load_runtime().get("pending_supervisor_event")
         self.assertEqual(pending["event"], event)
 
-        sc.resume(self.root)  # resume wins before the next loop iteration
+        sc.settle_pause(self.root, "PAUSED_BEFORE_RESUME")
+        runtime = o.load_runtime()
+        runtime["status"] = "PAUSED"
+        o.save_runtime(runtime)
+        from resume_lifecycle_fixture import simulated_resume
+        simulated_resume(self)  # verified owner resumes the deferred turn
         calls = []
 
         def supervisor_result(*_args, **_kwargs):
@@ -1295,63 +1303,43 @@ class SupervisorControlTests(unittest.TestCase):
         self.assertIn("payload identity", record["error"])
 
     def test_second_recheck_R5_json_resume_launch_is_bounded_single_document(self):
+        from resume_lifecycle_fixture import install_driver
+        import runtime_lifecycle as lifecycle
         shells = [name for name in ("powershell", "pwsh") if shutil.which(name)]
         if not shells:
             self.skipTest("PowerShell is unavailable")
-        (self.root / "scripts").mkdir(exist_ok=True)
-        for name in ("supervisor_control.py", "executor_fence.py", "executor_completion.py",
-                     "executor_claim.py"):
-            shutil.copy2(SCRIPTS / name, self.root / "scripts" / name)
+        install_driver(self)
         wrapper = self.root / "RESUME_AGENT_SYSTEM.ps1"
         shutil.copy2(REPO / wrapper.name, wrapper)
-        start = self.root / "START_AGENT_SYSTEM.ps1"
-
-        for shell in shells:
-            with self.subTest(shell=shell, schedule="long_running_start"):
-                start.write_text("Start-Sleep -Seconds 10\nexit 0\n", encoding="utf-8")
-                sc.set_pause(self.root)
+        sc.set_pause(self.root)
+        try:
+            for index, shell in enumerate(shells):
                 started = time.monotonic()
                 result = subprocess.run(
                     [shell, "-NoProfile", "-File", str(wrapper), "-Json"],
-                    cwd=self.root, capture_output=True, timeout=4,
-                )
-                elapsed = time.monotonic() - started
+                    cwd=self.root, capture_output=True, timeout=9)
                 self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-                self.assertLess(elapsed, 3.0)
-                document = json.loads(result.stdout.decode(errors="strict"))
-                self.assertEqual(document["startup"]["status"], "LAUNCHED")
+                self.assertLess(time.monotonic() - started, 8)
+                doc = json.loads(result.stdout.decode("ascii"))
+                self.assertTrue(doc["startup"]["verified"])
+                self.assertEqual(doc["startup"]["status"], "READY" if index == 0 else "EXISTING_OWNER")
                 self.assertEqual(len([line for line in result.stdout.splitlines() if line.strip()]), 1)
-                os.kill(int(document["startup"]["pid"]), signal.SIGTERM)
-                time.sleep(0.2)
-
-            with self.subTest(shell=shell, schedule="failed_start"):
-                start.unlink()
-                sc.set_pause(self.root)
-                result = subprocess.run(
-                    [shell, "-NoProfile", "-File", str(wrapper), "-Json"],
-                    cwd=self.root, capture_output=True, timeout=4,
-                )
-                document = json.loads(result.stdout.decode(errors="strict"))
-                self.assertEqual(result.returncode, 1)
-                self.assertFalse(document["ok"])
-                self.assertEqual(document["startup"]["status"], "FAILED")
-                self.assertEqual(len([line for line in result.stdout.splitlines() if line.strip()]), 1)
-
-            with self.subTest(shell=shell, schedule="existing_owner"):
-                start.write_text("exit 0\n", encoding="utf-8")
-                self._json(self.control / ".orchestrator.lock", {
-                    "pid": os.getpid(), "started_at": "2099-01-01T00:00:00+00:00",
-                })
-                sc.set_pause(self.root)
-                result = subprocess.run(
-                    [shell, "-NoProfile", "-File", str(wrapper), "-Json"],
-                    cwd=self.root, capture_output=True, timeout=4,
-                )
-                document = json.loads(result.stdout.decode(errors="strict"))
-                self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
-                self.assertEqual(document["startup"]["status"], "EXISTING_OWNER")
-                self.assertEqual(len([line for line in result.stdout.splitlines() if line.strip()]), 1)
-                (self.control / ".orchestrator.lock").unlink()
+        finally:
+            owner = lifecycle.live_owner(self.root)
+            if owner:
+                os.kill(owner["pid"], signal.SIGTERM)
+                for _ in range(100):
+                    if lifecycle.process_alive(owner["pid"]) is False:
+                        break
+                    time.sleep(0.02)
+        (self.control / ".orchestrator.lock").unlink(missing_ok=True)
+        sc.set_pause(self.root)
+        (self.root / "orchestrator.py").unlink()
+        result = subprocess.run([shells[0], "-NoProfile", "-File", str(wrapper), "-Json"],
+                                cwd=self.root, capture_output=True, timeout=9)
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(json.loads(result.stdout.decode("ascii"))["ok"])
+        self.assertEqual(sc.pause_status(self.root), "PAUSED")
 
     def test_final_recheck_N1_committed_completion_wins_before_restart_registration(self):
         # Drive the complete production lifecycle: committed Supervisor decision ->

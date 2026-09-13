@@ -60,13 +60,13 @@ class FVOnePassTests(unittest.TestCase):
         legacy["FINAL_VERIFICATION_RESULTS"] = results
         return legacy
 
-    def stage(self, receipt):
+    def stage(self, receipt, name="verification"):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             code = claim.acquire(self.root, *[self.task[k] for k in sc.IDENTITY_KEYS])
         self.assertEqual(code, claim.EXIT_ACQUIRED)
         self.token = output.getvalue().split("claim_token=")[1].strip()
-        self.staging = self.h.project / "completion_staging" / "verification"
+        self.staging = self.h.project / "completion_staging" / name
         self.staging.mkdir(parents=True)
         self.payload = {"COMPLETION_STAGING_SCHEMA_VERSION": 1,
                         **{k: self.task[k] for k in sc.IDENTITY_KEYS},

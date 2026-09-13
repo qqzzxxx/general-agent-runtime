@@ -198,7 +198,7 @@ import web_console_runtime_create
 import resume_human_review
 
 SCHEMA_VERSION = 1
-SERVER_VERSION = "GARWebConsole/1.3.0-p9"
+SERVER_VERSION = "GARWebConsole/1.3.0"
 DEFAULT_HOST = "127.0.0.1"
 CONSOLE_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNTIME_ROOT = CONSOLE_ROOT
@@ -1824,6 +1824,12 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 "CONTROL_PLANE_ERROR",
                 f"the v1.2 control plane reported an error for the {label} "
                 "action", detail)
+        if label == "resume" and (
+                not isinstance(document.get("startup"), dict)
+                or document["startup"].get("verified") is not True
+                or document["startup"].get("status") not in {"READY", "EXISTING_OWNER"}):
+            return 502, error_envelope(
+                "RESUME_UNVERIFIED", "Runtime did not prove scheduler startup", detail)
         return 200, {
             "schema_version": SCHEMA_VERSION, "ok": True, "runtime": meta,
             "control": {"command": label, "exit_code": result["exit_code"],

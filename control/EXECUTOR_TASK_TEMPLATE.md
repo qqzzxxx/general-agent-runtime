@@ -76,8 +76,9 @@ Supervisor model note: all Codex turns are fixed to GPT-5.6 Sol + High by the Or
 
 Ordinary tasks remain unchanged. For a new `TASK_KIND: FINAL_VERIFICATION` stage,
 the Supervisor records decision `FINAL_VERIFICATION` and supplies
-`FINAL_VERIFICATION_REQUEST` containing `CRITICAL_CLAIMS` and optional
-`EXECUTION_MODE`. Runtime prepares PENDING and the immutable gate before committing
+`FINAL_VERIFICATION_REQUEST` containing `CRITICAL_CLAIMS`.
+`EXECUTION_MODE` is Runtime-owned and should be omitted from the request.
+Runtime binds it from the FV policy, then prepares PENDING and the immutable gate before committing
 the decision. Do not author the gate or its hashes yourself. See
 `control/FINAL_VERIFICATION_POLICY.md` for the one-pass contract.
 

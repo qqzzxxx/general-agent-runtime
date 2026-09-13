@@ -33,15 +33,17 @@ _LOCK_STATE = threading.local()
 
 
 @contextmanager
-def runtime_lock(root: Path):
+def runtime_lock(root: Path, *, name: str = ".executor-fence.lock"):
     """Cross-process mutex; kernel releases it on crash. Never unlink it."""
     root = Path(root).resolve()
-    key = str(root).casefold() if os.name == "nt" else str(root)
+    if name not in {".executor-fence.lock", ".resume-lifecycle.lock"}:
+        raise FenceError("unknown Runtime mutex")
+    key = (str(root).casefold() if os.name == "nt" else str(root)) + "/" + name
     held = getattr(_LOCK_STATE, "held", set())
     if key in held:
         yield
         return
-    path = root / "control" / ".executor-fence.lock"
+    path = root / "control" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as handle:
         if path.stat().st_size == 0:

@@ -97,6 +97,48 @@ class StateInterpreterCase(unittest.TestCase):
 class StateFamilyTests(StateInterpreterCase):
     """Every required Current Execution family maps from bounded facts."""
 
+    def test_fix06_same_snapshot_activity_priority(self):
+        planning = {"turn_id": "actual-plan", "started_at": "2026-09-13T00:00:00Z",
+                    "reason": "ORCHESTRATOR_START"}
+        review = {**planning, "turn_id": "actual-review", "reason": "EXECUTOR_RESULT_READY"}
+        cases = [
+            (status_doc(project_status="SUPERVISOR_TURN", supervisor_turn_inflight=planning,
+                        last_consumed_message_id=700100, last_authorized_dispatch=identity()),
+             "CODEX_THINKING", "planning or evaluating", False),
+            (with_active_task(status_doc(supervisor_turn_inflight=review),
+                              completion="COMPLETION_CONSUMED", claim_recorded=True),
+             "RESULT_EVALUATION", "planning or evaluating", False),
+            (with_active_task(status_doc(), claimed=True, claim_recorded=True),
+             "ZCODE_EXECUTING", "idle — waiting for the Executor", True),
+            (with_active_task(status_doc()),
+             "WAITING_FOR_ZCODE_CLAIM", "idle — waiting for the Executor", True),
+            (status_doc(project_status="SUPERVISOR_TURN", runtime_status="PAUSED",
+                        pause={"status": "PAUSED"}, supervisor_turn_inflight=planning,
+                        last_authorized_dispatch=identity()),
+             "PAUSED", "paused", False),
+            (complete_doc(last_authorized_dispatch=identity()),
+             "COMPLETE", "finished — project complete", False),
+            (status_doc(project_status="SUPERVISOR_TURN", supervisor_turn_inflight=None,
+                        last_consumed_message_id=700100, last_authorized_dispatch=identity()),
+             "IDLE", "Idle — waiting for the Supervisor to plan the next step", False),
+        ]
+        for doc, family, label, authorized in cases:
+            with self.subTest(family=family):
+                result = self.state.interpret_status(doc)
+                self.assertEqual(result["state"]["family"], family)
+                self.assertEqual(result["health"]["codex"]["label"], label)
+                self.assertEqual(result["health"]["current_authorization"]["available"], authorized)
+                if family in ("CODEX_THINKING", "RESULT_EVALUATION"):
+                    self.assertEqual(result["state"]["worker"]["who"], "Codex (Supervisor)")
+
+    def test_fix06_pause_pending_supervisor_inflight_keeps_worker_and_health_consistent(self):
+        result = self.state.interpret_status(status_doc(
+            pause={"status": "PENDING_AFTER_CURRENT_STAGE"},
+            supervisor_turn_inflight={"turn_id": "review", "started_at": "now"}))
+        self.assertEqual(result["state"]["family"], "PAUSE_REQUESTED")
+        self.assertEqual(result["state"]["worker"]["who"], "Codex (Supervisor)")
+        self.assertEqual(result["health"]["codex"]["label"], "planning or evaluating")
+
     def test_codex_thinking(self):
         result = self.state.interpret_status(
             status_doc(project_status="SUPERVISOR_TURN"))
@@ -200,6 +242,34 @@ class StateFamilyTests(StateInterpreterCase):
     def test_paused_via_runtime_status(self):
         result = self.state.interpret_status(status_doc(runtime_status="PAUSED"))
         self.assertEqual(result["state"]["family"], self.state.FAM_PAUSED)
+
+    def test_pause_before_claim_does_not_report_codex_work_or_old_authority(self):
+        # Real Fresh Dogfood 002: pausing retires the unclaimed dispatch,
+        # while project_status remains SUPERVISOR_TURN for eventual resume.
+        doc = status_doc(
+            runtime_status="PAUSED", project_status="SUPERVISOR_TURN",
+            supervisor_turn_inflight=None, last_authorized_dispatch=identity(),
+            pause={"status": "PAUSED", "requested_at": None,
+                   "paused_at": None, "mode": "SAFE", "resumed_at": None})
+        original = copy.deepcopy(doc)
+        result = self.state.interpret_status(doc)
+        self.assertEqual(result["state"]["family"], self.state.FAM_PAUSED)
+        self.assertEqual(result["health"]["codex"],
+                         {"available": True, "label": "paused"})
+        self.assertFalse(result["health"]["current_authorization"]["available"])
+        self.assertIsNone(result["health"]["current_authorization"]["message_id"])
+        self.assertEqual(doc, original)  # Historical evidence is read-only.
+
+    def test_pending_pause_preserves_claimed_executor_and_authority(self):
+        doc = with_active_task(status_doc(
+            pause={"status": "PENDING_AFTER_CURRENT_STAGE",
+                   "requested_at": None, "mode": "SAFE", "resumed_at": None}),
+            claimed=True, claim_recorded=True)
+        result = self.state.interpret_status(doc)
+        self.assertEqual(result["state"]["family"], self.state.FAM_PAUSE_REQUESTED)
+        self.assertEqual(result["state"]["worker"]["who"], "ZCode (Executor)")
+        self.assertTrue(result["health"]["current_claim"]["running"])
+        self.assertTrue(result["health"]["current_authorization"]["available"])
 
     def test_human_review_wins(self):
         result = self.state.interpret_status(status_doc(human_review=True))

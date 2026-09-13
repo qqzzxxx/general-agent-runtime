@@ -174,13 +174,13 @@ def project_alerts(*, runtime, status, probe_ok, probe_error_code,
         authorized = status.get("last_authorized_dispatch") \
             if isinstance(status.get("last_authorized_dispatch"), dict) \
             else None
-        # Runtime keeps last_authorized_dispatch after completion. Resolve the
-        # same validated state as Cockpit before treating it as historical.
+        # Only the producer's current identity is eligible. Historical dispatch
+        # timestamps cannot be joined to lifecycle facts for a different task.
+        auth = active
         from web_console_state import interpret_status
         complete = (status.get("runtime_status") == "COMPLETE"
                     and status.get("project_status") == "COMPLETE"
                     and interpret_status(status)["state"]["family"] == "COMPLETE")
-        auth = active or (authorized if not complete else None)
         inflight = status.get("supervisor_turn_inflight") \
             if isinstance(status.get("supervisor_turn_inflight"), dict) \
             else None
@@ -190,8 +190,23 @@ def project_alerts(*, runtime, status, probe_ok, probe_error_code,
         completion_status = (completion or {}).get("status") \
             or status.get("active_task_completion_status")
         claimed = status.get("active_task_claimed") is True
+        consumed = status.get("last_consumed_message_id")
+        identity_keys = ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE")
+        if (not isinstance(auth, dict) or not isinstance(authorized, dict)
+                or any(auth.get(k) != authorized.get(k) for k in identity_keys)
+                or status.get("project_status") != "WAITING_EXECUTOR"
+                or status.get("runtime_status") not in {"RUNNING", "WAITING_EXECUTOR"}
+                or status.get("human_review") is True or status.get("stop") is True
+                or (status.get("pause") or {}).get("status") == "PAUSED"
+                or status.get("active_task_retired") is True
+                or completion_status is not None
+                or (type(consumed) is int and type(auth.get("MESSAGE_ID")) is int
+                    and auth["MESSAGE_ID"] <= consumed)):
+            auth = None
 
-        message_id = auth.get("MESSAGE_ID") if auth else None
+        # Non-timing diagnostics can still identify retained historical facts.
+        subject = active or authorized
+        message_id = subject.get("MESSAGE_ID") if subject else None
         message_label = str(message_id) if isinstance(message_id, int) \
             and not isinstance(message_id, bool) else "active"
 

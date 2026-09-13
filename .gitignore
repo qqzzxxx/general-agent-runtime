@@ -55,6 +55,9 @@ __pycache__/
 *.pyo
 .venv/
 
+# --- Console-owned local instances, registry and setup drafts ---
+web_console_data/
+
 # --- OS / editor ---
 Thumbs.db
 .DS_Store

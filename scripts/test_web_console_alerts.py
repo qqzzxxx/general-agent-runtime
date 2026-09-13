@@ -196,6 +196,31 @@ class ZcodePickupTests(unittest.TestCase):
 
 
 class AuthorizationExpiryTests(unittest.TestCase):
+    def test_only_current_unfinished_task_produces_timing_alerts(self):
+        disp = dispatch(700987, authorized_at=NOW - timedelta(minutes=90),
+                        expires_at=NOW + timedelta(minutes=5))
+        current = base_status(active_task=disp, last_authorized_dispatch=disp)
+        self.assertTrue({"zcode-pickup", "authorization-expiry"} <= rules(project(**current)))
+        claimed = current | {"active_task_claimed": True, "active_task_claim_recorded": True}
+        self.assertNotIn("zcode-pickup", rules(project(**claimed)))
+        self.assertIn("authorization-expiry", rules(project(**claimed)))
+        variants = [
+            {"active_task": None},
+            {"active_task_completion_status": "COMPLETION_COMMITTED"},
+            {"active_task_completion_status": "CONSUMED"},
+            {"active_task_completion_status": "SEALED"},
+            {"last_consumed_message_id": disp["MESSAGE_ID"]},
+            {"active_task_retired": True},
+            {"human_review": True, "project_status": "HUMAN_REVIEW", "runtime_status": "HUMAN_REVIEW"},
+            {"project_status": "COMPLETE", "runtime_status": "COMPLETE"},
+            {"project_status": "SUPERVISOR_TURN"},
+            {"stop": True},
+            {"last_authorized_dispatch": disp | {"NONCE": "different"}},
+        ]
+        for variant in variants:
+            with self.subTest(variant=variant):
+                self.assertFalse({"zcode-pickup", "authorization-expiry"} & rules(project(**(current | variant))))
+
     def dispatch_with_expiry(self, minutes_ahead, message_id=700601):
         disp = dispatch(message_id,
                         expires_at=NOW + timedelta(minutes=minutes_ahead))
@@ -359,14 +384,14 @@ class SevereStateTests(unittest.TestCase):
         result = project(**complete_doc(last_authorized_dispatch=historical))
         self.assertEqual(rules(result), {"project-complete"})
 
-    def test_unvalidated_complete_keeps_risks_and_never_announces_completion(self):
+    def test_unvalidated_complete_never_announces_completion_or_revives_history(self):
         historical = dispatch(700104, authorized_at=NOW - timedelta(hours=2),
                               expires_at=NOW - timedelta(hours=1))
         result = project(**complete_doc(last_authorized_dispatch=historical,
                                          terminal_completion=None))
         self.assertNotIn("project-complete", rules(result))
-        self.assertIn("authorization-expiry", rules(result))
-        self.assertIn("zcode-pickup", rules(result))
+        self.assertNotIn("authorization-expiry", rules(result))
+        self.assertNotIn("zcode-pickup", rules(result))
 
     def test_safe_pause_is_informational_and_optional(self):
         result = project(pause={"status": "PAUSED", "mode": "SAFE",

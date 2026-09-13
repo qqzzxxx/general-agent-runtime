@@ -332,12 +332,31 @@ def human_review_presentation(status, reason_text, *, truncated: bool) -> dict:
     message_id = active_task.get("MESSAGE_ID") \
         if task_present and isinstance(active_task.get("MESSAGE_ID"), int) \
         and not isinstance(active_task.get("MESSAGE_ID"), bool) else None
+    diagnostic = status.get("human_review_reason") if isinstance(status, dict) else None
+    diagnostic = diagnostic if active and isinstance(diagnostic, dict) else {}
+    raw_error = diagnostic.get("raw_error")
+    raw_error = raw_error if isinstance(raw_error, str) and raw_error.strip() else reason_text
+    summary = None
+    summary_en = None
+    if isinstance(raw_error, str) and raw_error.strip():
+        stage = diagnostic.get("stage")
+        if stage == "FINAL_VERIFICATION_DISPATCH":
+            summary = "最终验证任务在执行授权前校验失败，自动恢复次数已用尽，因此暂停。需要人工检查失败原因并决定后续操作；尚未完成最终验证。"
+            summary_en = "Final Verification dispatch failed validation before execution authorization and automatic recovery was exhausted. Human review is required to decide the next action; Final Verification has not completed."
+        elif stage == "DISPATCH_CANDIDATE_VALIDATION":
+            summary = "任务在执行授权前校验失败，自动恢复次数已用尽，因此暂停。需要人工检查原因并决定后续操作。"
+            summary_en = "Task dispatch failed validation before execution authorization and automatic recovery was exhausted. Human review is required to decide the next action."
+        else:
+            summary = "Runtime 已暂停并等待人工决策。请检查停止原因，再决定后续操作。"
+            summary_en = "Runtime has stopped for human review. Inspect the recorded reason and decide the next action."
     return {
         "active": active,
-        "reason": {"available": isinstance(reason_text, str),
-                   "text": reason_text if isinstance(reason_text, str)
-                   else None,
-                   "truncated": bool(truncated)},
+        "reason": {"available": isinstance(raw_error, str), "text": raw_error,
+                   "summary": summary, "summary_en": summary_en,
+                   "stage": diagnostic.get("stage"),
+                   "requires_human_action": active,
+                   "source": diagnostic.get("source") or "control/HUMAN_REVIEW",
+                   "raw_error": raw_error, "truncated": bool(truncated)},
         "authorized_task": {"present": task_present, "claimed": claimed,
                             "message_id": message_id},
         "project_status": status.get("project_status")

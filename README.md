@@ -1,4 +1,4 @@
-# General Agent Runtime
+# General Agent Runtime v1.3
 
 An unattended dual-Agent runtime in which a **high-reasoning Supervisor**, a
 **high-throughput Executor**, and a **deterministic Python Orchestrator** cooperate on
@@ -296,10 +296,24 @@ instantaneous process termination. If completion commits before interrupt obtain
 fence, completion wins and is delivered normally; if interrupt obtains the fence first,
 the identity is retired and its later commit is rejected. STOP remains terminal, and HUMAN_REVIEW still
 requires `RESUME_HUMAN_REVIEW.ps1`. Query and mutation commands support `-Json`.
-`scripts/supervisor_control.py` is the structured interface intended for the future
-v1.3 Web Console; no browser console is included here. JSON mode emits exactly one
+`scripts/supervisor_control.py` is the structured interface used by the included
+v1.3 Web Console. JSON mode emits exactly one
 ASCII-safe JSON document on stdout, including for Unicode input; lifecycle/start text
 is kept off that stream.
+
+## Web Console (v1.3)
+
+Run `.\START_WEB_CONSOLE.ps1` to start the local server and open the browser.
+Use **Create Runtime** to create an isolated release skeleton, then **Setup** to
+configure its Goal, inputs, Supervisor and ZCode Executor before starting a project.
+The **Cockpit** shows current activity and Pause / Resume controls; **Artifacts**
+shows published outputs and their provenance. Inspect the Final Verification state
+and claim results before treating a project as complete. `COMPLETE` requires the
+Runtime's verification gate and final Supervisor acceptance.
+
+Console instance metadata, Runtime registrations and Setup drafts are local data in
+`web_console_data/` and are not part of the release. See
+[Web Console documentation](docs/WEB_CONSOLE_DEVELOPMENT.md) for route and setup details.
 
 Upgrade policy is deliberately narrow: an archive-less legacy authorization cannot
 be newly claimed. A pre-upgrade attempt that already owns its permanent claim may use

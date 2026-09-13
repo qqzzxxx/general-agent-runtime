@@ -305,7 +305,9 @@ def _worker_for(family: str, status: dict) -> dict:
                     FAM_RESULT_EVALUATION):
         who = "Codex (Supervisor)"
     elif family == FAM_PAUSE_REQUESTED:
-        if status.get("active_task_claimed") is True:
+        if _supervisor_active(status):
+            who = "Codex (Supervisor)"
+        elif status.get("active_task_claimed") is True:
             who = "ZCode (Executor)"
         elif status.get("project_status") == "SUPERVISOR_TURN":
             who = "Codex (Supervisor)"
@@ -495,9 +497,11 @@ def _health_for(status: dict, family: str) -> dict:
     pending = status.get("pending_interventions")
     consumed = status.get("last_consumed_message_id")
 
-    # A completed Runtime retains its historical authorization; it is not
-    # a current task. Only a validated terminal family disables the fallback.
-    auth_source, auth = None, active or (authorized if family != FAM_COMPLETE else None)
+    # Completion and pause-before-claim retain historical authorization.
+    # Without an active task it must not reappear as current authorization.
+    auth_source, auth = None, active
+    if family == FAM_COMPLETE or status.get("active_task_completion_status") is not None:
+        auth = None
     if isinstance(auth, dict):
         auth_source = "active_task" if auth is active \
             else "last_authorized_dispatch"
@@ -546,9 +550,16 @@ def _health_for(status: dict, family: str) -> dict:
             if _is_str(runtime_status) else None,
         },
         "codex": {
-            "available": project_status is not None,
-            "label": _PROJECT_CODEX_LABELS.get(project_status)
-            if _is_str(project_status) else None,
+            "available": family == FAM_PAUSED or project_status is not None,
+            # SUPERVISOR_TURN also denotes the stage to resume later; it
+            # does not mean Codex is executing while the Runtime is paused.
+            "label": "paused" if family == FAM_PAUSED else (
+                _STATE_LABELS[FAM_IDLE] if family == FAM_IDLE else
+                "planning or evaluating" if (
+                    family in (FAM_CODEX_THINKING, FAM_RESULT_EVALUATION)
+                    or (family == FAM_PAUSE_REQUESTED and _supervisor_active(status))) else
+                _PROJECT_CODEX_LABELS.get(project_status)
+                if _is_str(project_status) else None),
         },
         "zcode": {"available": activity is not None,
                   "last_observed_activity": activity,
@@ -687,6 +698,12 @@ def _detail_for(status: dict, family: str, determine: bool) -> str:
     return detail
 
 
+def _supervisor_active(status: dict) -> bool:
+    turn = status.get("supervisor_turn_inflight")
+    return (isinstance(turn, dict) and bool(turn.get("turn_id"))
+            and isinstance(turn.get("started_at"), str) and bool(turn["started_at"]))
+
+
 def _determine_family(status: dict, pause: dict) -> str:
     runtime_status = status.get("runtime_status")
     project_status = status.get("project_status")
@@ -713,6 +730,16 @@ def _determine_family(status: dict, pause: dict) -> str:
         return FAM_COMPLETE
     if pause_status == "PENDING_AFTER_CURRENT_STAGE":
         return FAM_PAUSE_REQUESTED
+    if _supervisor_active(status):
+        reason = status["supervisor_turn_inflight"].get("reason")
+        if reason == "EXECUTOR_RESULT_READY" or (reason is None and completion is not None):
+            return FAM_RESULT_EVALUATION
+        return FAM_CODEX_THINKING
+    if ("supervisor_turn_inflight" in status
+            and status["supervisor_turn_inflight"] is None
+            and (project_status == "SUPERVISOR_TURN"
+                 or completion in ("COMPLETION_CONSUMED", "COMPLETION_SEALED"))):
+        return FAM_IDLE
     if active is not None and completion == "COMPLETION_COMMITTED":
         return FAM_COMPLETION_COMMITTED
     if active is not None and completion in ("COMPLETION_CONSUMED",
