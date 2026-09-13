@@ -21,6 +21,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 import web_console_alerts as wal
+from test_web_console_state import complete_doc
 
 
 NOW = datetime(2026, 9, 12, 15, 0, 0, tzinfo=timezone.utc)
@@ -345,12 +346,27 @@ class SevereStateTests(unittest.TestCase):
         self.assertEqual(alert["evidence"]["message_id"], 700801)
 
     def test_complete_is_informational_and_optional(self):
-        result = project(project_status="COMPLETE")
+        result = project(**complete_doc())
         alert = by_rule(result, "project-complete")
         self.assertEqual(alert["severity"], "informational")
         self.assertEqual(alert["notification_class"],
                          "optional-informational")
         self.assertEqual(alert["notification_kind"], "COMPLETE")
+
+    def test_verified_complete_does_not_reactivate_historical_authorization(self):
+        historical = dispatch(700104, authorized_at=NOW - timedelta(hours=2),
+                              expires_at=NOW - timedelta(hours=1))
+        result = project(**complete_doc(last_authorized_dispatch=historical))
+        self.assertEqual(rules(result), {"project-complete"})
+
+    def test_unvalidated_complete_keeps_risks_and_never_announces_completion(self):
+        historical = dispatch(700104, authorized_at=NOW - timedelta(hours=2),
+                              expires_at=NOW - timedelta(hours=1))
+        result = project(**complete_doc(last_authorized_dispatch=historical,
+                                         terminal_completion=None))
+        self.assertNotIn("project-complete", rules(result))
+        self.assertIn("authorization-expiry", rules(result))
+        self.assertIn("zcode-pickup", rules(result))
 
     def test_safe_pause_is_informational_and_optional(self):
         result = project(pause={"status": "PAUSED", "mode": "SAFE",

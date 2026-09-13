@@ -58,6 +58,15 @@ def status_doc(**over):
     return doc
 
 
+def complete_doc(**over):
+    return status_doc(**dict({
+        "runtime_status": "COMPLETE", "project_status": "COMPLETE",
+        "supervisor_turn_inflight": None,
+        "terminal_completion": {"schema_version": 1, "valid": True,
+                                "problems": [], "final_verification_status": "PASS"},
+    }, **over))
+
+
 _UNSET = object()
 
 
@@ -204,7 +213,7 @@ class StateFamilyTests(StateInterpreterCase):
         self.assertEqual(result["state"]["family"], self.state.FAM_HUMAN_REVIEW)
 
     def test_complete(self):
-        result = self.state.interpret_status(status_doc(project_status="COMPLETE"))
+        result = self.state.interpret_status(complete_doc())
         self.assertEqual(result["state"]["family"], self.state.FAM_COMPLETE)
         self.assertFalse(result["state"]["user_action_required"])
         self.assertIn("COMPLETE", result["next_expected"]["label"])
@@ -280,14 +289,14 @@ class PrecedenceTests(StateInterpreterCase):
         result = self.state.interpret_status(doc)
         self.assertEqual(result["state"]["family"], self.state.FAM_PAUSED)
 
-    def test_complete_beats_pending_pause(self):
-        # A terminal COMPLETE outranks a still-pending safe pause request.
-        doc = status_doc(project_status="COMPLETE",
+    def test_complete_with_unsettled_pause_fails_closed(self):
+        # Conflicting terminal/control facts require inspection, never a guess.
+        doc = complete_doc(
                          pause={"status": "PENDING_AFTER_CURRENT_STAGE",
                                 "requested_at": "2026-09-12T01:00:00+00:00",
                                 "mode": "SAFE", "resumed_at": None})
         result = self.state.interpret_status(doc)
-        self.assertEqual(result["state"]["family"], self.state.FAM_COMPLETE)
+        self.assertTrue(unavailable(result))
 
 
 class FailClosedTests(StateInterpreterCase):

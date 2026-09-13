@@ -1,0 +1,201 @@
+{
+  "status": {
+    "schema_version": 1,
+    "PROJECT_ID": "v13-dogfood-001",
+    "runtime_status": "COMPLETE",
+    "project_status": "COMPLETE",
+    "pause": {
+      "status": "RUNNING",
+      "requested_at": null,
+      "mode": null,
+      "resumed_at": null
+    },
+    "active_task": null,
+    "last_authorized_dispatch": {
+      "schema_version": 1,
+      "MESSAGE_ID": 700104,
+      "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+      "STAGE_ID": "GENERAL_FV_V1_BINDING_REPAIR",
+      "ATTEMPT": 3,
+      "NONCE": "305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924",
+      "TO_ZCODE_SHA256": "4723a1203918efc1741e50fd4aa5be115c38c74bb89e1a9f51faa2175877c1d7",
+      "AUTHORIZED_AT": "2026-09-12T21:21:46+00:00",
+      "IS_FINAL_VERIFICATION": true,
+      "FENCE_VERSION": 1,
+      "PROJECT_ID": "v13-dogfood-001",
+      "SUPERVISOR_CONTROL_ORIGIN": {
+        "originating_control_revision": 0,
+        "supervisor_turn_id": "supervisor-turn-5bc8f54b448c4385b6b93aac2c9edf59",
+        "decision_receipt_sha256": "027a12a0407fb01542a376b8638142aae4aad85b92fdc6c4f037272a1672351e"
+      },
+      "EXPIRES_AT": "2026-09-12T22:26:08+00:00",
+      "SUPERVISOR_DISPATCH_ARCHIVE": {
+        "schema_version": 1,
+        "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.json",
+        "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.md",
+        "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.authorized.json",
+        "dispatch_sha256": "4723a1203918efc1741e50fd4aa5be115c38c74bb89e1a9f51faa2175877c1d7"
+      },
+      "FINAL_VERIFICATION_GATE": {
+        "POLICY_ID": "GENERAL_FV_V1",
+        "POLICY_VERSION": 1,
+        "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+        "CLAIM_COUNT": 4,
+        "EXECUTION_MODE": "LIVE_READ_ONLY",
+        "CRITICAL_CLAIMS": [
+          {
+            "claim_id": "C1",
+            "claim": "workspace/dogfood-note.md is a concise and accurate summary of the normal public protocol flow and major agent/control roles described in docs/ARCHITECTURE.md.",
+            "claim_type": "SOURCE_SUPPORT",
+            "decision_impact": "HIGH",
+            "evidence_pointers": [
+              "workspace/dogfood-note.md",
+              "docs/ARCHITECTURE.md"
+            ],
+            "verification_standard": "Adversarially compare each material statement in the note with the architecture source; fail on any unsupported or materially misleading protocol statement."
+          },
+          {
+            "claim_id": "C2",
+            "claim": "evidence/dogfood-rounds.csv has the required schema and records every and only authoritative consumed dogfood round available at its declared collection cutoff, including 700100 and excluding then-unconsumed 700101.",
+            "claim_type": "NUMERICAL",
+            "decision_impact": "HIGH",
+            "evidence_pointers": [
+              "evidence/dogfood-rounds.csv",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/audit.jsonl"
+            ],
+            "verification_standard": "Parse the CSV, reconstruct the qualifying ledger set at the declared cutoff, and fail on any missing, extra, duplicated, invented, or mismatched row."
+          },
+          {
+            "claim_id": "C3",
+            "claim": "Both required deliverables exist at the goal paths and are readable through the normal local Web Console and Artifact Center resolution workflow.",
+            "claim_type": "DELIVERABLE_INTEGRITY",
+            "decision_impact": "HIGH",
+            "evidence_pointers": [
+              "workspace/dogfood-note.md",
+              "evidence/dogfood-rounds.csv"
+            ],
+            "verification_standard": "Verify exact paths, readable bytes, Markdown and CSV integrity, and the existing local Artifact Center discovery/resolution path without GUI or network access; fail if either artifact cannot be resolved and read normally."
+          },
+          {
+            "claim_id": "C4",
+            "claim": "The dogfood work preserved Runtime safety constraints: authorized stages used the claim, fence, publication, and completion lifecycle and changed no user-facing artifacts beyond the two goal deliverables.",
+            "claim_type": "CONSTRAINT_COMPLIANCE",
+            "decision_impact": "HIGH",
+            "evidence_pointers": [
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+              "workspace/dogfood-note.md",
+              "evidence/dogfood-rounds.csv"
+            ],
+            "verification_standard": "Adversarially inspect authoritative receipts and publication records for both stages; fail on any bypass, direct canonical write evidence, forbidden dependency or network use, or extra user-facing output."
+          }
+        ]
+      }
+    },
+    "active_task_claimed": false,
+    "active_task_claim_recorded": false,
+    "active_task_completion_status": null,
+    "active_task_retired": false,
+    "pending_interventions": 0,
+    "last_consumed_message_id": 700104,
+    "human_review": false,
+    "stop": false,
+    "supervisor_turn_inflight": null,
+    "active_task_completion": null,
+    "terminal_completion": {
+      "schema_version": 1,
+      "valid": true,
+      "problems": [],
+      "final_verification_status": "PASS"
+    }
+  },
+  "interpretation": {
+    "schema_version": 1,
+    "deterministic": true,
+    "state": {
+      "family": "COMPLETE",
+      "label": "Complete \u2014 the project reached its goal",
+      "detail": "",
+      "worker": {
+        "available": false,
+        "who": null
+      },
+      "since": {
+        "available": false,
+        "at": null,
+        "source": null
+      },
+      "user_action_required": false,
+      "user_action_reason": null
+    },
+    "next_expected": {
+      "available": true,
+      "label": "No further work is expected \u2014 the project is COMPLETE",
+      "detail": "History remains inspectable.",
+      "message_id": null
+    },
+    "milestones": [],
+    "protocol": {
+      "available": false,
+      "message_id": null,
+      "task_id": null,
+      "stage_id": null,
+      "attempt": null
+    },
+    "final_verification": {
+      "available": false,
+      "is_final_verification": null
+    },
+    "health": {
+      "project": {
+        "available": true,
+        "id": "v13-dogfood-001"
+      },
+      "orchestrator": {
+        "available": true,
+        "status": "COMPLETE",
+        "label": "the Orchestrator completed normally"
+      },
+      "codex": {
+        "available": true,
+        "label": "finished \u2014 project complete"
+      },
+      "zcode": {
+        "available": true,
+        "last_observed_activity": "last completion consumed: MESSAGE 700104",
+        "at": null
+      },
+      "current_authorization": {
+        "available": true,
+        "source": "last_authorized_dispatch",
+        "message_id": 700104,
+        "task_id": "DOGFOOD_FINAL_VERIFICATION",
+        "stage_id": "GENERAL_FV_V1_BINDING_REPAIR",
+        "attempt": 3
+      },
+      "current_claim": {
+        "available": true,
+        "recorded": false,
+        "running": false,
+        "retired": false
+      },
+      "pending_interventions": {
+        "available": true,
+        "count": 0
+      },
+      "errors_and_warnings": []
+    },
+    "honesty": {
+      "unknown_fields": [],
+      "malformed_fields": [],
+      "contradictions": [],
+      "notes": []
+    },
+    "terminal_completion": {
+      "available": true,
+      "last_consumed_message_id": 700104,
+      "final_verification_status": "PASS"
+    }
+  }
+}

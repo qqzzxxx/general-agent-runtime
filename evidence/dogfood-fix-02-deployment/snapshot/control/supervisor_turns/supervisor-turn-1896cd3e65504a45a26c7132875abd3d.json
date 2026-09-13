@@ -1,0 +1,106 @@
+{
+  "schema": "SUPERVISOR-TURN-OBSERVABILITY-V1",
+  "schema_version": 1,
+  "turn_id": "supervisor-turn-1896cd3e65504a45a26c7132875abd3d",
+  "PROJECT_ID": "v13-dogfood-001",
+  "invocation": {
+    "event": {
+      "runtime": "v2",
+      "shared_file_executor": true
+    },
+    "reason": "ORCHESTRATOR_START"
+  },
+  "started_at": "2026-09-12T20:16:22+00:00",
+  "finished_at": "2026-09-12T20:18:20+00:00",
+  "duration_seconds": 118.44,
+  "supervisor_config": {
+    "source": "fixed_policy",
+    "config_revision": null,
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "queued_at": null
+  },
+  "usage": {
+    "reported": false,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null,
+    "source": null,
+    "note": "the Codex environment did not report token usage for this turn"
+  },
+  "context_manifest": {
+    "supervisor_rules": {
+      "path": "control/CODEX_SUPERVISOR_RUNTIME.md",
+      "present": true,
+      "truncated": true
+    },
+    "project_state": {
+      "path": "projects/v13-dogfood-001/project_state.json",
+      "present": true,
+      "truncated": false
+    },
+    "research_state": {
+      "path": "projects/v13-dogfood-001/RESEARCH_STATE.md",
+      "present": true,
+      "truncated": false
+    },
+    "project_goal": {
+      "path": "projects/v13-dogfood-001/PROJECT_GOAL.md",
+      "present": true,
+      "truncated": false
+    },
+    "profile": {
+      "project_type": "GENERAL"
+    },
+    "human_decision_receipt": null,
+    "interventions": [],
+    "executor_brief": {
+      "source": "none"
+    },
+    "mechanical_event": {
+      "reason": "ORCHESTRATOR_START",
+      "event_keys": [
+        "runtime",
+        "shared_file_executor"
+      ]
+    }
+  },
+  "decision": {
+    "committed": true,
+    "receipt_file": "control/supervisor_decisions/supervisor-turn-1896cd3e65504a45a26c7132875abd3d.json",
+    "receipt_sha256": "243134649d4326fa7a5af7516502dcf3327a5668f0c04db937e022253d16e12c",
+    "decision": {
+      "decision": "CONTINUE",
+      "at": "2026-09-12T20:16:22+00:00",
+      "reason": "Dispatch one bounded Executor stage to create the two required deliverables from canonical local sources and authoritative consumed-round evidence.",
+      "goal_alignment": {
+        "original_objective": "Run a small end-to-end Runtime dogfood project and produce the protocol note and authoritative rounds CSV.",
+        "unmet_criteria": "Both deliverables are absent; Artifact Center readability, lifecycle completion, and Final Verification remain unproven.",
+        "latest_result": "No Executor result exists yet; the project has only been bootstrapped.",
+        "next_action_alignment": "Create exactly the two bounded deliverables using the architecture source and Runtime-owned consumed-round evidence.",
+        "scope_drift": "None; work is restricted to the two goal outputs and read-only local evidence.",
+        "method": "Continue with the initial source-grounded drafting and evidence-enumeration method."
+      }
+    },
+    "decision_sha256": "cec9f8f2b134ed42b2e62585bc105663edc91135c98fc318f331dfa026797081",
+    "decision_summary": "Dispatch one bounded Executor stage to create the two required deliverables from canonical local sources and authoritative consumed-round evidence.",
+    "decision_history_index": 0,
+    "resulting_status": "WAITING_EXECUTOR"
+  },
+  "dispatch_linkage": {
+    "MESSAGE_ID": 700100,
+    "TASK_ID": "DOGFOOD_DELIVERABLES",
+    "STAGE_ID": "DRAFT_AND_EVIDENCE_V1",
+    "ATTEMPT": 1,
+    "NONCE": "0f85db0685434b65a69144d0533dd53b0e23c97d19874349",
+    "dispatch_sha256": "8d461f4c4623792030dd2e0487ac91c604a180461ac54fe5390a9e1c45f9056e"
+  },
+  "intervention_ids": [],
+  "outcome": {
+    "committed": true,
+    "stale": false,
+    "recovered_after_crash": false,
+    "candidate_validation_failed": false,
+    "error": null
+  }
+}

@@ -49,7 +49,7 @@ FAM_STATE_UNAVAILABLE = "STATE_UNAVAILABLE"
 
 KNOWN_RUNTIME_STATUSES = frozenset({
     "RUNNING", "PAUSED", "STOPPED", "STOPPED_BY_USER", "HUMAN_REVIEW",
-    "DEADLINE_REACHED", "ORCHESTRATOR_ERROR",
+    "DEADLINE_REACHED", "ORCHESTRATOR_ERROR", "COMPLETE",
 })
 KNOWN_PROJECT_STATUSES = frozenset({
     "WAITING_EXECUTOR", "SUPERVISOR_TURN", "COMPLETE", "BLOCKED", "STOPPED",
@@ -99,6 +99,7 @@ _PROJECT_CODEX_LABELS = {
 }
 
 _RUNTIME_ORCHESTRATOR_LABELS = {
+    "COMPLETE": "the Orchestrator completed normally",
     "RUNNING": "the Orchestrator is running",
     "PAUSED": "the Orchestrator recorded PAUSED",
     "STOPPED": "the Orchestrator stopped normally",
@@ -179,8 +180,11 @@ def _document_problems(status) -> tuple[list, list, list]:
                 elif pause_status not in KNOWN_PAUSE_STATUSES:
                     unknown.append("pause.status")
             mode = pause.get("mode")
-            if mode is not None and mode not in KNOWN_PAUSE_MODES:
-                unknown.append("pause.mode")
+            if mode is not None:
+                if not _is_str(mode):
+                    malformed.append("pause.mode")
+                elif mode not in KNOWN_PAUSE_MODES:
+                    unknown.append("pause.mode")
             for key in ("requested_at", "paused_at", "resumed_at"):
                 stamp = pause.get(key)
                 if stamp is not None and not _is_str(stamp):
@@ -239,6 +243,41 @@ def _document_problems(status) -> tuple[list, list, list]:
         if _identity_of("active_task", active) != \
                 _identity_of("last_authorized_dispatch", authorized):
             contradiction.append("AUTHORIZATION_IDENTITY_MISMATCH")
+    if project_status == "COMPLETE" or runtime_status == "COMPLETE":
+        if project_status != "COMPLETE" or runtime_status != "COMPLETE":
+            contradiction.append("TERMINAL_STATUS_MISMATCH")
+        evidence = status.get("terminal_completion")
+        if not isinstance(evidence, dict):
+            malformed.append("terminal_completion")
+        else:
+            if not _is_int(evidence.get("schema_version")) or evidence["schema_version"] != 1:
+                malformed.append("terminal_completion.schema_version")
+            if not isinstance(evidence.get("valid"), bool):
+                malformed.append("terminal_completion.valid")
+            if not isinstance(evidence.get("problems"), list) or any(
+                    not isinstance(p, str) for p in evidence.get("problems", [])):
+                malformed.append("terminal_completion.problems")
+            elif evidence["problems"]:
+                contradiction.extend(evidence["problems"])
+            if evidence.get("valid") is not True:
+                contradiction.append("TERMINAL_COMPLETION_NOT_VALIDATED")
+            if "final_verification_status" not in evidence or evidence.get(
+                    "final_verification_status") not in (None, "PASS"):
+                malformed.append("terminal_completion.final_verification_status")
+        for field in ("active_task", "active_task_completion_status",
+                      "supervisor_turn_inflight"):
+            if field not in status:
+                malformed.append(field)
+            elif status[field] is not None:
+                contradiction.append("TERMINAL_WITH_" + field.upper())
+        for field in ("active_task_claimed", "active_task_claim_recorded",
+                      "active_task_retired", "human_review", "stop"):
+            if status.get(field) is True:
+                contradiction.append("TERMINAL_WITH_" + field.upper())
+        if isinstance(pending, int) and pending > 0:
+            contradiction.append("TERMINAL_WITH_PENDING_INTERVENTIONS")
+        if not isinstance(pause, dict) or pause.get("status") != "RUNNING":
+            contradiction.append("TERMINAL_PAUSE_NOT_RUNNING")
     return unknown, malformed, contradiction
 
 
@@ -442,7 +481,7 @@ def _milestones_for(active: dict | None, claimed, claim_recorded,
     ]
 
 
-def _health_for(status: dict) -> dict:
+def _health_for(status: dict, family: str) -> dict:
     project_id = status.get("PROJECT_ID")
     runtime_status = status.get("runtime_status")
     project_status = status.get("project_status")
@@ -456,7 +495,9 @@ def _health_for(status: dict) -> dict:
     pending = status.get("pending_interventions")
     consumed = status.get("last_consumed_message_id")
 
-    auth_source, auth = None, active or authorized
+    # A completed Runtime retains its historical authorization; it is not
+    # a current task. Only a validated terminal family disables the fallback.
+    auth_source, auth = None, active or (authorized if family != FAM_COMPLETE else None)
     if isinstance(auth, dict):
         auth_source = "active_task" if auth is active \
             else "last_authorized_dispatch"
@@ -591,6 +632,13 @@ def _assemble(result: dict, status: dict, family: str,
             for note in result["honesty"]["notes"])
 
     result["next_expected"] = _next_expected_for(family, status)
+    result["terminal_completion"] = {
+        "available": family == FAM_COMPLETE,
+        "last_consumed_message_id": status.get("last_consumed_message_id")
+            if family == FAM_COMPLETE else None,
+        "final_verification_status": status["terminal_completion"]["final_verification_status"]
+            if family == FAM_COMPLETE else None,
+    }
     result["milestones"] = _milestones_for(
         active, status.get("active_task_claimed"),
         status.get("active_task_claim_recorded"), completion)
@@ -607,7 +655,7 @@ def _assemble(result: dict, status: dict, family: str,
         result["final_verification"] = {"available": fv is not None,
                                         "is_final_verification": bool(fv)}
 
-    health = _health_for(status)
+    health = _health_for(status, family)
     if not determine:
         reasons = result["honesty"]["unknown_fields"] \
             + result["honesty"]["malformed_fields"] \

@@ -104,6 +104,15 @@ class StaticFrontendTests(unittest.TestCase):
         self.assertIn("setInterval", self.text)
         self.assertIn("cache: \"no-store\"", self.text)
 
+    def test_terminal_facts_use_validated_interpretation_and_clear_on_reload(self):
+        self.assertIn('<dl id="ce-terminal" hidden>', self.text)
+        self.assertIn('terminalPanel.hidden = !terminal.available', self.text)
+        self.assertIn('terminal.final_verification_status === "PASS"', self.text)
+        self.assertIn('terminal.last_consumed_message_id', self.text)
+        load = self.text.split('async function loadCockpit()', 1)[1]
+        self.assertLess(load.index('document.getElementById("ce-terminal").hidden = true'),
+                        load.index('await fetchJson('))
+
     def test_html_is_well_formed(self):
         parser = WellFormedness()
         parser.feed(self.text)

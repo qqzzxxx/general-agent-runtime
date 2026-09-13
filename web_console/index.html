@@ -421,6 +421,7 @@
       <ul id="ce-milestones"></ul>
       <h3>Task identity</h3>
       <dl id="ce-protocol"></dl>
+      <dl id="ce-terminal" hidden></dl>
       <details>
         <summary>Bounded technical details</summary>
         <dl id="ce-tech"></dl>
@@ -1274,6 +1275,7 @@ Object.assign(UI_ZH, {
   "Revokes the current task's Runtime authority using the existing fencing (the task is retired and quarantined), preserves all historical records, and leaves the Runtime paused; future work requires fresh authorization. This is cooperative — it does not kill the Executor process, which stops at its next control boundary.": "撤销当前任务的授权，将其退役并隔离，保留历史记录，同时暂停 Runtime。后续工作需要重新授权。这是协作式中断：执行器会在下一控制边界停止，不会强制终止其进程。",
   "STOP is terminal and different from Pause: the Orchestrator makes no new Codex calls after detecting it, and an ordinary Resume will not resurrect the stopped work — recovery needs the documented STOP path. The Console asks the Runtime's formal STOP entry point to apply it after a confirmation challenge you request here.": "STOP 为终止操作。检测到 STOP 后，编排器不再发起新的 Codex 调用，普通“恢复”无法恢复已停止的工作；请按 STOP 恢复流程操作。这里须先申请确认，再交由 Runtime 的正式 STOP 入口执行。",
   "Supervisor model": "Supervisor 模型", "Reasoning effort": "推理强度", "LOW": "低", "MEDIUM": "中", "HIGH": "高", "EXTRA_HIGH": "更高", "HIGHEST": "最高", "ULTRA": "极高",
+  "Last processed task": "最后处理任务", "the Orchestrator completed normally": "Orchestrator 已正常完成",
   "Unavailable — nobody is actively working": "当前无人执行", "Unavailable — the Runtime reported no authoritative timestamp for this state": "未报告",
   "COMPLETED": "已完成", "DISPATCHED": "已派发", "AWAITING_COMPLETION": "等待结果", "UNTRUSTED": "不可信", "ANOMALY": "异常",
   "Codex → ZCode": "Codex → ZCode 派发", "ZCode → Codex": "ZCode → Codex 结果", "Ledger-bound": "已绑定来源", "Unbound": "未绑定来源", "Missing": "文件缺失",
@@ -1868,6 +1870,14 @@ function selectRuntime(runtimeId) {
 
 function renderInterpretation(interpretation) {
   const state = interpretation.state;
+  const terminal = interpretation.terminal_completion || {};
+  const terminalPanel = document.getElementById("ce-terminal");
+  terminalPanel.hidden = !terminal.available;
+  fillDetails(terminalPanel, terminal.available ? [
+    ["Final Verification", terminal.final_verification_status === "PASS" ? "PASS" : "unavailable"],
+    ["Last processed task", terminal.last_consumed_message_id === null
+      ? "unavailable" : "MESSAGE " + terminal.last_consumed_message_id],
+  ] : []);
   const tone = state.user_action_required ? "bad"
     : (state.family === "COMPLETE" || state.family === "IDLE"
       ? "ok" : "muted");
@@ -1997,6 +2007,7 @@ function renderRuntimeIdentity(runtime) {
 
 async function loadCockpit() {
   const stateLabel = document.getElementById("ce-state-label");
+  document.getElementById("ce-terminal").hidden = true;
   if (selectedRuntimeId === null) {
     setPanel(stateLabel, "Select a Runtime to observe it.", "muted");
     return;

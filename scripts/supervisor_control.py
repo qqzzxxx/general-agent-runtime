@@ -2179,11 +2179,91 @@ def _bounded_inflight_view(inflight) -> dict | None:
     return {"turn_id": turn_id, "started_at": started_at}
 
 
+def _read_status_object(path: Path) -> dict:
+    """Read authority for observation without silently accepting duplicate keys."""
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique)
+    except FileNotFoundError:
+        return {}
+    except (ValueError, OSError) as exc:
+        raise ControlError(f"invalid status authority: {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ControlError(f"status authority must be an object: {path}")
+    return value
+
+
+def _terminal_completion_view(root, project_id, state, runtime, control):
+    """Read-only completion evidence; never enforce/reconcile or save state.
+
+    Runtime COMPLETE is emitted only after its existing terminal gate. Repeat
+    that same predicate for observation so damaged acceptance facts cannot be
+    concealed by the terminal label. Historical authorization is not activity.
+    """
+    if state.get("status") != "COMPLETE" and runtime.get("status") != "COMPLETE":
+        return None
+    problems = []
+    if state.get("status") != "COMPLETE" or runtime.get("status") != "COMPLETE":
+        problems.append("TERMINAL_STATUS_MISMATCH")
+    if "current_task" not in state or state["current_task"] is not None:
+        problems.append("TERMINAL_CURRENT_TASK_NOT_EMPTY")
+    if project_id is not None and state.get("project_id") != project_id:
+        problems.append("TERMINAL_PROJECT_ID_MISMATCH")
+    if control.get("inflight_supervisor_turn") is not None:
+        problems.append("TERMINAL_SUPERVISOR_INFLIGHT")
+    if any(item.get("integrity") != "OK" for item in list_interventions(root, project_id)):
+        problems.append("TERMINAL_INTERVENTION_INTEGRITY")
+    fv_status = None
+    try:
+        import importlib.util
+        # Use this producer's installed gate and profile definitions, not an
+        # unrelated Console installation or a module cached for another root.
+        spec = importlib.util.spec_from_file_location(
+            "status_terminal_gate", Path(__file__).resolve().parents[1] / "orchestrator.py")
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+        fv = state.get("final_verification")
+        if fv is not None and (not isinstance(fv, dict)
+                               or not isinstance(fv.get("required"), bool)):
+            raise ValueError("malformed final_verification")
+        gated = gate.final_verification_gate_enforced(runtime, state)
+        if not gated and any(runtime.get(key) is not None for key in (
+                "last_final_verification_message_id", "last_final_verification_receipt_sha256")):
+            raise ValueError("recorded verification has no required project binding")
+        if gated:
+            for field in ("policy_version", "verification_message_id"):
+                if type(fv.get(field)) is not int:
+                    raise ValueError(f"malformed final_verification.{field}")
+            for field in ("claims_hash", "verification_receipt_sha256"):
+                if not isinstance(fv.get(field), str) or not HEX64.fullmatch(fv[field]):
+                    raise ValueError(f"malformed final_verification.{field}")
+            for field in ("last_final_verification_message_id", "last_consumed_message_id"):
+                if type(runtime.get(field)) is not int:
+                    raise ValueError(f"malformed {field}")
+        allowed, reason = gate.final_verification_terminal_check(runtime, state)
+        if not allowed:
+            problems.append("TERMINAL_FINAL_VERIFICATION: " + reason)
+        elif gated:
+            fv_status = "PASS"
+    except Exception as exc:
+        problems.append("TERMINAL_VERIFICATION_UNAVAILABLE: " + str(exc))
+    return {"schema_version": 1, "valid": not problems, "problems": problems,
+            "final_verification_status": fv_status}
+
+
 def current_status(root: Path) -> dict:
     root = Path(root).resolve()
     project_id, _, state_path = resolve_active_project(root)
-    state = _read_json(state_path, {}) or {}
-    runtime = _read_json(root / "control" / "orchestrator_runtime.json", {}) or {}
+    state = _read_status_object(state_path)
+    runtime = _read_status_object(root / "control" / "orchestrator_runtime.json")
+    _read_status_object(root / "control" / "supervisor_control.json")
     control = load_control(root)
     active = runtime.get("authorized_dispatch")
     current = state.get("current_task") if state.get("status") == "WAITING_EXECUTOR" else None
@@ -2220,6 +2300,8 @@ def current_status(root: Path) -> dict:
         "supervisor_turn_inflight": _bounded_inflight_view(
             control.get("inflight_supervisor_turn")),
         "active_task_completion": completion_view,
+        "terminal_completion": _terminal_completion_view(
+            root, project_id, state, runtime, control),
     }
 
 

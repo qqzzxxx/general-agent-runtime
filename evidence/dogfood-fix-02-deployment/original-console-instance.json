@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "pid": 19740,
+  "port": 60649,
+  "token": "95b5a26c24a268bb82ff0d5a486c505d",
+  "runtime_root": "C:\\general-agent-runtime-v13-builder\\projects\\v13-web-console-dev-001\\workspace\\v1.3-dev",
+  "console_root": "C:\\general-agent-runtime-v13-builder\\projects\\v13-web-console-dev-001\\workspace\\v1.3-dev",
+  "started_at": "2026-09-13T04:45:16+00:00"
+}

@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "ok": true,
+  "runtime": {
+    "id": "51042462032cbc1f",
+    "label": "v1.3 Dogfood",
+    "root": "C:\\general-agent-runtime-v13-dogfood"
+  },
+  "cockpit": {
+    "schema_version": 1,
+    "source": {
+      "kind": "supervisor_control_status",
+      "status_schema_version": 1,
+      "exit_code": 0,
+      "elapsed_ms": 218,
+      "runtime_root": "C:\\general-agent-runtime-v13-dogfood"
+    },
+    "runtime": {
+      "id": "51042462032cbc1f",
+      "label": "v1.3 Dogfood",
+      "root": "C:\\general-agent-runtime-v13-dogfood"
+    },
+    "backend": {
+      "status": "ok",
+      "pid": 19740,
+      "started_at": "2026-09-13T04:45:16+00:00"
+    },
+    "generated_at": "2026-09-13T05:47:40+00:00",
+    "interpretation": {
+      "schema_version": 1,
+      "deterministic": true,
+      "state": {
+        "family": "STATE_UNAVAILABLE",
+        "label": "State unavailable \u2014 the reported facts do not determine a state",
+        "detail": "The reported facts were unknown, malformed, or contradictory, so no state is presented rather than a guess. No state is guessed from unknown, malformed, or contradictory facts.",
+        "worker": {
+          "available": false,
+          "who": null
+        },
+        "since": {
+          "available": false,
+          "at": null,
+          "source": null
+        },
+        "user_action_required": false,
+        "user_action_reason": "The state cannot be determined from the reported facts; inspect the bounded details before acting."
+      },
+      "next_expected": {
+        "available": false,
+        "label": "Unavailable \u2014 what happens next cannot be determined from the reported facts",
+        "detail": "",
+        "message_id": null
+      },
+      "milestones": [],
+      "protocol": {
+        "available": false,
+        "message_id": null,
+        "task_id": null,
+        "stage_id": null,
+        "attempt": null
+      },
+      "final_verification": {
+        "available": false,
+        "is_final_verification": null
+      },
+      "health": {
+        "project": {
+          "available": true,
+          "id": "v13-dogfood-001"
+        },
+        "orchestrator": {
+          "available": true,
+          "status": "COMPLETE",
+          "label": null
+        },
+        "codex": {
+          "available": true,
+          "label": "finished \u2014 project complete"
+        },
+        "zcode": {
+          "available": true,
+          "last_observed_activity": "last completion consumed: MESSAGE 700104",
+          "at": null
+        },
+        "current_authorization": {
+          "available": true,
+          "source": "last_authorized_dispatch",
+          "message_id": 700104,
+          "task_id": "DOGFOOD_FINAL_VERIFICATION",
+          "stage_id": "GENERAL_FV_V1_BINDING_REPAIR",
+          "attempt": 3
+        },
+        "current_claim": {
+          "available": true,
+          "recorded": false,
+          "running": false,
+          "retired": false
+        },
+        "pending_interventions": {
+          "available": true,
+          "count": 0
+        },
+        "errors_and_warnings": [
+          {
+            "severity": "error",
+            "code": "STATE_UNAVAILABLE",
+            "message": "The state presentation is unavailable because of: runtime_status. no state is guessed from unknown, malformed, or contradictory facts"
+          }
+        ]
+      },
+      "honesty": {
+        "unknown_fields": [
+          "runtime_status"
+        ],
+        "malformed_fields": [],
+        "contradictions": [],
+        "notes": [
+          "no state is guessed from unknown, malformed, or contradictory facts"
+        ]
+      }
+    }
+  }
+}

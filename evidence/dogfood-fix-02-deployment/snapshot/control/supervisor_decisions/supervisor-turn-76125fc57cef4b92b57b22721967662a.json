@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "turn_id": "supervisor-turn-76125fc57cef4b92b57b22721967662a",
+  "PROJECT_ID": "v13-dogfood-001",
+  "originating_control_revision": 0,
+  "intervention_ids": [],
+  "invocation": {
+    "event": {
+      "archive": "handoff\\archive\\brief-700102-65e6a4af9bbb-consumed-2085cbf8e31a.md",
+      "brief_sha256": "2085cbf8e31adcfb537bb510df76f28ca9f28775cc2b042bde3f29e5a3032b12",
+      "commit_id": "completion-700102-c3df95c1cbbe992824f58363",
+      "committed_receipt_path": "C:\\general-agent-runtime-v13-dogfood\\handoff\\completion_ledger\\completion-700102-c3df95c1cbbe992824f58363.json",
+      "final_verification": {
+        "claim_result_count": 0,
+        "claims_hash": "",
+        "is_final_verification": true,
+        "issues": [
+          "Receipt missing FINAL_VERIFICATION object"
+        ],
+        "mechanical_pass": false,
+        "overall_status": null,
+        "policy_id": "GENERAL_FV_V1",
+        "policy_version": 1
+      },
+      "message_id": 700102,
+      "receipt_sha256": "651f01ba53270038f3e8d0b8cfdaf6946a0ac354a61eebf0b93049eb602f20b3",
+      "stage_id": "GENERAL_FV_V1_CHECK",
+      "status": "COMPLETED",
+      "task_id": "DOGFOOD_FINAL_VERIFICATION",
+      "type": "EXECUTOR_RESULT_READY"
+    },
+    "reason": "EXECUTOR_RESULT_READY"
+  },
+  "state_sha256_before": "8b92dff8a392eb03881c4ab983c44978e83c3fba3fa54f1e4b610ed4cbf5b7cb",
+  "state_sha256_after": "8d057f911bca976208446c6a831a305b172a97a229edd649a119a3d2fdf36667",
+  "decision_history_index": 4,
+  "decision": {
+    "decision": "REVISE",
+    "at": "2026-09-12T21:02:38+00:00",
+    "reason": "The substantive verification report passed all four claims, but Runtime mechanical acceptance failed because the completion receipt omitted the required FINAL_VERIFICATION object; repair only that receipt envelope under a fresh identity.",
+    "goal_alignment": {
+      "original_objective": "Produce the concise protocol note and authoritative consumed-round CSV, then finish through the normal verified Runtime lifecycle.",
+      "unmet_criteria": "The mandatory GENERAL_FV_V1 gate has no mechanically accepted PASS receipt, so final acceptance and terminal completion remain forbidden.",
+      "latest_result": "Stage 700102 reported all four claims PASS and published its verification report, but the authoritative receipt lacked the required FINAL_VERIFICATION envelope and mechanically failed.",
+      "next_action_alignment": "Revalidate the existing report and unchanged evidence, then emit the exact policy-bound FINAL_VERIFICATION receipt object under a fresh claimed and fenced attempt.",
+      "scope_drift": "None; the revision is limited to the defective verification receipt envelope and must not modify deliverables or publish another report.",
+      "method": "Revise the smallest defective segment while preserving the four claims and prior substantive verification method."
+    }
+  },
+  "decision_sha256": "4708404f3df8f07c6d6c2d631c6d53c90a04677f574d715241d45b15aa6ce116",
+  "resulting_status": "WAITING_EXECUTOR",
+  "candidate": {
+    "MESSAGE_ID": 700103,
+    "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+    "STAGE_ID": "GENERAL_FV_V1_RECEIPT_REPAIR",
+    "ATTEMPT": 2,
+    "NONCE": "d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e",
+    "dispatch_sha256": "0a619d427f2e3edae4fab3f71737c9c243bf93baec24c4c3b1f671f5b9069377"
+  },
+  "committed_at": "2026-09-12T21:08:08+00:00"
+}

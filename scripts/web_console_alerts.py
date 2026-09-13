@@ -174,7 +174,13 @@ def project_alerts(*, runtime, status, probe_ok, probe_error_code,
         authorized = status.get("last_authorized_dispatch") \
             if isinstance(status.get("last_authorized_dispatch"), dict) \
             else None
-        auth = active or authorized
+        # Runtime keeps last_authorized_dispatch after completion. Resolve the
+        # same validated state as Cockpit before treating it as historical.
+        from web_console_state import interpret_status
+        complete = (status.get("runtime_status") == "COMPLETE"
+                    and status.get("project_status") == "COMPLETE"
+                    and interpret_status(status)["state"]["family"] == "COMPLETE")
+        auth = active or (authorized if not complete else None)
         inflight = status.get("supervisor_turn_inflight") \
             if isinstance(status.get("supervisor_turn_inflight"), dict) \
             else None
@@ -352,7 +358,7 @@ def project_alerts(*, runtime, status, probe_ok, probe_error_code,
                 identity=f"task-retired:{message_label}"))
 
         # -- Lifecycle informational events ---------------------------------
-        if status.get("project_status") == "COMPLETE":
+        if complete:
             alerts.append(_alert(
                 rule="project-complete", severity="informational",
                 message="the project reached COMPLETE",
