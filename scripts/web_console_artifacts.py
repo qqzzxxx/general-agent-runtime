@@ -3,7 +3,7 @@
 Deterministic, offline half of the read-only Artifact Center: artifact path
 normalization, format classification for exactly the v1.3.0 preview formats,
 fail-closed query parsing, the artifact index/catalog projection over
-authoritative completion-ledger receipts plus bounded walk results, bounded
+authoritative completion publication manifests plus bounded walk results, bounded
 preview documents, and the typed artifact-feedback schema that reuses the P5
 formal intervention surface (`web_console_control.ControlRequestError`).
 
@@ -15,7 +15,7 @@ preview reads, and delegates the one mutation (artifact-triggered STEER /
 AUDIT) through the existing P5 intervention machinery.
 
 Provenance honesty classes are structural: `ledger` bindings come only from
-completion-ledger entries whose integrity the v1.2 control plane verified
+Runtime publication projections whose completion and publication integrity the control plane verified
 (`integrity == "OK"`), `unbound` means a file exists under an authorized
 publication root with no authoritative receipt. Untrusted ledger entries
 never bind provenance and are surfaced in the honesty block. Filenames are
@@ -290,198 +290,122 @@ def _bounded_examples(items):
     return items[:MAX_LISTED_EXAMPLES]
 
 
-def _best_binding(occurrences):
-    """The provenance of the highest producing MESSAGE_ID (deterministic
-    regardless of ledger iteration order) plus its receipt content hash."""
-    best_mid = max(mid for mid, _, _ in occurrences)
-    for mid, provenance, sha256 in occurrences:
-        if mid == best_mid:
-            return provenance, sha256
-    raise AssertionError("unreachable: best_mid comes from occurrences")
+def artifact_id_for_publication(path: str, commit_id: str) -> str:
+    """Stable identity of a path's publication in one completion, not its bytes."""
+    return hashlib.sha256((commit_id + "\0" + normalize_artifact_path(path)).encode()).hexdigest()
+
+
+def verified_publications(entry):
+    """Consume only the control plane's verified publication projection.
+
+    Fail the entire round closed on malformed or ambiguous metadata; never
+    reinterpret Executor-authored receipt fields as Runtime publication proof.
+    """
+    projection = entry.get("artifact_provenance")
+    if entry.get("integrity") != "OK":
+        return [], "completion integrity is not OK"
+    if not isinstance(projection, dict) or projection.get("integrity") != "OK":
+        return [], "authoritative publication evidence is unavailable or untrusted"
+    raw = projection.get("publications")
+    if not isinstance(raw, list) or len(raw) > 128:
+        return [], "invalid publication list"
+    if (not _is_int(entry.get("MESSAGE_ID")) or not _is_int(entry.get("ATTEMPT"))
+            or not all(isinstance(entry.get(k), str) and entry[k]
+                       for k in ("TASK_ID", "STAGE_ID", "NONCE", "COMMIT_ID"))):
+        return [], "incomplete publication identity"
+    seen = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            return [], "invalid publication record"
+        try:
+            path = normalize_artifact_path(item.get("path"))
+        except ArtifactPathError:
+            return [], "invalid publication path"
+        if (path.casefold() in seen
+                or not isinstance(item.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"])
+                or any(type(item.get(k)) is not type(entry.get(k)) or item.get(k) != entry.get(k)
+                       for k in ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE", "PROJECT_ID"))):
+            return [], "ambiguous publication path, hash or identity"
+        seen.add(path.casefold())
+    return raw, None
 
 
 def build_artifact_index(ledger_entries, files) -> dict:
-    """Join authoritative receipt provenance with the bounded walk results.
-
-    `ledger_entries` is the parsed `feedback --json` list (v1.2 control
-    plane); `files` is the walk result over the authorized publication roots,
-    a list of `{"path": <project-relative>, "size_bytes": int | None}`.
-
-    Returns `{"index": {artifact_id: record}, "honesty": {...}}`. Only
-    ledger entries the control plane verified (`integrity == "OK"`) bind
-    provenance; a path republished by a later round binds to the highest
-    producing MESSAGE_ID with the earlier rounds listed in `republished_by`.
-    """
-    unusable_paths = []
-    unusable_total = 0
-    untrusted_entries = []
-    untrusted_total = 0
-    notes = []
-    bindings = {}
-    if not isinstance(ledger_entries, list):
-        ledger_entries = []
-        notes.append("the completion-ledger document was not a list; no "
-                     "receipt provenance is bound")
-    for entry in ledger_entries:
-        if not isinstance(entry, dict):
-            untrusted_total += 1
-            untrusted_entries.append({"message_id": None,
-                                      "integrity": None,
-                                      "ledger_file": None})
-            continue
-        integrity = entry.get("integrity")
-        message_id = entry.get("MESSAGE_ID")
-        if integrity != "OK":
-            untrusted_total += 1
-            if len(untrusted_entries) < MAX_LISTED_EXAMPLES:
-                untrusted_entries.append({
-                    "message_id": message_id if _is_int(message_id) else None,
-                    "integrity": integrity if isinstance(integrity, str)
-                    else None,
-                    "ledger_file": entry.get("ledger_file")
-                    if isinstance(entry.get("ledger_file"), str) else None,
-                })
-            continue
-        receipt = entry.get("RECEIPT")
-        if not isinstance(receipt, dict):
-            untrusted_total += 1
-            untrusted_entries.append({
-                "message_id": message_id if _is_int(message_id) else None,
-                "integrity": "RECEIPT_UNUSABLE", "ledger_file": None})
-            continue
-        published = receipt.get("PUBLISHED_PATHS")
-        if not isinstance(published, list):
-            notes.append(f"receipt for MESSAGE_ID {message_id!s} carries no "
-                         "usable PUBLISHED_PATHS list")
-            continue
-        seen_in_receipt = set()
-        for item in published:
-            path = item.get("path") if isinstance(item, dict) else None
-            sha256 = item.get("sha256") if isinstance(item, dict) else None
-            try:
-                normalized = normalize_artifact_path(path)
-            except ArtifactPathError:
-                unusable_total += 1
-                if len(unusable_paths) < MAX_LISTED_EXAMPLES:
-                    unusable_paths.append({
-                        "message_id": message_id if _is_int(message_id)
-                        else None,
-                        "path": path if isinstance(path, str) else None})
-                continue
-            if not isinstance(sha256, str) or not re.fullmatch(
-                    r"[0-9a-f]{64}", sha256):
-                unusable_total += 1
-                if len(unusable_paths) < MAX_LISTED_EXAMPLES:
-                    unusable_paths.append({
-                        "message_id": message_id if _is_int(message_id)
-                        else None,
-                        "path": normalized})
-                continue
-            if normalized in seen_in_receipt:
-                notes.append(f"receipt for MESSAGE_ID {message_id!s} lists "
-                             f"{normalized!r} more than once")
-            seen_in_receipt.add(normalized)
-            provenance = {
-                "message_id": message_id if _is_int(message_id) else None,
-                "task_id": entry.get("TASK_ID")
-                if isinstance(entry.get("TASK_ID"), str) else None,
-                "stage_id": entry.get("STAGE_ID")
-                if isinstance(entry.get("STAGE_ID"), str) else None,
-                "attempt": entry.get("ATTEMPT")
-                if _is_int(entry.get("ATTEMPT")) else None,
-                "producer": receipt.get("EXECUTOR_MODEL_FAMILY")
-                if isinstance(receipt.get("EXECUTOR_MODEL_FAMILY"), str)
-                else None,
-                "committed_at": entry.get("COMMITTED_AT")
-                if isinstance(entry.get("COMMITTED_AT"), str) else None,
-                "receipt_created_at": receipt.get("CREATED_AT")
-                if isinstance(receipt.get("CREATED_AT"), str) else None,
-                "completion_status": entry.get("STATUS")
-                if isinstance(entry.get("STATUS"), str) else None,
-                "completion_integrity": integrity,
-                "ledger_file": entry.get("ledger_file")
-                if isinstance(entry.get("ledger_file"), str) else None,
-            }
-            bindings.setdefault(normalized, []).append(
-                (provenance["message_id"] if provenance["message_id"]
-                 is not None else -1, provenance, sha256))
-
-    index = {}
+    """One catalog record per verified (completion, path), plus unbound files."""
+    notes, untrusted, unusable = [], [], []
+    entries = ledger_entries if isinstance(ledger_entries, list) else []
+    counts = {}
+    for entry in entries:
+        if isinstance(entry, dict) and _is_int(entry.get("MESSAGE_ID")):
+            mid = entry["MESSAGE_ID"]
+            counts[mid] = counts.get(mid, 0) + 1
+    present = {}
     for item in files if isinstance(files, list) else []:
-        if not isinstance(item, dict):
-            unusable_total += 1
-            continue
         try:
-            normalized = normalize_artifact_path(item.get("path"))
-        except ArtifactPathError:
-            unusable_total += 1
+            path = normalize_artifact_path(item.get("path"))
+            size = item.get("size_bytes")
+            present[path] = size if _is_int(size) and size >= 0 else None
+        except (ArtifactPathError, AttributeError):
+            unusable.append({"path": None})
+    index, bound = {}, set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            untrusted.append({"message_id": None})
             continue
-        size = item.get("size_bytes")
-        size = size if _is_int(size) and size >= 0 else None
-        occurrences = bindings.get(normalized)
-        if occurrences:
-            provenance, sha256 = _best_binding(occurrences)
-            best_mid = provenance["message_id"] or -1
-            republished = sorted({mid for mid, _, _ in occurrences
-                                  if mid != best_mid})
-            provenance = {**provenance,
-                          "republished_by": republished[:MAX_REPUBLISHED_LISTED]}
-            provenance_class = "ledger"
-        else:
-            provenance = {"message_id": None, "task_id": None,
-                          "stage_id": None, "attempt": None,
-                          "producer": None, "committed_at": None,
-                          "receipt_created_at": None,
-                          "completion_status": None,
-                          "completion_integrity": None,
-                          "ledger_file": None, "republished_by": []}
-            provenance_class = "unbound"
-            sha256 = None
-        index[artifact_id_for_path(normalized)] = {
-            "artifact_id": artifact_id_for_path(normalized),
-            "path": normalized,
-            "name": normalized.rsplit("/", 1)[-1],
-            "root": normalized.split("/", 1)[0],
-            "format": classify_format(normalized),
-            "size_bytes": size,
-            "availability": "present",
-            "expected_sha256": sha256,
-            "provenance": {**provenance, "class": provenance_class},
-        }
-    # Receipt-bound paths with no file under the authorized roots are still
-    # cataloged: their honest availability is "missing".
-    for normalized, occurrences in bindings.items():
-        aid = artifact_id_for_path(normalized)
-        if aid in index:
+        mid = entry.get("MESSAGE_ID")
+        publications, reason = verified_publications(entry)
+        if counts.get(mid, 0) > 1:
+            publications, reason = [], "ambiguous completion MESSAGE_ID"
+        if reason:
+            notes.append(f"MESSAGE_ID {mid}: {reason}")
+            if entry.get("integrity") != "OK":
+                untrusted.append({"message_id": mid, "integrity": entry.get("integrity")})
+            else:
+                unusable.append({"message_id": mid})
             continue
-        provenance, sha256 = _best_binding(occurrences)
-        best_mid = provenance["message_id"] or -1
-        republished = sorted({mid for mid, _, _ in occurrences
-                              if mid != best_mid})
+        receipt = entry.get("RECEIPT") or {}
+        for publication in publications:
+            path = publication["path"]
+            aid = artifact_id_for_publication(path, entry["COMMIT_ID"])
+            bound.add(path)
+            index[aid] = {
+                "artifact_id": aid, "path": path, "name": path.rsplit("/", 1)[-1],
+                "root": path.split("/", 1)[0], "format": classify_format(path),
+                "size_bytes": present.get(path),
+                "availability": "present" if path in present else "missing",
+                "expected_sha256": publication["sha256"],
+                "provenance": {
+                    "class": "ledger", "message_id": mid, "task_id": entry["TASK_ID"],
+                    "stage_id": entry["STAGE_ID"], "attempt": entry["ATTEMPT"],
+                    "commit_id": entry["COMMIT_ID"], "project_id": entry.get("PROJECT_ID"),
+                    "producer": receipt.get("EXECUTOR_MODEL_FAMILY"),
+                    "committed_at": entry.get("COMMITTED_AT"),
+                    "published_at": publication.get("PUBLISHED_AT"),
+                    "receipt_created_at": receipt.get("CREATED_AT"),
+                    "completion_status": entry.get("STATUS"),
+                    "completion_integrity": entry["integrity"],
+                    "ledger_file": entry.get("ledger_file"),
+                    "source": entry["artifact_provenance"].get("source"),
+                    "historical_content_retained": False,
+                },
+            }
+    for path, size in present.items():
+        if path in bound:
+            continue
+        aid = artifact_id_for_path(path)
         index[aid] = {
-            "artifact_id": aid,
-            "path": normalized,
-            "name": normalized.rsplit("/", 1)[-1],
-            "root": normalized.split("/", 1)[0],
-            "format": classify_format(normalized),
-            "size_bytes": None,
-            "availability": "missing",
-            "expected_sha256": sha256,
-            "provenance": {**provenance,
-                           "republished_by":
-                           republished[:MAX_REPUBLISHED_LISTED],
-                           "class": "ledger"},
+            "artifact_id": aid, "path": path, "name": path.rsplit("/", 1)[-1],
+            "root": path.split("/", 1)[0], "format": classify_format(path),
+            "size_bytes": size, "availability": "present", "expected_sha256": None,
+            "provenance": {"class": "unbound", "message_id": None, "task_id": None,
+                           "stage_id": None, "attempt": None},
         }
-    honesty = {
-        "unusable_publication_paths": {
-            "count": unusable_total,
-            "examples": _bounded_examples(unusable_paths)},
-        "untrusted_ledger_entries": {
-            "count": untrusted_total,
-            "examples": _bounded_examples(untrusted_entries)},
-        "notes": notes,
-    }
-    return {"index": index, "honesty": honesty}
+    return {"index": index, "honesty": {
+        "unusable_publication_paths": {"count": len(unusable), "examples": _bounded_examples(unusable)},
+        "untrusted_ledger_entries": {"count": len(untrusted), "examples": _bounded_examples(untrusted)},
+        "notes": sorted(notes),
+    }}
 
 
 def project_catalog(index, honesty, params: dict, *,
@@ -516,7 +440,7 @@ def project_catalog(index, honesty, params: dict, *,
         records = [record for record in records
                    if needle in record["path"].casefold()
                    or needle in record["name"].casefold()]
-    records.sort(key=lambda record: record["path"])
+    records.sort(key=lambda record: (record["path"], record["artifact_id"]))
     total = len(records)
     page_size = params["page_size"]
     pages = max(1, -(-total // page_size))
@@ -775,12 +699,13 @@ def check_feedback_binding(request: dict, index: dict):
     request's MESSAGE_ID by a verified receipt; a structured reason code
     otherwise."""
     for path in request["artifact_paths"]:
-        record = index.get(artifact_id_for_path(path))
-        if record is None or record.get("availability") != "present":
+        records = [r for r in index.values() if r["path"] == path
+                   and r.get("availability") == "present"]
+        if not records:
             return "ARTIFACT_UNAVAILABLE"
-        provenance = record.get("provenance") or {}
-        if provenance.get("class") != "ledger" \
-                or provenance.get("message_id") != request["message_id"]:
+        matches = [r for r in records if r["provenance"].get("class") == "ledger"
+                   and r["provenance"].get("message_id") == request["message_id"]]
+        if len(matches) != 1:
             return "ARTIFACT_NOT_BOUND_TO_MESSAGE"
     return None
 

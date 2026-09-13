@@ -557,7 +557,18 @@ def list_feedback(root: Path, project_id: str | None = None) -> list[dict]:
         record = dict(entry)
         record["ledger_file"] = path.relative_to(root).as_posix()
         record["integrity"] = "OK" if completion.entry_hashes_intact(entry) else "HASH_MISMATCH"
+        import executor_fence
+        record["artifact_provenance"] = executor_fence.project_publications(root, entry)
         records.append(record)
+    counts = {}
+    for record in records:
+        mid = record.get("MESSAGE_ID")
+        counts[mid] = counts.get(mid, 0) + 1
+    for record in records:
+        if counts[record.get("MESSAGE_ID")] > 1:
+            record["artifact_provenance"] = {
+                "integrity": "AMBIGUOUS", "publications": [],
+                "note": "multiple completion entries for this MESSAGE_ID"}
     return sorted(records, key=lambda r: (int(r.get("MESSAGE_ID", -1)), str(r.get("COMMITTED_AT", ""))))
 
 

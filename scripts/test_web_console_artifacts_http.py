@@ -36,7 +36,11 @@ import web_console_server as wcs
 
 
 def artifact_id(path: str) -> str:
-    return hashlib.sha256(path.encode("utf-8")).hexdigest()
+    import web_console_artifacts as artifacts
+    if path == "workspace/unbound.txt":
+        return artifacts.artifact_id_for_path(path)
+    mid = 800801 if path in ("reports/beta.md", "evidence/only-b.txt") else 700107
+    return artifacts.artifact_id_for_publication(path, f"completion-{mid}-abc")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -182,7 +186,12 @@ class ArtifactsFixture:
                         "OUTCOME": "stage delivered",
                         "CREATED_AT": "2026-09-12T00:59:00+00:00",
                         "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
-                        "PUBLISHED_PATHS": published},
+                        },
+            "artifact_provenance": {"integrity": "OK", "source": "sealed_manifest",
+                "publications": [{"MESSAGE_ID": message_id, "TASK_ID": "TASK-ART",
+                    "STAGE_ID": "stage-art", "ATTEMPT": 1, "NONCE": "n" * 24,
+                    "PROJECT_ID": project_id, "PUBLISHED_AT": "2026-09-12T01:00:00+00:00", **item}
+                    for item in published]},
         }]
         history = root / "stub_history"
         history.mkdir(parents=True, exist_ok=True)

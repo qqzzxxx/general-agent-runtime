@@ -2572,6 +2572,25 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             return size, None
         return size, digest.hexdigest()
 
+    def _artifact_snapshot(self, path: Path, preview_cap: int):
+        """Hash the same snapshot whose bounded bytes will be returned."""
+        digest, chunks, size, kept = hashlib.sha256(), [], 0, 0
+        try:
+            with path.open("rb") as handle:
+                while True:
+                    block = handle.read(min(1024 * 1024, ARTIFACTS_MAX_HASH_BYTES + 1 - size))
+                    if not block:
+                        return size, digest.hexdigest(), b"".join(chunks)
+                    size += len(block)
+                    digest.update(block)
+                    piece = block[:max(0, preview_cap + 1 - kept)]
+                    chunks.append(piece)
+                    kept += len(piece)
+                    if size > ARTIFACTS_MAX_HASH_BYTES:
+                        return size, None, b"".join(chunks)
+        except OSError:
+            return None, None, b""
+
     def _artifact_from_context(self, context: dict, artifact_id: str):
         record = context["built"]["index"].get(artifact_id)
         if record is None:
@@ -2658,7 +2677,21 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 "the artifact file could not be resolved inside the active "
                 "project"), with_body=with_body)
             return
-        size, actual = self._hash_file_bounded(file_path)
+        if format_name == formats.FORMAT_PDF:
+            read_cap = formats.MAX_PDF_BYTES
+        elif format_name in (formats.FORMAT_PNG, formats.FORMAT_JPEG,
+                             formats.FORMAT_WEBP):
+            read_cap = formats.MAX_IMAGE_BYTES
+        elif format_name == formats.FORMAT_UNSUPPORTED:
+            read_cap = 0
+        else:
+            read_cap = formats.MAX_PREVIEW_BYTES
+        size, actual, raw = self._artifact_snapshot(file_path, read_cap)
+        if size is None:
+            self._send_json(502, error_envelope(
+                "ARTIFACT_UNREADABLE", "the artifact file could not be read"),
+                with_body=with_body)
+            return
         if record.get("expected_sha256") is not None:
             if actual is None:
                 self._send_json(409, error_envelope(
@@ -2673,33 +2706,6 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                     "the file bytes no longer match the authoritative "
                     "receipt hash; the preview is refused instead of "
                     "showing unverified content"), with_body=with_body)
-                return
-        if format_name == formats.FORMAT_PDF:
-            read_cap = formats.MAX_PDF_BYTES
-        elif format_name in (formats.FORMAT_PNG, formats.FORMAT_JPEG,
-                             formats.FORMAT_WEBP):
-            read_cap = formats.MAX_IMAGE_BYTES
-        elif format_name == formats.FORMAT_UNSUPPORTED:
-            read_cap = 0
-        else:
-            read_cap = formats.MAX_PREVIEW_BYTES
-        raw = b""
-        skip_read = False
-        if format_name in (formats.FORMAT_PNG, formats.FORMAT_JPEG,
-                           formats.FORMAT_WEBP, formats.FORMAT_PDF):
-            # Oversized images/PDFs are refused by size before any read;
-            # text-like formats always read their bounded window so the
-            # preview can honestly report TRUNCATED.
-            skip_read = size is not None and size > read_cap
-        if read_cap and not skip_read:
-            try:
-                with file_path.open("rb") as handle:
-                    raw = handle.read(read_cap + 1)
-            except OSError:
-                self._send_json(502, error_envelope(
-                    "ARTIFACT_UNREADABLE",
-                    "the artifact file could not be read"),
-                    with_body=with_body)
                 return
         preview = formats.project_preview(format_name, raw, total_bytes=size)
         self._send_json(200, {
@@ -2751,7 +2757,13 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 "the artifact file could not be resolved inside the active "
                 "project"))
             return
-        size, actual = self._hash_file_bounded(file_path)
+        cap = formats.MAX_IMAGE_BYTES if format_name != formats.FORMAT_PDF else formats.MAX_PDF_BYTES
+        size, actual, raw = self._artifact_snapshot(file_path, cap)
+        if size is None:
+            self._send_json(502, error_envelope(
+                "ARTIFACT_UNREADABLE", "the artifact file could not be read"),
+                with_body=with_body)
+            return
         if record.get("expected_sha256") is not None:
             if actual is None:
                 self._send_json(409, error_envelope(
@@ -2773,13 +2785,6 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 "ARTIFACT_TOO_LARGE",
                 f"the artifact exceeds the {cap}-byte bound for raw "
                 "serving; nothing was read"))
-            return
-        try:
-            with file_path.open("rb") as handle:
-                raw = handle.read(cap + 1)
-        except OSError:
-            self._send_json(502, error_envelope(
-                "ARTIFACT_UNREADABLE", "the artifact file could not be read"))
             return
         if len(raw) > cap or not formats.magic_matches(format_name, raw):
             self._send_json(409, error_envelope(

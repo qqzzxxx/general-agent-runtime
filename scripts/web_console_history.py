@@ -593,28 +593,16 @@ def _interventions_block(interventions_result: dict, message_id: int,
     return matched
 
 
-def _artifacts_block(completion: dict) -> dict:
-    receipt = completion.get("receipt")
-    if not isinstance(receipt, dict):
-        return {"available": False, "reason": "NO_AUTHORITATIVE_RECEIPT",
-                "paths": [],
-                "note": ("artifact metadata is unavailable because the "
-                         "authoritative completion receipt is unavailable")}
-    raw = receipt.get("PUBLISHED_PATHS")
-    paths = []
-    if isinstance(raw, list):
-        for item in raw:
-            if (isinstance(item, dict) and _is_str(item.get("path"))
-                    and len(paths) < MAX_ARTIFACTS_LISTED):
-                paths.append({"path": item["path"],
-                              "sha256": item.get("sha256")
-                              if _is_str(item.get("sha256")) else None})
+def _artifacts_block(document: dict) -> dict:
+    from web_console_artifacts import verified_publications
+    publications, reason = verified_publications(document if isinstance(document, dict) else {})
     return {
-        "available": True,
-        "paths": paths,
-        "note": ("read-only artifact metadata and provenance only; content "
-                 "preview and editing are deferred to the Artifact Center "
-                 "stage"),
+        "available": reason is None,
+        "reason": reason,
+        "paths": [{"path": item["path"], "sha256": item["sha256"]}
+                  for item in publications[:MAX_ARTIFACTS_LISTED]],
+        "note": reason or ("Verified Runtime publication metadata; historical bytes are not retained. "
+                           "Current-content preview is available in Artifact Center only when its hash matches this publication."),
     }
 
 
@@ -675,7 +663,7 @@ def interpret_round_detail(message_id: int, *, dispatch_result: dict,
         "dispatch": dispatch,
         "completion": completion,
         "interventions": interventions,
-        "artifacts": _artifacts_block(completion),
+        "artifacts": _artifacts_block(completion_result.get("document") if not _control_note(completion_result, "completion") else {}),
         "decision": decision if isinstance(decision, dict) else
         {"available": False, "verified": False, "reason": "DECISION_UNAVAILABLE"},
         "honesty": {

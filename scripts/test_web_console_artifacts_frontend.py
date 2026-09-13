@@ -93,7 +93,8 @@ class ArtifactCenterStructureTests(unittest.TestCase):
 
     def test_provenance_presentation_markers(self):
         for phrase in ("Producing MESSAGE", "Provenance", "completion status",
-                       "unbound"):
+                       "unbound", "Publication SHA-256", "Current SHA-256",
+                       "Completion ID", "Historical bytes are not retained"):
             self.assertIn(phrase, self.text)
 
     def test_navigation_links_to_timeline_detail(self):

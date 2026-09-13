@@ -256,6 +256,174 @@ def validate_publications(root: Path, identity: dict, staging: dict):
             raise FenceError("publication_binding_mismatch")
 
 
+
+# Completion-bound publication provenance (additive v1 manifest).
+MAX_PUBLICATIONS = 128
+MANIFEST_KEYS = {"schema_version", "COMMIT_ID", "PROJECT_ID", "publications",
+                 *IDENTITY_KEYS}
+RECORD_KEYS = {"PROJECT_ID", "path", "sha256", "PUBLISHED_AT",
+               *IDENTITY_KEYS}
+
+
+def validate_record(record, entry):
+    c = completion_module()
+    if not isinstance(record, dict) or set(record) != RECORD_KEYS:
+        raise ValueError("publication record schema mismatch")
+    if (c._validated_identity(record, "publication") !=
+            c._validated_identity(entry, "completion") or
+            record["PROJECT_ID"] != entry.get("PROJECT_ID")):
+        raise ValueError("publication identity/project mismatch")
+    path = record["path"]
+    if not isinstance(path, str) or "\\" in path:
+        raise ValueError("invalid publication path")
+    parts = path.split("/")
+    if (len(parts) < 2 or parts[0] not in {"workspace", "evidence", "reports"}
+            or path.casefold() == "reports/user_status.md"
+            or any(p in {"", ".", ".."} or p[-1:] in {" ", "."}
+                   or re.search(r'[<>:"|?*\x00-\x1f]', p)
+                   or re.fullmatch(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?", p)
+                   for p in parts)):
+        raise ValueError("invalid publication path")
+    if not isinstance(record["sha256"], str) or not c.HEX64.fullmatch(record["sha256"]):
+        raise ValueError("invalid publication hash")
+    c._check_timestamp(record["PUBLISHED_AT"], "PUBLISHED_AT")
+
+
+def manifest_for(entry, records):
+    c = completion_module()
+    manifest = {"schema_version": 1, **c.entry_identity(entry),
+                "PROJECT_ID": entry.get("PROJECT_ID"),
+                "COMMIT_ID": c.commit_id_for(entry["MESSAGE_ID"], entry["NONCE"]),
+                "publications": sorted(records, key=lambda r: r["path"])}
+    validate_manifest(manifest, entry)
+    return manifest
+
+
+def validate_manifest(manifest, entry):
+    c = completion_module()
+    if (not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS
+            or type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1
+            or c._validated_identity(manifest, "manifest") !=
+               c._validated_identity(entry, "completion")
+            or manifest["PROJECT_ID"] != entry.get("PROJECT_ID")
+            or manifest["COMMIT_ID"] != c.commit_id_for(entry["MESSAGE_ID"], entry["NONCE"])):
+        raise ValueError("publication manifest binding mismatch")
+    records = manifest["publications"]
+    if not isinstance(records, list) or len(records) > MAX_PUBLICATIONS:
+        raise ValueError("invalid publication list")
+    seen = set()
+    for record in records:
+        validate_record(record, entry)
+        key = record["path"].casefold()
+        if key in seen:
+            raise ValueError("ambiguous duplicate publication path")
+        seen.add(key)
+
+
+def sealed_intact(entry):
+    c = completion_module()
+    present = {"PUBLICATION_MANIFEST", "PUBLICATION_MANIFEST_SHA256"} & set(entry)
+    if not present:
+        return True  # additive extension; old completions remain valid
+    if len(present) != 2:
+        return False
+    try:
+        manifest = entry["PUBLICATION_MANIFEST"]
+        validate_manifest(manifest, entry)
+        return c.canonical_json_sha256(manifest) == entry["PUBLICATION_MANIFEST_SHA256"]
+    except (ValueError, TypeError, KeyError, c.CompletionError):
+        return False
+
+
+def read_publication_json(root, relative, cap=None):
+    if cap is None:
+        cap = completion_module().STAGING_MAX_BYTES
+    path = safe_path(Path(root), relative)
+    with path.open("rb") as handle:
+        raw = handle.read(cap + 1)
+    if len(raw) > cap:
+        raise ValueError("publication evidence exceeds read bound")
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("ambiguous duplicate JSON key in publication evidence")
+            result[key] = value
+        return result
+    return raw, json.loads(raw.decode("utf-8-sig"), object_pairs_hook=unique_object)
+
+
+def collect_locked(root, entry):
+    """Snapshot every Runtime-published final path for this fenced attempt."""
+    c = completion_module()
+    commit_id = c.commit_id_for(entry["MESSAGE_ID"], entry["NONCE"])
+    relative = f"handoff/executor_publications/{commit_id}"
+    directory = safe_path(Path(root), relative)
+    records = []
+    if directory.exists():
+        for path in directory.iterdir():
+            if len(records) >= MAX_PUBLICATIONS:
+                raise ValueError("too many publication records")
+            _, record = read_publication_json(root, f"{relative}/{path.name}")
+            validate_record(record, entry)
+            if path.name != c.sha256_bytes(record["path"].encode()) + ".json":
+                raise ValueError("publication record filename binding mismatch")
+            records.append(record)
+    return manifest_for(entry, records)
+
+
+def project_publications(root, entry):
+    """Read-only control-plane projection. Never fall back after corruption."""
+    c = completion_module()
+    try:
+        if not c.entry_hashes_intact(entry):
+            raise ValueError("completion integrity failure")
+        if entry.get("COMMIT_ID") != c.commit_id_for(entry["MESSAGE_ID"], entry["NONCE"]):
+            raise ValueError("completion id mismatch")
+        if "PUBLICATION_MANIFEST" in entry:
+            return {"integrity": "OK", "source": "sealed_manifest",
+                    "publications": entry["PUBLICATION_MANIFEST"]["publications"]}
+        raw, staging = read_publication_json(root, f"handoff/completion_ledger/staged/{entry['COMMIT_ID']}/staging.json")
+        if (c.sha256_bytes(raw) != entry.get("STAGING_MANIFEST_SHA256")
+                or not isinstance(staging, dict)
+                or c._validated_identity(staging, "archived staging") != c.entry_identity(entry)
+                or staging.get("PROJECT_ID") != entry.get("PROJECT_ID")
+                or staging.get("RECEIPT") != entry["RECEIPT"]
+                or staging.get("COMPLETION_STAGING_SCHEMA_VERSION") != 1
+                or staging.get("STATUS") != "STAGING_READY"):
+            raise ValueError("archived staging binding mismatch")
+        paths = {}
+        for label in ("EVIDENCE", "DELIVERABLES"):
+            items = staging.get(label, [])
+            if not isinstance(items, list) or len(items) > c.EVIDENCE_MAX_ENTRIES:
+                raise ValueError("invalid archived output list")
+            for item in items:
+                if not isinstance(item, dict) or set(item) != {"path", "sha256"}:
+                    raise ValueError("invalid archived output")
+                # Validate BEFORE deriving any filesystem path.
+                candidate = {**c.entry_identity(entry), "PROJECT_ID": entry.get("PROJECT_ID"),
+                             **item, "PUBLISHED_AT": entry.get("COMMITTED_AT")}
+                validate_record(candidate, entry)
+                if item["path"] in paths and paths[item["path"]] != item["sha256"]:
+                    raise ValueError("conflicting archived output hashes")
+                paths[item["path"]] = item["sha256"]
+        records = []
+        for path, digest in paths.items():
+            record_path = publication_record(Path(root), entry, path).relative_to(root).as_posix()
+            _, record = read_publication_json(root, record_path)
+            validate_record(record, entry)
+            if record["path"] != path or record["sha256"] != digest:
+                raise ValueError("legacy publication/staging mismatch")
+            records.append(record)
+        manifest = manifest_for(entry, records)
+        return {"integrity": "OK", "source": "legacy_staging_and_publication",
+                "publications": manifest["publications"],
+                "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."}
+    except (OSError, ValueError, TypeError, KeyError, c.CompletionError, FenceError) as exc:
+        return {"integrity": "UNAVAILABLE", "source": None,
+                "publications": [], "note": str(exc)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("check", "prepare", "publish"))

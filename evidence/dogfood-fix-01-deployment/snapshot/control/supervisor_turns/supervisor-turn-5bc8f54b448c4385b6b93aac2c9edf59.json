@@ -1,0 +1,136 @@
+{
+  "schema": "SUPERVISOR-TURN-OBSERVABILITY-V1",
+  "schema_version": 1,
+  "turn_id": "supervisor-turn-5bc8f54b448c4385b6b93aac2c9edf59",
+  "PROJECT_ID": "v13-dogfood-001",
+  "invocation": {
+    "event": {
+      "archive": "handoff\\archive\\brief-700103-d480d4d2307b-consumed-dfaa3d55be8c.md",
+      "brief_sha256": "dfaa3d55be8c6fb2c29c75c1d57f3ed6eaa78742ac17159607896364a386d36c",
+      "commit_id": "completion-700103-e0aefba229597b814e933d30",
+      "committed_receipt_path": "C:\\general-agent-runtime-v13-dogfood\\handoff\\completion_ledger\\completion-700103-e0aefba229597b814e933d30.json",
+      "final_verification": {
+        "claim_result_count": 4,
+        "claims_hash": "",
+        "is_final_verification": true,
+        "issues": [
+          "Receipt CLAIMS_HASH does not match dispatched gate",
+          "CLAIM_RESULTS does not cover exactly the dispatched critical claims"
+        ],
+        "mechanical_pass": false,
+        "overall_status": "PASS",
+        "policy_id": "GENERAL_FV_V1",
+        "policy_version": 1
+      },
+      "message_id": 700103,
+      "receipt_sha256": "547f0b6868d18760a16a494a8146b53eeb6f55639573c5c29abd479b5d5d7f03",
+      "stage_id": "GENERAL_FV_V1_RECEIPT_REPAIR",
+      "status": "COMPLETED",
+      "task_id": "DOGFOOD_FINAL_VERIFICATION",
+      "type": "EXECUTOR_RESULT_READY"
+    },
+    "reason": "EXECUTOR_RESULT_READY"
+  },
+  "started_at": "2026-09-12T21:16:08+00:00",
+  "finished_at": "2026-09-12T21:21:46+00:00",
+  "duration_seconds": 337.89,
+  "supervisor_config": {
+    "source": "fixed_policy",
+    "config_revision": null,
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "queued_at": null
+  },
+  "usage": {
+    "reported": false,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null,
+    "source": null,
+    "note": "the Codex environment did not report token usage for this turn"
+  },
+  "context_manifest": {
+    "supervisor_rules": {
+      "path": "control/CODEX_SUPERVISOR_RUNTIME.md",
+      "present": true,
+      "truncated": true
+    },
+    "project_state": {
+      "path": "projects/v13-dogfood-001/project_state.json",
+      "present": true,
+      "truncated": false
+    },
+    "research_state": {
+      "path": "projects/v13-dogfood-001/RESEARCH_STATE.md",
+      "present": true,
+      "truncated": false
+    },
+    "project_goal": {
+      "path": "projects/v13-dogfood-001/PROJECT_GOAL.md",
+      "present": true,
+      "truncated": false
+    },
+    "profile": {
+      "project_type": "GENERAL"
+    },
+    "human_decision_receipt": null,
+    "interventions": [],
+    "executor_brief": {
+      "source": "provided"
+    },
+    "mechanical_event": {
+      "reason": "EXECUTOR_RESULT_READY",
+      "event_keys": [
+        "archive",
+        "brief_sha256",
+        "commit_id",
+        "committed_receipt_path",
+        "final_verification",
+        "message_id",
+        "receipt_sha256",
+        "stage_id",
+        "status",
+        "task_id",
+        "type"
+      ]
+    }
+  },
+  "decision": {
+    "committed": true,
+    "receipt_file": "control/supervisor_decisions/supervisor-turn-5bc8f54b448c4385b6b93aac2c9edf59.json",
+    "receipt_sha256": "027a12a0407fb01542a376b8638142aae4aad85b92fdc6c4f037272a1672351e",
+    "decision": {
+      "decision": "REVISE",
+      "at": "2026-09-12T21:16:08+00:00",
+      "reason": "Receipt 700103 contains the correct four-claim PASS envelope, but Runtime evaluated it against a gate-less current-task view and therefore expected an empty hash and claim set; retry the same receipt-only repair once with Final Verification resolved exclusively from the Runtime-authorized dispatch binding.",
+      "goal_alignment": {
+        "original_objective": "Produce the concise protocol note and authoritative consumed-round CSV, then finish through the normal verified Runtime lifecycle.",
+        "unmet_criteria": "GENERAL_FV_V1 still lacks a mechanically accepted PASS binding; final acceptance and terminal completion remain forbidden.",
+        "latest_result": "Stage 700103 emitted the correct hash and exact C1-C4 results, but mechanical evaluation used an empty gate because the compact current_task marker shadowed the authorized dispatch fallback.",
+        "next_action_alignment": "Commit the unchanged policy-bound receipt under a fresh identity whose compact current_task omits the shadowing marker so Runtime resolves the authoritative gate from authorization.",
+        "scope_drift": "None; this final bounded retry changes no deliverable, evidence, report, Runtime Core, or control-plane semantics.",
+        "method": "Revise only the acceptance-binding route while reusing the validated receipt content; this is the second and final retry of the verification method."
+      }
+    },
+    "decision_sha256": "6177a103c405a8ab62b144753e389b1d0cd1c702d028d7bf892d6aeb071eae1b",
+    "decision_summary": "Receipt 700103 contains the correct four-claim PASS envelope, but Runtime evaluated it against a gate-less current-task view and therefore expected an empty hash and claim set; retry the same receipt-only repair once with Final Verification resolved exclusively from the Runtime-authorized dispatch binding.",
+    "decision_history_index": 5,
+    "resulting_status": "WAITING_EXECUTOR"
+  },
+  "dispatch_linkage": {
+    "MESSAGE_ID": 700104,
+    "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+    "STAGE_ID": "GENERAL_FV_V1_BINDING_REPAIR",
+    "ATTEMPT": 3,
+    "NONCE": "305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924",
+    "dispatch_sha256": "4723a1203918efc1741e50fd4aa5be115c38c74bb89e1a9f51faa2175877c1d7"
+  },
+  "intervention_ids": [],
+  "outcome": {
+    "committed": true,
+    "stale": false,
+    "recovered_after_crash": false,
+    "candidate_validation_failed": false,
+    "error": null
+  }
+}

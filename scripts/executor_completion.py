@@ -649,7 +649,8 @@ def entry_hashes_intact(entry: dict) -> bool:
             return False
     except CompletionError:
         return False
-    return True
+    import executor_fence
+    return executor_fence.sealed_intact(entry)
 
 
 def publish_compatibility_artifacts(root: Path, entry: dict, *, include_done: bool = True) -> None:
@@ -737,6 +738,22 @@ def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
         fence.validate_publications(root, identity, staging)
 
     entry = build_entry(staging, project_id, claim, root)
+    if "FENCE_VERSION" in runtime["authorized_dispatch"]:
+        try:
+            manifest = fence.collect_locked(root, entry)
+            outputs = [{"path": r["path"], "sha256": r["sha256"]}
+                       for r in manifest["publications"]]
+            for output in outputs:
+                fence.output_path(project_root, output["path"])
+            for offset in range(0, len(outputs), EVIDENCE_MAX_ENTRIES):
+                _check_evidence_list(outputs[offset:offset + EVIDENCE_MAX_ENTRIES],
+                                     project_root, "PUBLICATIONS")
+        except (ValueError, OSError) as exc:
+            raise CompletionError(EXIT_INVALID_STAGING, str(exc)) from exc
+        # Manifest IO must not extend a claim's authorization past its deadline.
+        fence.check_locked(root, identity, claim_token=claim_token)
+        entry["PUBLICATION_MANIFEST"] = manifest
+        entry["PUBLICATION_MANIFEST_SHA256"] = canonical_json_sha256(manifest)
     target = entry_path(root, entry["COMMIT_ID"])
     try:
         _atomic_create(target, json.dumps(entry, ensure_ascii=False, indent=2) + "\n")

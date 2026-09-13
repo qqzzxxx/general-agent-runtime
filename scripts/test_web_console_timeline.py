@@ -138,10 +138,11 @@ def completion_record(identity, *, status="COMPLETION_SEALED",
             "RECEIPT": {**identity, "PROJECT_ID": "proj-x",
                         "STATUS": receipt_status,
                         "OUTCOME": "stage delivered with evidence",
-                        "PUBLISHED_PATHS": [
-                            {"path": "reports/p4-x.md", "sha256": "b" * 64},
-                            {"path": "evidence/x/tests.txt",
-                             "sha256": "c" * 64}]}}
+                        },
+            "artifact_provenance": {"integrity": "OK", "publications": [
+                {**identity, "PROJECT_ID": "proj-x", "path": path, "sha256": digest}
+                for path, digest in (("reports/p4-x.md", "b" * 64), ("evidence/x/tests.txt", "c" * 64))]}}
+
 
 
 def timeline_document_a():

@@ -42,8 +42,6 @@ def ledger_entry(message_id=700107, *, task_id="TASK-P6", stage_id="p6-a1",
         "PROJECT_ID": "proj-x", "STATUS": "COMPLETE",
         "OUTCOME": "stage delivered", "CREATED_AT": created_at,
         "EXECUTOR_MODEL_FAMILY": producer,
-        "PUBLISHED_PATHS": published_paths if published_paths is not None
-        else [{"path": "reports/r.md", "sha256": "a" * 64}],
     }
     return {"COMPLETION_PROTOCOL_VERSION": 1, "STATUS": status,
             "MESSAGE_ID": message_id, "TASK_ID": task_id,
@@ -54,7 +52,13 @@ def ledger_entry(message_id=700107, *, task_id="TASK-P6", stage_id="p6-a1",
             "SEALED_AT": None, "CONSUMED_ARCHIVE": None,
             "ledger_file": f"handoff/completion_ledger/"
                            f"completion-{message_id}-abc.json",
-            "integrity": integrity, "RECEIPT": receipt}
+            "integrity": integrity, "RECEIPT": receipt,
+            "artifact_provenance": {"integrity": "OK", "source": "sealed_manifest",
+                "publications": [{**{k: receipt[k] for k in
+                    ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE", "PROJECT_ID")},
+                    **item, "PUBLISHED_AT": created_at}
+                    for item in (published_paths if published_paths is not None else
+                                 [{"path": "reports/r.md", "sha256": "a" * 64}])]}}
 
 
 def walk_file(path, size_bytes=100):
@@ -208,7 +212,7 @@ class BuildIndexTests(unittest.TestCase):
     def test_bound_artifact_has_verified_ledger_provenance(self):
         result = wca.build_artifact_index(
             [ledger_entry(700107)], [walk_file("reports/r.md")])
-        record = result["index"][wca.artifact_id_for_path("reports/r.md")]
+        record = result["index"][wca.artifact_id_for_publication("reports/r.md", "completion-700107-abc")]
         self.assertEqual(record["path"], "reports/r.md")
         self.assertEqual(record["root"], "reports")
         self.assertEqual(record["format"], "markdown")
@@ -238,7 +242,7 @@ class BuildIndexTests(unittest.TestCase):
     def test_bound_but_missing_file_is_reported_missing(self):
         result = wca.build_artifact_index(
             [ledger_entry(700107)], [])
-        record = result["index"][wca.artifact_id_for_path("reports/r.md")]
+        record = result["index"][wca.artifact_id_for_publication("reports/r.md", "completion-700107-abc")]
         self.assertEqual(record["availability"], "missing")
         self.assertEqual(record["provenance"]["class"], "ledger")
 
@@ -278,9 +282,12 @@ class BuildIndexTests(unittest.TestCase):
                                     {"path": "reports/live.md",
                                      "sha256": "c" * 64}])]
         result = wca.build_artifact_index(entries, [])
-        record = result["index"][wca.artifact_id_for_path("reports/live.md")]
+        record = result["index"][wca.artifact_id_for_publication("reports/live.md", "completion-700109-abc")]
         self.assertEqual(record["provenance"]["message_id"], 700109)
-        self.assertEqual(record["provenance"]["republished_by"], [700107])
+        self.assertEqual(len(result["index"]), 2)
+        older = result["index"][wca.artifact_id_for_publication("reports/live.md", "completion-700107-abc")]
+        self.assertEqual(older["expected_sha256"], "a" * 64)
+        self.assertEqual(older["provenance"]["message_id"], 700107)
         self.assertEqual(record["expected_sha256"], "c" * 64)
 
     def test_index_is_deterministic(self):

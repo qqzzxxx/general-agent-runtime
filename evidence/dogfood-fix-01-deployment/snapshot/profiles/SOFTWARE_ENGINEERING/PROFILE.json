@@ -1,0 +1,9 @@
+{
+  "profile_schema_version": 1,
+  "profile_id": "SOFTWARE_ENGINEERING",
+  "profile_version": "1.0",
+  "display_name": "Software Engineering",
+  "supervisor_guidance_file": "SUPERVISOR_GUIDANCE.md",
+  "executor_guidance_file": "EXECUTOR_GUIDANCE.md",
+  "final_verification_policy_id": "SOFTWARE_ENGINEERING_FV_V1"
+}

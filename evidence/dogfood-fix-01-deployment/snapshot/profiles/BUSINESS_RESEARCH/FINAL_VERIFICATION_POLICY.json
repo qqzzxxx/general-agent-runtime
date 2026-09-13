@@ -1,0 +1,130 @@
+{
+  "policy_schema_version": 1,
+  "policy_id": "BUSINESS_RESEARCH_FV_V1",
+  "policy_version": 1,
+  "claim_count": {
+    "min": 3,
+    "max": 8
+  },
+  "allowed_result_statuses": [
+    "SUPPORTED",
+    "PARTIALLY_SUPPORTED",
+    "WEAK",
+    "UNSUPPORTED",
+    "CONTRADICTED",
+    "NOT_VERIFIABLE"
+  ],
+  "impact_acceptance": {
+    "HIGH": [
+      "SUPPORTED"
+    ],
+    "MEDIUM": [
+      "SUPPORTED",
+      "PARTIALLY_SUPPORTED"
+    ]
+  },
+  "unknown_claim_type": "ENVELOPE_ONLY",
+  "claim_types": {
+    "IP": {
+      "required_checks": [
+        {
+          "field": "authoritative_identifier_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires authoritative_identifier_check=PASS"
+        },
+        {
+          "field": "authoritative_source_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires authoritative_source_pointers"
+        }
+      ]
+    },
+    "ECONOMICS": {
+      "required_checks": [
+        {
+          "field": "mechanical_recalculation",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires mechanical_recalculation=PASS"
+        },
+        {
+          "field": "calculation_artifact",
+          "op": "NONEMPTY_STRING",
+          "message": "requires calculation_artifact"
+        }
+      ]
+    },
+    "CUSTOMER_PAIN": {
+      "required_checks": [
+        {
+          "field": "source_independence_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires source_independence_check=PASS"
+        },
+        {
+          "field": "independent_underlying_sources",
+          "op": "INTEGER_GTE",
+          "value": 2,
+          "message": "requires at least 2 independent underlying sources"
+        }
+      ]
+    },
+    "DEMAND": {
+      "required_checks": [
+        {
+          "field": "source_independence_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires source_independence_check=PASS"
+        },
+        {
+          "field": "independent_underlying_sources",
+          "op": "INTEGER_GTE",
+          "value": 2,
+          "message": "requires at least 2 independent underlying sources"
+        }
+      ]
+    },
+    "REGULATORY": {
+      "required_checks": [
+        {
+          "field": "authoritative_source_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires authoritative_source_check=PASS"
+        },
+        {
+          "field": "authoritative_source_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires authoritative_source_pointers"
+        }
+      ]
+    },
+    "SAFETY": {
+      "required_checks": [
+        {
+          "field": "authoritative_source_check",
+          "op": "EQUALS",
+          "value": "PASS",
+          "message": "requires authoritative_source_check=PASS"
+        },
+        {
+          "field": "authoritative_source_pointers",
+          "op": "NONEMPTY_LIST",
+          "message": "requires authoritative_source_pointers"
+        }
+      ]
+    },
+    "COMPETITION": {
+      "required_checks": []
+    },
+    "PRODUCT_SPEC": {
+      "required_checks": []
+    },
+    "OTHER": {
+      "required_checks": []
+    }
+  }
+}

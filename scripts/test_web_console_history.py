@@ -43,13 +43,15 @@ def completion_event(mid, status="COMPLETION_SEALED", committed_at=None,
     receipt = {"MESSAGE_ID": mid, "TASK_ID": task, "STAGE_ID": stage,
                "ATTEMPT": attempt, "NONCE": "n" * 24,
                "STATUS": receipt_status, "OUTCOME": "all good",
-               "PUBLISHED_PATHS": [{"path": "reports/x.md",
-                                    "sha256": "b" * 64}]}
+               }
     record = {"MESSAGE_ID": mid, "TASK_ID": task, "STAGE_ID": stage,
               "ATTEMPT": attempt, "NONCE": "n" * 24, "STATUS": status,
               "integrity": integrity, "COMMITTED_AT": committed_at,
               "CONSUMED_AT": None, "SEALED_AT": None,
-              "COMMIT_ID": f"completion-{mid}-abc", "RECEIPT": receipt}
+              "COMMIT_ID": f"completion-{mid}-abc", "RECEIPT": receipt,
+              "artifact_provenance": {"integrity": "OK", "publications": [
+                  {**{k: receipt[k] for k in ("MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE")},
+                   "path": "reports/x.md", "sha256": "b" * 64}]}}
     record.update(extra)
     return {"type": "EXECUTOR_COMPLETION", "at": committed_at,
             "MESSAGE_ID": mid, "record": record}
@@ -462,7 +464,7 @@ class RoundDetailTests(unittest.TestCase):
         codes = [entry["code"] for entry in detail["honesty"]["control"]]
         self.assertIn("COMPLETION_TIMEOUT", codes)
 
-    def test_artifact_metadata_comes_from_receipt_published_paths(self):
+    def test_artifact_metadata_comes_from_verified_runtime_publications(self):
         dispatch, completion, interventions = self.results()
         detail = wch.interpret_round_detail(
             700501, dispatch_result=dispatch, completion_result=completion,
@@ -470,7 +472,7 @@ class RoundDetailTests(unittest.TestCase):
         self.assertTrue(detail["artifacts"]["available"])
         self.assertEqual(detail["artifacts"]["paths"],
                          [{"path": "reports/x.md", "sha256": "b" * 64}])
-        self.assertIn("deferred", detail["artifacts"]["note"].lower())
+        self.assertIn("historical bytes are not retained", detail["artifacts"]["note"].lower())
 
     def test_exact_dispatch_only_from_authorized_valid(self):
         dispatch, completion, interventions = self.results(

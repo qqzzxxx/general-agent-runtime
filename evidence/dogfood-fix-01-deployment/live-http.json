@@ -1,0 +1,1802 @@
+{
+  "at": "2026-09-13T04:47:03.728953+00:00",
+  "base": "http://127.0.0.1:60649/api/runtimes/51042462032cbc1f",
+  "method": "GET only; existing real server and registry",
+  "passed": true,
+  "summary": [
+    {
+      "message_id": 700100,
+      "path": "evidence/dogfood-rounds.csv",
+      "artifact_id": "17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62",
+      "verification": "hash_mismatch",
+      "preview_http_status": 409
+    },
+    {
+      "message_id": 700100,
+      "path": "workspace/dogfood-note.md",
+      "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c",
+      "verification": "verified",
+      "preview_http_status": 200
+    },
+    {
+      "message_id": 700101,
+      "path": "evidence/dogfood-rounds.csv",
+      "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e",
+      "verification": "verified",
+      "preview_http_status": 200
+    },
+    {
+      "message_id": 700102,
+      "path": "reports/final-verification-700102.json",
+      "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b",
+      "verification": "verified",
+      "preview_http_status": 200
+    },
+    {
+      "message_id": 700103,
+      "publications": []
+    },
+    {
+      "message_id": 700104,
+      "publications": []
+    }
+  ],
+  "responses": {
+    "/rounds/700100": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "round": {
+          "message_id": 700100,
+          "found": true,
+          "identity": {
+            "message_id": 700100,
+            "task_id": "DOGFOOD_DELIVERABLES",
+            "stage_id": "DRAFT_AND_EVIDENCE_V1",
+            "attempt": 1,
+            "nonce": "0f85db0685434b65a69144d0533dd53b0e23c97d19874349"
+          },
+          "dispatch": {
+            "available": true,
+            "integrity": "AUTHORIZED_VALID",
+            "trust_status": "AUTHORIZED_VALID",
+            "exact_dispatch": "MESSAGE_ID: 700100\nTASK_ID: DOGFOOD_DELIVERABLES\nSTAGE_ID: DRAFT_AND_EVIDENCE_V1\n\n```json\n{\n  \"PROTOCOL_VERSION\": 2,\n  \"CLAIM_PROTOCOL_VERSION\": 1,\n  \"MESSAGE_ID\": 700100,\n  \"TASK_ID\": \"DOGFOOD_DELIVERABLES\",\n  \"STAGE_ID\": \"DRAFT_AND_EVIDENCE_V1\",\n  \"ATTEMPT\": 1,\n  \"NONCE\": \"0f85db0685434b65a69144d0533dd53b0e23c97d19874349\",\n  \"ISSUED_AT\": \"2026-09-12T20:16:22+00:00\",\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"TASK_KIND\": \"GENERAL_STAGE\",\n  \"OBJECTIVE\": \"Create exactly the two user-facing dogfood deliverables: a concise, accurate protocol-flow note grounded in the Runtime architecture document and a CSV snapshot containing only authoritative consumed Runtime rounds relevant to this project that are available during this attempt.\",\n  \"INPUTS\": [\n    \"C:/general-agent-runtime-v13-dogfood/docs/ARCHITECTURE.md (primary source; read-only)\",\n    \"C:/general-agent-runtime-v13-dogfood/projects/v13-dogfood-001/PROJECT_GOAL.md (goal; read-only)\",\n    \"C:/general-agent-runtime-v13-dogfood/projects/v13-dogfood-001/project_state.json (project identity/context; read-only)\",\n    \"C:/general-agent-runtime-v13-dogfood/handoff/completion_ledger/ (authoritative completion evidence; read-only; inspect only entries relevant to PROJECT_ID v13-dogfood-001 and count only state COMPLETION_CONSUMED)\",\n    \"C:/general-agent-runtime-v13-dogfood/handoff/supervisor_dispatch_archive/ (read-only identity corroboration only when needed for a relevant consumed ledger entry)\"\n  ],\n  \"OUTPUTS\": [\n    \"workspace/dogfood-note.md\",\n    \"evidence/dogfood-rounds.csv\"\n  ],\n  \"ACCEPTANCE_CRITERIA\": [\n    \"Publish workspace/dogfood-note.md as a short, technically literate summary of the normal public protocol flow and major Runtime, Supervisor, Executor, Web Console/Artifact Center, and human-control roles described by docs/ARCHITECTURE.md.\",\n    \"Keep the note focused on normal project flow; distinguish Runtime-owned authority from compatibility/wake artifacts and do not claim details absent from the architecture source.\",\n    \"Publish evidence/dogfood-rounds.csv with a header and one row per authoritative COMPLETION_CONSUMED ledger entry for PROJECT_ID v13-dogfood-001 that exists at evidence-collection time; include at minimum MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, ledger state, and an evidence pointer.\",\n    \"Do not include the current unconsumed attempt merely because it is assigned or claimed. If no qualifying consumed entries exist, publish a header-only CSV and state that limitation in the completion receipt; never invent an ID, timestamp, state, or execution fact.\",\n    \"CSV values must be validly quoted/escaped and every data row must trace to a named Runtime-owned ledger artifact.\",\n    \"Create no user-facing deliverables other than the two exact output paths, and make both plain-text artifacts readable by the normal Artifact Center workflow.\",\n    \"Completion receipt must identify the architecture sections used, list every ledger evidence pointer inspected or state that none qualified, report uncertainties/limitations, and self-check each acceptance criterion.\"\n  ],\n  \"MAX_TIME\": 1800,\n  \"MAX_RETRIES\": 0,\n  \"SCHEDULER_GRACE_SECONDS\": 3600,\n  \"SUPERVISOR_REVIEW_EFFORT\": \"high\",\n  \"FORBIDDEN_ACTIONS\": [\n    \"Do not use network access, browser or GUI automation, Computer Use, mouse/keyboard simulation, or ZCode CLI.\",\n    \"Do not modify Runtime Core, scripts, docs/ARCHITECTURE.md, PROJECT_GOAL.md, project_state.json, RESEARCH_STATE.md, control-plane semantics, claims, ledgers, dispatch archives, or Runtime-owned root completion artifacts.\",\n    \"Do not bypass claim, fence, authorization, completion, intervention, HUMAN_REVIEW, STOP, or Final Verification controls.\",\n    \"Do not fabricate Runtime evidence, MESSAGE_IDs, timestamps, states, token usage, or test results.\",\n    \"Do not directly write canonical output paths; stage mutations only in the claimed attempt workspace and publish them through executor_fence.py.\",\n    \"Do not delete or alter claim directories, transfer a claim token, reuse a retired identity, or start any next stage.\"\n  ],\n  \"STOP_CONDITIONS\": [\n    \"Stop silently and immediately on CLAIM_EXISTS or ALREADY_PROCESSED.\",\n    \"Fail closed and stop without stage-output mutations on any other claim-helper failure.\",\n    \"Stop if executor_fence.py check fails, the identity is retired/superseded, or the claim token no longer matches.\",\n    \"Stop and report BLOCKED through authorized completion if docs/ARCHITECTURE.md is unavailable or cannot support an accurate note.\",\n    \"Stop and report the limitation without guessing if no authoritative consumed ledger evidence exists for this project.\",\n    \"After executor_completion.py reports COMPLETION_COMMITTED, stop immediately.\"\n  ],\n  \"EXECUTOR_PROTOCOL\": [\n    \"Read and retain the exact task identity, then before any stage work run: python scripts/executor_claim.py acquire --message-id 700100 --task-id \\\"DOGFOOD_DELIVERABLES\\\" --stage-id \\\"DRAFT_AND_EVIDENCE_V1\\\" --attempt 1 --nonce \\\"0f85db0685434b65a69144d0533dd53b0e23c97d19874349\\\".\",\n    \"Exit code 0 / CLAIM_ACQUIRED means this instance owns the attempt; retain the returned claim token and only then proceed.\",\n    \"Exit code 10 / CLAIM_EXISTS or 11 / ALREADY_PROCESSED requires stopping this Scheduled Automation run immediately and silently without browsing/research, touching evidence or deliverables, building completion staging, calling the completion helper, or creating root completion artifacts.\",\n    \"Any other claim-helper failure requires failing closed and stopping without touching stage outputs; never delete a claim directory or retry the same MESSAGE_ID/NONCE after a crash.\",\n    \"After claim acquisition run executor_fence.py prepare with the exact MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, NONCE, and claim token; keep all mutations and subprocess outputs inside the returned attempt workspace and treat canonical inputs as read-only.\",\n    \"Run executor_fence.py check with the exact identity and token on resume and immediately before every work batch, mutation-capable command, publication, and completion action; each successful check is only a checkpoint, not a reusable write grant.\",\n    \"Publish each canonical output only with executor_fence.py publish using the exact identity/token, project-relative destination, candidate path in the attempt workspace, and candidate SHA-256; never write canonical outputs or project memory directly.\",\n    \"Follow EXECUTOR-FENCE-V1 and supported-path/file-size limits; do not bypass its fencing even though it is not an OS sandbox.\",\n    \"Complete exactly this assigned stage, report failed methods and uncertainties, and do not select or begin a next stage.\",\n    \"Build a completion staging directory under projects/v13-dogfood-001/completion_staging containing exactly one staging.json with COMPLETION_STAGING_SCHEMA_VERSION 1, the exact stable identity, PROJECT_ID v13-dogfood-001, STATUS STAGING_READY, timezone-aware CREATED_AT, and a full RECEIPT whose identity matches exactly.\",\n    \"Immediately before completion run executor_fence.py check, then run: python scripts/executor_completion.py commit --staging-dir \\\"<staging dir>\\\" --claim-token \\\"<claim token>\\\".\",\n    \"Exit code 0 / COMPLETION_COMMITTED means the Runtime durably committed completion and generated compatibility artifacts; stop immediately and never edit, repair, or republish SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, or ZCODE_DONE.flag.\",\n    \"Exit codes 10 / ALREADY_COMMITTED, 11 / COMPLETION_SEALED, 12 / COMPLETION_NOT_AUTHORIZED, 13 / COMPLETION_CLAIM_MISMATCH, or 14 / INVALID_COMPLETION_STAGING require fail-closed stop with no publication; a retry requires a fresh Supervisor-issued MESSAGE_ID and NONCE.\"\n  ]\n}\n```\n",
+            "error": null,
+            "archived_at": "2026-09-12T20:18:20+00:00",
+            "dispatch_sha256": "8d461f4c4623792030dd2e0487ac91c604a180461ac54fe5390a9e1c45f9056e",
+            "supervisor_turn_id": "supervisor-turn-1896cd3e65504a45a26c7132875abd3d",
+            "decision_receipt_sha256": "243134649d4326fa7a5af7516502dcf3327a5668f0c04db937e022253d16e12c",
+            "originating_control_revision": 0,
+            "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700100-d190a8b3e8efef383fc55ae7.json",
+            "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700100-d190a8b3e8efef383fc55ae7.md",
+            "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700100-d190a8b3e8efef383fc55ae7.authorized.json"
+          },
+          "completion": {
+            "available": true,
+            "status": "COMPLETION_SEALED",
+            "integrity": "OK",
+            "committed_at": "2026-09-12T20:25:00+00:00",
+            "consumed_at": "2026-09-12T20:25:01+00:00",
+            "sealed_at": "2026-09-12T20:29:39+00:00",
+            "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+            "claim_dir": "handoff/executor_claims/700100-d190a8b3e8efef383fc55ae7.claim",
+            "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+            "receipt": {
+              "MESSAGE_ID": 700100,
+              "TASK_ID": "DOGFOOD_DELIVERABLES",
+              "STAGE_ID": "DRAFT_AND_EVIDENCE_V1",
+              "ATTEMPT": 1,
+              "NONCE": "0f85db0685434b65a69144d0533dd53b0e23c97d19874349",
+              "PROJECT_ID": "v13-dogfood-001",
+              "STATUS": "COMPLETED",
+              "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+              "COMPLETED_AT": "2026-09-13T04:23:56+08:00",
+              "OBJECTIVE_SUMMARY": "Created exactly the two user-facing dogfood deliverables: workspace/dogfood-note.md (a concise protocol-flow note grounded in docs/ARCHITECTURE.md) and evidence/dogfood-rounds.csv (authoritative consumed Runtime rounds for PROJECT_ID v13-dogfood-001). Both were drafted in the fenced attempt workspace and published through executor_fence.py; no other user-facing deliverables were created.",
+              "ARCHITECTURE_SECTIONS_USED": [
+                "Components (Orchestrator/Supervisor/Executor roles, diagram, derived-artifact footnote)",
+                "Identity model (MESSAGE_ID/TASK_ID/STAGE_ID/ATTEMPT/NONCE, inbox-snapshot SHA-256 binding)",
+                "Supervisor control plane (v1.2) (dispatch archive, interventions, control revision, pause/interrupt, supervisor_control.py JSON boundary and planned v1.3 browser console)",
+                "Concurrency and instance isolation (executor claims, orchestrator lock)",
+                "Post-claim publication fencing (EXECUTOR-FENCE-V1)",
+                "Completion lifecycle (COMPLETION-SEAL-V1) (staging, ledger commit, compatibility artifact generation, COMMITTED -> CONSUMED -> SEALED)",
+                "Profiles and Final Verification (FINAL_VERIFICATION_POLICY.json, mechanical gate)",
+                "Project isolation (activate_project_scope)",
+                "Human decisions (HUMAN_REVIEW/BLOCKED surfacing, hash-bound receipts via resume_human_review.py)"
+              ],
+              "EVIDENCE_INSPECTION": {
+                "LEDGER_STATE_AT_COLLECTION": "handoff/completion_ledger/ did not exist at evidence-collection time (observed 2026-09-13T04:20+08:00 during this attempt); therefore zero ledger entries of any state existed for PROJECT_ID v13-dogfood-001 and zero COMPLETION_CONSUMED entries qualified.",
+                "QUALIFYING_CONSUMED_ENTRIES": 0,
+                "LEDGER_POINTERS_INSPECTED": [],
+                "DISPATCH_ARCHIVE_NOTE": "handoff/supervisor_dispatch_archive/v13-dogfood-001/ exists and was inspected for structure only; no corroboration was needed because no consumed ledger entry existed to corroborate. Its contents are not cited as round evidence.",
+                "CURRENT_ATTEMPT_EXCLUSION": "The current attempt (MESSAGE_ID 700100) is assigned/claimed but unconsumed at evidence-collection time and is deliberately excluded from the CSV per acceptance criteria."
+              },
+              "DELIVERABLES_SUMMARY": [
+                {
+                  "path": "workspace/dogfood-note.md",
+                  "sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+                  "description": "Concise Markdown note summarizing the normal public protocol flow from docs/ARCHITECTURE.md: the three roles, identity/authorization model, one round (dispatch -> claim -> fence -> staging -> ledger commit -> compatibility artifacts -> consume/seal), authority vs wake hints, concurrency/isolation, control plane/console/human decisions, and profiles/Final Verification. Plain Markdown readable via the normal Artifact Center workflow."
+                },
+                {
+                  "path": "evidence/dogfood-rounds.csv",
+                  "sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242",
+                  "description": "Header-only CSV (columns: MESSAGE_ID,TASK_ID,STAGE_ID,ATTEMPT,LEDGER_STATE,EVIDENCE_POINTER). No data rows because no authoritative COMPLETION_CONSUMED ledger entry exists for PROJECT_ID v13-dogfood-001 at evidence-collection time."
+                }
+              ],
+              "LIMITATIONS_AND_UNCERTAINTIES": [
+                "No authoritative consumed-round evidence existed for this project at evidence-collection time: handoff/completion_ledger/ was absent, so the CSV is header-only. This is reported as a limitation rather than guessed or fabricated.",
+                "docs/ARCHITECTURE.md does not describe Web Console or Artifact Center internals beyond naming the supervisor_control.py JSON boundary as the stable backend intended for a later v1.3 browser console; the note states exactly that and claims no console details absent from the source.",
+                "Evidence absence reflects a point-in-time observation (2026-09-13T04:20+08:00); ledger entries committed after collection time are intentionally not included."
+              ],
+              "ACCEPTANCE_CRITERIA_SELF_CHECK": [
+                {
+                  "criterion": "Publish workspace/dogfood-note.md as a short, technically literate summary of the normal public protocol flow and major Runtime, Supervisor, Executor, Web Console/Artifact Center, and human-control roles described by docs/ARCHITECTURE.md.",
+                  "result": "PASS",
+                  "note": "Published via executor_fence.py (PUBLICATION_COMMITTED); covers all major roles including the honest treatment of the console boundary and human-control flow."
+                },
+                {
+                  "criterion": "Keep the note focused on normal project flow; distinguish Runtime-owned authority from compatibility/wake artifacts and do not claim details absent from the architecture source.",
+                  "result": "PASS",
+                  "note": "Dedicated 'Authority versus wake hints' section separates the authoritative ledger from Runtime-generated SUPERVISOR_BRIEF.md / ZCODE_LAST_PROCESSED.txt / ZCODE_DONE.flag; console described only as the source describes."
+                },
+                {
+                  "criterion": "Publish evidence/dogfood-rounds.csv with a header and one row per authoritative COMPLETION_CONSUMED ledger entry for PROJECT_ID v13-dogfood-001 at evidence-collection time; include at minimum MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, ledger state, and an evidence pointer.",
+                  "result": "PASS_WITH_LIMITATION",
+                  "note": "Published with the required header columns; zero qualifying entries exist, so zero data rows, which matches the conditional criterion."
+                },
+                {
+                  "criterion": "Do not include the current unconsumed attempt merely because it is assigned or claimed; if no qualifying consumed entries exist, publish a header-only CSV and state that limitation; never invent an ID, timestamp, state, or execution fact.",
+                  "result": "PASS",
+                  "note": "Current attempt 700100 excluded; CSV is header-only; limitation recorded here and in the deliverable description; nothing fabricated."
+                },
+                {
+                  "criterion": "CSV values must be validly quoted/escaped and every data row must trace to a named Runtime-owned ledger artifact.",
+                  "result": "PASS",
+                  "note": "No data rows exist; the header row is plain ASCII and trivially valid. Vacuously satisfied for rows."
+                },
+                {
+                  "criterion": "Create no user-facing deliverables other than the two exact output paths, and make both plain-text artifacts readable by the normal Artifact Center workflow.",
+                  "result": "PASS",
+                  "note": "Exactly two canonical files published (plain Markdown and plain CSV); all other work stayed in the attempt workspace and this completion staging."
+                },
+                {
+                  "criterion": "Completion receipt must identify the architecture sections used, list every ledger evidence pointer inspected or state that none qualified, report uncertainties/limitations, and self-check each acceptance criterion.",
+                  "result": "PASS",
+                  "note": "ARCHITECTURE_SECTIONS_USED, EVIDENCE_INSPECTION (none qualified; pointers list empty), LIMITATIONS_AND_UNCERTAINTIES, and this per-criterion self-check are all present."
+                }
+              ],
+              "SUGGESTED_MEMORY_UPDATES": [
+                "Suggested for Supervisor consideration (not Executor-written): record in project memory that v13-dogfood-001 was bootstrapped 2026-09-12 and its first Executor stage (700100/DRAFT_AND_EVIDENCE_V1) found zero consumed ledger rounds, so a later evidence stage should refresh evidence/dogfood-rounds.csv from handoff/completion_ledger/ once earlier stages have been consumed."
+              ]
+            },
+            "receipt_status": "COMPLETED",
+            "receipt_outcome": null
+          },
+          "interventions": [],
+          "artifacts": {
+            "available": true,
+            "reason": null,
+            "paths": [
+              {
+                "path": "evidence/dogfood-rounds.csv",
+                "sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242"
+              },
+              {
+                "path": "workspace/dogfood-note.md",
+                "sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58"
+              }
+            ],
+            "note": "Verified Runtime publication metadata; historical bytes are not retained. Current-content preview is available in Artifact Center only when its hash matches this publication."
+          },
+          "decision": {
+            "available": true,
+            "verified": true,
+            "reason": null,
+            "turn_id": "supervisor-turn-1896cd3e65504a45a26c7132875abd3d",
+            "committed_at": "2026-09-12T20:18:20+00:00",
+            "resulting_status": "WAITING_EXECUTOR",
+            "decision_decision": "CONTINUE",
+            "decision_reason": "Dispatch one bounded Executor stage to create the two required deliverables from canonical local sources and authoritative consumed-round evidence.",
+            "decision_history_index": 0,
+            "intervention_ids": [],
+            "originating_control_revision": 0
+          },
+          "honesty": {
+            "notes": [],
+            "control": [],
+            "contradictions": []
+          }
+        }
+      }
+    },
+    "/artifacts?message_id=700100": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:46:59+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": 700100,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 2,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [
+            {
+              "artifact_id": "17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62",
+              "path": "evidence/dogfood-rounds.csv",
+              "name": "dogfood-rounds.csv",
+              "root": "evidence",
+              "format": "csv",
+              "size_bytes": 212,
+              "availability": "present",
+              "expected_sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700100,
+                "task_id": "DOGFOOD_DELIVERABLES",
+                "stage_id": "DRAFT_AND_EVIDENCE_V1",
+                "attempt": 1,
+                "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:25:00+00:00",
+                "published_at": "2026-09-12T20:22:55+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            },
+            {
+              "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c",
+              "path": "workspace/dogfood-note.md",
+              "name": "dogfood-note.md",
+              "root": "workspace",
+              "format": "markdown",
+              "size_bytes": 6276,
+              "availability": "present",
+              "expected_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700100,
+                "task_id": "DOGFOOD_DELIVERABLES",
+                "stage_id": "DRAFT_AND_EVIDENCE_V1",
+                "attempt": 1,
+                "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:25:00+00:00",
+                "published_at": "2026-09-12T20:22:49+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            }
+          ],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    },
+    "/artifacts/17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62",
+          "path": "evidence/dogfood-rounds.csv",
+          "name": "dogfood-rounds.csv",
+          "root": "evidence",
+          "format": "csv",
+          "size_bytes": 212,
+          "availability": "present",
+          "expected_sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242",
+          "provenance": {
+            "class": "ledger",
+            "message_id": 700100,
+            "task_id": "DOGFOOD_DELIVERABLES",
+            "stage_id": "DRAFT_AND_EVIDENCE_V1",
+            "attempt": 1,
+            "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+            "project_id": "v13-dogfood-001",
+            "producer": "GLM-5.3",
+            "committed_at": "2026-09-12T20:25:00+00:00",
+            "published_at": "2026-09-12T20:22:55+00:00",
+            "receipt_created_at": null,
+            "completion_status": "COMPLETION_SEALED",
+            "completion_integrity": "OK",
+            "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+            "source": "legacy_staging_and_publication",
+            "historical_content_retained": false
+          },
+          "verification": "hash_mismatch",
+          "actual_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003"
+        }
+      }
+    },
+    "/artifacts/17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62/preview": {
+      "status": 409,
+      "document": {
+        "schema_version": 1,
+        "ok": false,
+        "error": {
+          "code": "ARTIFACT_HASH_MISMATCH",
+          "message": "the file bytes no longer match the authoritative receipt hash; the preview is refused instead of showing unverified content",
+          "detail": null
+        }
+      }
+    },
+    "/artifacts/5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c",
+          "path": "workspace/dogfood-note.md",
+          "name": "dogfood-note.md",
+          "root": "workspace",
+          "format": "markdown",
+          "size_bytes": 6276,
+          "availability": "present",
+          "expected_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+          "provenance": {
+            "class": "ledger",
+            "message_id": 700100,
+            "task_id": "DOGFOOD_DELIVERABLES",
+            "stage_id": "DRAFT_AND_EVIDENCE_V1",
+            "attempt": 1,
+            "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+            "project_id": "v13-dogfood-001",
+            "producer": "GLM-5.3",
+            "committed_at": "2026-09-12T20:25:00+00:00",
+            "published_at": "2026-09-12T20:22:49+00:00",
+            "receipt_created_at": null,
+            "completion_status": "COMPLETION_SEALED",
+            "completion_integrity": "OK",
+            "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+            "source": "legacy_staging_and_publication",
+            "historical_content_retained": false
+          },
+          "verification": "verified",
+          "actual_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58"
+        }
+      }
+    },
+    "/artifacts/5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c/preview": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c",
+          "path": "workspace/dogfood-note.md",
+          "format": "markdown",
+          "verification": "verified"
+        },
+        "preview": {
+          "kind": "text",
+          "state": "OK",
+          "content": "# General Agent Runtime: protocol flow in brief\n\nSource: `docs/ARCHITECTURE.md` (v1.3). This note summarizes the normal public\nprotocol flow for a reader who has not read the full architecture document.\n\n## The three roles\n\n- **Runtime (Python Orchestrator)** — a deterministic program that never calls a\n  model and never does project work. It mechanically validates every handoff,\n  binds authorization records to the SHA-256 of the exact inbox snapshot, owns\n  global runtime state (`control/`), budgets, the Final Verification gate, and\n  project isolation under `projects/<id>/`.\n- **Supervisor** — the high-reasoning model role (architect/reviewer/decision\n  maker). Each turn it receives a compressed context prompt (runtime contract,\n  project memory, current state) and returns exactly one machine-readable\n  decision: dispatch a new Executor stage, revise, redirect, request human\n  review, or terminate.\n- **Executor** — a high-throughput automation role that receives exactly one\n  stage at a time as a JSON task embedded in `TO_ZCODE.md`, executes it fully\n  inside the active project, and publishes a single fenced JSON receipt.\n\n## Identity and authorization\n\nEvery dispatch is identified by the tuple `MESSAGE_ID / TASK_ID / STAGE_ID /\nATTEMPT / NONCE`. `MESSAGE_ID` is a monotonically increasing turn number whose\nretired ids are never re-issued; `NONCE` makes each claim unique; `ATTEMPT`\nrecords revisions of the same stage as first-class history. The authorization\nrecord is bound to the inbox snapshot hash, so a task file without a matching\nrecord is unclaimable, a modified inbox never matches (no executor-side task\ninjection), and a consumed identity is rejected permanently.\n\n## One normal round\n\n1. The Supervisor decides to continue; the Runtime writes the exact dispatch\n   bytes to `TO_ZCODE.md`, archives them under\n   `handoff/supervisor_dispatch_archive/<project>/`, and only then saves the\n   authorization record. Unclaimed legacy authorizations are rejected; rejected\n   candidates stay in quarantine.\n2. The Executor acquires a **permanent claim** under\n   `handoff/executor_claims/<message-id>-<nonce>.claim/`; filesystem creation is\n   the serialization point, so of two racers exactly one wins and losers exit\n   quietly. Exit 0 = acquired, 10 = another live claim, 11 = already processed.\n3. A claim is not lasting write authority. The claim winner receives an opaque\n   token (only its hash is stored), works in a separate **attempt workspace**\n   via `executor_fence.py prepare/check`, and only `executor_fence.py publish`\n   replaces canonical project outputs, as per-file copies. Timeout or\n   supersession persists retirement before recovery.\n4. The Executor finishes stage outputs and builds a **candidate** staging\n   directory carrying the exact identity, `PROJECT_ID`, `STATUS=STAGING_READY`,\n   and the receipt. Staging is never authoritative.\n5. `scripts/executor_completion.py` mechanically validates the staging against\n   the authorized dispatch, the live `WAITING_EXECUTOR` lifecycle, the claim,\n   and the ledger, then atomically creates ONE ledger entry under\n   `handoff/completion_ledger/` binding the identity, project, claim identity\n   hash, receipt hash, brief hash, staging manifest hash, and a deterministic\n   `commit_id`.\n6. Only after that commit is durable does the Runtime generate the root\n   compatibility artifacts `SUPERVISOR_BRIEF.md` → `ZCODE_LAST_PROCESSED.txt`\n   → `ZCODE_DONE.flag` (last) from the committed entry.\n7. The Orchestrator consumes a completion only when the DONE wake hint is\n   backed by a matching `COMPLETION_COMMITTED` ledger entry whose identity,\n   project, and receipt hashes all bind; it archives the receipt, marks the\n   entry `CONSUMED`, and the identity is `SEALED` once its single Supervisor\n   lifecycle decision is past. Ledger status advances monotonically\n   `COMPLETION_COMMITTED → COMPLETION_CONSUMED → COMPLETION_SEALED` and is\n   never reversible, across restarts too.\n\n## Authority versus wake hints\n\nThe completion ledger is the **authoritative** completion truth. The root files\n`SUPERVISOR_BRIEF.md`, `ZCODE_LAST_PROCESSED.txt`, and `ZCODE_DONE.flag` are\n**derived compatibility artifacts / wake hints** that\nthe Runtime generates from the ledger; raw DONE without a ledger record is\nquarantined as `UNKNOWN_RAW_COMPLETION` and never consumed.\n\n## Concurrency and isolation\n\nOne orchestrator per runtime root, enforced by an exclusive lock with dead-owner\nreclaim; independent runtime roots never share locks, state, stop flags, or\nclaims. Per project, `activate_project_scope()` rebinds every mutable path\n(state, memory, reports, workspace, evidence) under `projects/<active-id>/`;\npath traversal or pointer escapes fail closed.\n\n## Control plane, console, and human decisions\n\nAll read-only task/feedback/intervention/status/timeline queries and all\nmutations have JSON forms in `scripts/supervisor_control.py` — the stable\nbackend boundary intended for the later v1.3 browser console (the Web\nConsole / Artifact Center experience is served through this boundary; the\narchitecture document itself does not describe console internals beyond it).\nHuman Supervisor interventions are immutable inputs under\n`handoff/supervisor_interventions/<project>/`, gated by a monotonically\nincreasing control revision, so an intervention arriving after prompt\nconstruction quarantines the unseen candidate. Pause is separate from STOP and\n`HUMAN_REVIEW`; interrupt mode retires the current identity so fence\ncheckpoints revoke its authority. Terminal or attention states are surfaced\nmechanically (console banner + `USER_ATTENTION.json`), and human decisions\nre-enter the runtime only through hash-bound receipts prepared by\n`scripts/resume_human_review.py`, whose consumption is ledgered so a receipt\ncan never be replayed.\n\n## Profiles and Final Verification\n\nEach profile under `profiles/<TYPE>/` binds goal parameterization\n(`PROFILE.json`), role-specific guidance, and a declarative\n`FINAL_VERIFICATION_POLICY.json` listing the evidence claims required before\nthe Orchestrator's mechanical gate allows a terminal `COMPLETE`. A Supervisor\n`COMPLETE` without a passing policy-satisfying verification is blocked and\nrecorded, never silently accepted.\n",
+          "total_bytes": 6276,
+          "returned_bytes": 6276,
+          "total_lines": 110,
+          "returned_lines": 110,
+          "truncated": false
+        }
+      }
+    },
+    "/rounds/700101": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "round": {
+          "message_id": 700101,
+          "found": true,
+          "identity": {
+            "message_id": 700101,
+            "task_id": "DOGFOOD_ROUNDS_REVISION",
+            "stage_id": "REFRESH_CONSUMED_ROUNDS_V2",
+            "attempt": 1,
+            "nonce": "8ccfe854420f485ba0eb59a004c74672c3e7619a27af4a54"
+          },
+          "dispatch": {
+            "available": true,
+            "integrity": "AUTHORIZED_VALID",
+            "trust_status": "AUTHORIZED_VALID",
+            "exact_dispatch": "MESSAGE_ID: 700101\nTASK_ID: DOGFOOD_ROUNDS_REVISION\nSTAGE_ID: REFRESH_CONSUMED_ROUNDS_V2\n\n```json\n{\n  \"PROTOCOL_VERSION\": 2,\n  \"CLAIM_PROTOCOL_VERSION\": 1,\n  \"MESSAGE_ID\": 700101,\n  \"TASK_ID\": \"DOGFOOD_ROUNDS_REVISION\",\n  \"STAGE_ID\": \"REFRESH_CONSUMED_ROUNDS_V2\",\n  \"ATTEMPT\": 1,\n  \"NONCE\": \"8ccfe854420f485ba0eb59a004c74672c3e7619a27af4a54\",\n  \"ISSUED_AT\": \"2026-09-12T20:25:01+00:00\",\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"TASK_KIND\": \"GENERAL_STAGE\",\n  \"OBJECTIVE\": \"Revise only evidence/dogfood-rounds.csv so it records every authoritative COMPLETION_CONSUMED ledger entry for PROJECT_ID v13-dogfood-001 available at this revision's evidence-collection cutoff, including MESSAGE_ID 700100; preserve workspace/dogfood-note.md unchanged.\",\n  \"INPUTS\": [\n    \"C:\\\\general-agent-runtime-v13-dogfood\\\\handoff\\\\completion_ledger\\\\\",\n    \"C:\\\\general-agent-runtime-v13-dogfood\\\\handoff\\\\completion_ledger\\\\completion-700100-d190a8b3e8efef383fc55ae7.json\",\n    \"evidence/dogfood-rounds.csv\",\n    \"workspace/dogfood-note.md\"\n  ],\n  \"OUTPUTS\": [\n    \"evidence/dogfood-rounds.csv\"\n  ],\n  \"ACCEPTANCE_CRITERIA\": [\n    \"Inspect Runtime-owned completion ledger records read-only and include exactly one CSV data row for every record whose PROJECT_ID is v13-dogfood-001 and whose status at the recorded collection cutoff is COMPLETION_CONSUMED.\",\n    \"The CSV must retain the header MESSAGE_ID,TASK_ID,STAGE_ID,ATTEMPT,LEDGER_STATE,EVIDENCE_POINTER and must include the exact authoritative row for MESSAGE_ID 700100, TASK_ID DOGFOOD_DELIVERABLES, STAGE_ID DRAFT_AND_EVIDENCE_V1, ATTEMPT 1, ledger state COMPLETION_CONSUMED, pointing to handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json.\",\n    \"Do not include MESSAGE_ID 700101 merely because it is assigned or claimed; it is not consumed during evidence collection. Do not invent, predict, or infer any row or state.\",\n    \"Record in the completion receipt the timezone-aware evidence-collection cutoff, every inspected qualifying ledger pointer, the emitted row count, and the explicit self-exclusion of this active attempt.\",\n    \"Publish only evidence/dogfood-rounds.csv through executor_fence.py publish; preserve workspace/dogfood-note.md byte-for-byte at SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58 and create no other canonical user-facing artifact.\",\n    \"Use valid RFC 4180-compatible CSV quoting and report the final CSV SHA-256 in the completion receipt.\"\n  ],\n  \"MAX_TIME\": 900,\n  \"MAX_RETRIES\": 1,\n  \"SCHEDULER_GRACE_SECONDS\": 3600,\n  \"SUPERVISOR_REVIEW_EFFORT\": \"high\",\n  \"FORBIDDEN_ACTIONS\": [\n    \"Do not modify Runtime Core, control-plane files, PROJECT_GOAL.md, project_state.json, RESEARCH_STATE.md, workspace/dogfood-note.md, or any canonical file other than evidence/dogfood-rounds.csv via the authorized fence publication helper.\",\n    \"Do not use network access, browser or GUI automation, ZCode CLI, external dependencies, or fabricate Runtime evidence.\",\n    \"Do not write directly to canonical project outputs; all stage mutations and subprocess outputs must remain in the fenced attempt workspace until authorized publication.\",\n    \"Do not delete claims, alter Runtime-owned completion ledger records, edit root compatibility artifacts, or choose/start any later stage.\"\n  ],\n  \"STOP_CONDITIONS\": [\n    \"Stop silently and immediately on CLAIM_EXISTS or ALREADY_PROCESSED.\",\n    \"Fail closed without touching stage outputs on any other claim-helper or fence-check failure.\",\n    \"Stop and report BLOCKED if the authoritative 700100 ledger record cannot be read or does not identify PROJECT_ID v13-dogfood-001 with STATUS COMPLETION_CONSUMED.\",\n    \"Stop immediately after executor_completion.py reports COMPLETION_COMMITTED; on any other documented completion exit, fail closed and publish nothing further.\"\n  ],\n  \"EXECUTOR_PROTOCOL\": [\n    \"Before any stage work, run exactly: python scripts/executor_claim.py acquire --message-id 700101 --task-id \\\"DOGFOOD_ROUNDS_REVISION\\\" --stage-id \\\"REFRESH_CONSUMED_ROUNDS_V2\\\" --attempt 1 --nonce \\\"8ccfe854420f485ba0eb59a004c74672c3e7619a27af4a54\\\".\",\n    \"Exit code 0 / CLAIM_ACQUIRED means this instance owns the attempt; retain the returned claim token. Exit code 10 / CLAIM_EXISTS or 11 / ALREADY_PROCESSED means stop this Scheduled Automation run immediately and silently without research, mutations, staging, completion, or root artifacts.\",\n    \"On any other claim-helper failure, fail closed and stop without touching stage outputs; never delete a claim directory or reuse this identity after a crash.\",\n    \"After claim acquisition, run executor_fence.py prepare with the exact task identity and claim token; place all stage mutations and subprocess outputs in the returned attempt workspace and treat canonical inputs as read-only.\",\n    \"Run executor_fence.py check with the exact identity and token on resume and immediately before each work batch, mutation-capable command, publication, and completion; a prior successful check is not a reusable write grant.\",\n    \"Publish evidence/dogfood-rounds.csv only through executor_fence.py publish with the exact identity, token, project-relative path, and candidate SHA-256; do not directly write canonical outputs or project memory.\",\n    \"Build one completion staging directory under the active project's completion_staging directory containing staging.json with COMPLETION_STAGING_SCHEMA_VERSION 1, the exact stable identity, PROJECT_ID v13-dogfood-001, STATUS STAGING_READY, a timezone-aware CREATED_AT, and the full matching RECEIPT payload.\",\n    \"Before completion run executor_fence.py check again, then run python scripts/executor_completion.py commit --staging-dir \\\"<staging dir>\\\" --claim-token \\\"<claim token>\\\". On exit code 0 / COMPLETION_COMMITTED stop immediately and never edit Runtime-generated root compatibility artifacts; on exits 10 through 14 fail closed and publish nothing further.\",\n    \"Report actual work, inspected evidence pointers, cutoff, row count, limitations, failed methods, deliverable hash, and acceptance self-check in the receipt; never choose the next stage.\"\n  ]\n}\n```\n",
+            "error": null,
+            "archived_at": "2026-09-12T20:29:39+00:00",
+            "dispatch_sha256": "779ed829c48ad101a6010e2166bf5e16d00537b3ce8b9ef3e79dd79cf20dab3e",
+            "supervisor_turn_id": "supervisor-turn-5b3ce70b5e4b497aa8344530be947d5d",
+            "decision_receipt_sha256": "bed1c76b9fddd41c6939aca1049c06dd3fa39ab6fc33c9a9d338410804ed9ed9",
+            "originating_control_revision": 0,
+            "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700101-3edf22139d440a89e205fa46.json",
+            "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700101-3edf22139d440a89e205fa46.md",
+            "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700101-3edf22139d440a89e205fa46.authorized.json"
+          },
+          "completion": {
+            "available": true,
+            "status": "COMPLETION_SEALED",
+            "integrity": "OK",
+            "committed_at": "2026-09-12T20:35:54+00:00",
+            "consumed_at": "2026-09-12T20:35:56+00:00",
+            "sealed_at": "2026-09-12T21:08:08+00:00",
+            "commit_id": "completion-700101-3edf22139d440a89e205fa46",
+            "claim_dir": "handoff/executor_claims/700101-3edf22139d440a89e205fa46.claim",
+            "ledger_file": "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+            "receipt": {
+              "MESSAGE_ID": 700101,
+              "TASK_ID": "DOGFOOD_ROUNDS_REVISION",
+              "STAGE_ID": "REFRESH_CONSUMED_ROUNDS_V2",
+              "ATTEMPT": 1,
+              "NONCE": "8ccfe854420f485ba0eb59a004c74672c3e7619a27af4a54",
+              "PROJECT_ID": "v13-dogfood-001",
+              "STATUS": "COMPLETED",
+              "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+              "COMPLETED_AT": "2026-09-13T04:35:04.729613+08:00",
+              "OBJECTIVE_SUMMARY": "Revised exactly evidence/dogfood-rounds.csv so it records the authoritative COMPLETION_CONSUMED completion-ledger entries for PROJECT_ID v13-dogfood-001 as of the evidence-collection cutoff, including MESSAGE_ID 700100. The ledger directory was inspected read-only; exactly one qualifying entry exists, so the CSV now carries the required header plus exactly one data row for 700100. The candidate was built in the fenced attempt workspace, published via executor_fence.py publish (PUBLICATION_COMMITTED), and workspace/dogfood-note.md was preserved byte-for-byte. No other canonical user-facing artifact was created.",
+              "EVIDENCE_INSPECTION": {
+                "EVIDENCE_COLLECTION_CUTOFF": "2026-09-12T20:31:16.888225+00:00",
+                "LEDGER_DIRECTORIES_INSPECTED": [
+                  "handoff/completion_ledger/"
+                ],
+                "LEDGER_DIRECTORY_CONTENTS_AT_CUTOFF": [
+                  "audit.jsonl",
+                  "completion-700100-d190a8b3e8efef383fc55ae7.json",
+                  "staged/"
+                ],
+                "LEDGER_POINTERS_INSPECTED": [
+                  "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json"
+                ],
+                "AUDIT_TRAIL_INSPECTED": "handoff/completion_ledger/audit.jsonl contains exactly three events, all for MESSAGE_ID 700100 / PROJECT_ID v13-dogfood-001: COMPLETION_COMMITTED at 2026-09-12T20:25:00+00:00, COMPLETION_CONSUMED at 2026-09-12T20:25:01+00:00, COMPLETION_SEALED at 2026-09-12T20:29:39+00:00. handoff/completion_ledger/staged/ contains only the archived staging of that same sealed 700100 completion. No other completion records exist.",
+                "QUALIFYING_CONSUMED_ENTRIES": 1,
+                "EMITTED_ROW_COUNT": 1,
+                "LEDGER_STATE_NOTE": "The single qualifying record completion-700100-d190a8b3e8efef383fc55ae7.json currently carries STATUS COMPLETION_SEALED (SEALED_AT 2026-09-12T20:29:39+00:00, before the cutoff), with authoritative CONSUMED_AT 2026-09-12T20:25:01+00:00 and an explicit COMPLETION_CONSUMED audit event. It is an authoritative COMPLETION_CONSUMED ledger entry whose lifecycle subsequently advanced to sealed; sealing is an advance of the same entry, not a separate record. The row therefore records LEDGER_STATE COMPLETION_CONSUMED exactly as mandated by the task acceptance criteria, and emitting exactly one row for it satisfies 'exactly one CSV data row for every consumed record'.",
+                "CURRENT_ATTEMPT_EXCLUSION": "The current attempt (MESSAGE_ID 700101 / REFRESH_CONSUMED_ROUNDS_V2 / ATTEMPT 1) is assigned and claimed but had no completion ledger record and was not consumed during evidence collection; it is deliberately excluded from the CSV per acceptance criteria. Nothing was predicted or inferred for it.",
+                "FAILED_METHODS": "None. All authorized methods succeeded; no network access, browser/GUI automation, or external dependencies were used (all forbidden by the task)."
+              },
+              "PRESERVATION_VERIFICATION": {
+                "path": "workspace/dogfood-note.md",
+                "required_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+                "observed_before_publication_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+                "observed_after_publication_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+                "result": "PRESERVED_BYTE_FOR_BYTE"
+              },
+              "FINAL_CSV_SHA256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+              "LIMITATIONS_AND_UNCERTAINTIES": [
+                "The CSV reflects a point-in-time observation at the recorded cutoff 2026-09-12T20:31:16.888225+00:00; ledger entries committed or consumed after that instant are intentionally not included.",
+                "The 700100 record's STATUS field reads COMPLETION_SEALED at cutoff because the Runtime had already sealed it (20:29:39+00:00, before the cutoff); consumption is still an authoritative recorded fact (CONSUMED_AT 2026-09-12T20:25:01+00:00 and the COMPLETION_CONSUMED audit event), and the acceptance criteria explicitly require the row with ledger state COMPLETION_CONSUMED. This nuance is documented here rather than silently resolved."
+              ],
+              "ACCEPTANCE_CRITERIA_SELF_CHECK": [
+                {
+                  "criterion": "Inspect Runtime-owned completion ledger records read-only and include exactly one CSV data row for every record whose PROJECT_ID is v13-dogfood-001 and whose status at the recorded collection cutoff is COMPLETION_CONSUMED.",
+                  "result": "PASS",
+                  "note": "Ledger inspected read-only at cutoff 2026-09-12T20:31:16.888225+00:00; exactly one consumed entry (700100) exists and exactly one data row was emitted."
+                },
+                {
+                  "criterion": "The CSV must retain the header MESSAGE_ID,TASK_ID,STAGE_ID,ATTEMPT,LEDGER_STATE,EVIDENCE_POINTER and must include the exact authoritative row for MESSAGE_ID 700100, TASK_ID DOGFOOD_DELIVERABLES, STAGE_ID DRAFT_AND_EVIDENCE_V1, ATTEMPT 1, ledger state COMPLETION_CONSUMED, pointing to handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json.",
+                  "result": "PASS",
+                  "note": "Header retained verbatim; the single data row is 700100,DOGFOOD_DELIVERABLES,DRAFT_AND_EVIDENCE_V1,1,COMPLETION_CONSUMED,handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json; verified by re-parsing the written bytes with the csv module."
+                },
+                {
+                  "criterion": "Do not include MESSAGE_ID 700101 merely because it is assigned or claimed; it is not consumed during evidence collection. Do not invent, predict, or infer any row or state.",
+                  "result": "PASS",
+                  "note": "700101 absent from the CSV (no ledger record exists for it); exclusion recorded explicitly; every emitted field traces to the named Runtime-owned ledger artifact."
+                },
+                {
+                  "criterion": "Record in the completion receipt the timezone-aware evidence-collection cutoff, every inspected qualifying ledger pointer, the emitted row count, and the explicit self-exclusion of this active attempt.",
+                  "result": "PASS",
+                  "note": "EVIDENCE_INSPECTION carries EVIDENCE_COLLECTION_CUTOFF, LEDGER_POINTERS_INSPECTED, EMITTED_ROW_COUNT=1, and CURRENT_ATTEMPT_EXCLUSION."
+                },
+                {
+                  "criterion": "Publish only evidence/dogfood-rounds.csv through executor_fence.py publish; preserve workspace/dogfood-note.md byte-for-byte at SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58 and create no other canonical user-facing artifact.",
+                  "result": "PASS",
+                  "note": "Exactly one publication (PUBLICATION_COMMITTED for evidence/dogfood-rounds.csv); note hash verified identical before and after publication; no other canonical artifacts touched."
+                },
+                {
+                  "criterion": "Use valid RFC 4180-compatible CSV quoting and report the final CSV SHA-256 in the completion receipt.",
+                  "result": "PASS",
+                  "note": "Written via Python csv.writer (QUOTE_MINIMAL); no field requires quoting since none contains comma, quote, or newline; parses back to exactly the intended values. Final SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003 is reported in FINAL_CSV_SHA256."
+                }
+              ],
+              "SUGGESTED_MEMORY_UPDATES": [
+                "Suggested for Supervisor consideration (not Executor-written): project memory for v13-dogfood-001 can now record that evidence/dogfood-rounds.csv contains exactly one consumed round (700100, DRAFT_AND_EVIDENCE_V1, consumed 2026-09-12T20:25:01+00:00) as of cutoff 2026-09-12T20:31:16.888225+00:00, refreshed by 700101/REFRESH_CONSUMED_ROUNDS_V2, and that future evidence stages should repeat this read-only ledger refresh pattern with a fresh cutoff."
+              ]
+            },
+            "receipt_status": "COMPLETED",
+            "receipt_outcome": null
+          },
+          "interventions": [],
+          "artifacts": {
+            "available": true,
+            "reason": null,
+            "paths": [
+              {
+                "path": "evidence/dogfood-rounds.csv",
+                "sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003"
+              }
+            ],
+            "note": "Verified Runtime publication metadata; historical bytes are not retained. Current-content preview is available in Artifact Center only when its hash matches this publication."
+          },
+          "decision": {
+            "available": true,
+            "verified": true,
+            "reason": null,
+            "turn_id": "supervisor-turn-5b3ce70b5e4b497aa8344530be947d5d",
+            "committed_at": "2026-09-12T20:29:38+00:00",
+            "resulting_status": "WAITING_EXECUTOR",
+            "decision_decision": "REVISE",
+            "decision_reason": "Refresh only the rounds CSV because completion 700100 is now authoritative and consumed; preserve the accepted protocol note.",
+            "decision_history_index": 1,
+            "intervention_ids": [],
+            "originating_control_revision": 0
+          },
+          "honesty": {
+            "notes": [],
+            "control": [],
+            "contradictions": []
+          }
+        }
+      }
+    },
+    "/artifacts?message_id=700101": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:47:00+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": 700101,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 1,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [
+            {
+              "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e",
+              "path": "evidence/dogfood-rounds.csv",
+              "name": "dogfood-rounds.csv",
+              "root": "evidence",
+              "format": "csv",
+              "size_bytes": 212,
+              "availability": "present",
+              "expected_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700101,
+                "task_id": "DOGFOOD_ROUNDS_REVISION",
+                "stage_id": "REFRESH_CONSUMED_ROUNDS_V2",
+                "attempt": 1,
+                "commit_id": "completion-700101-3edf22139d440a89e205fa46",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:35:54+00:00",
+                "published_at": "2026-09-12T20:34:04+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            }
+          ],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    },
+    "/artifacts/d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e",
+          "path": "evidence/dogfood-rounds.csv",
+          "name": "dogfood-rounds.csv",
+          "root": "evidence",
+          "format": "csv",
+          "size_bytes": 212,
+          "availability": "present",
+          "expected_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+          "provenance": {
+            "class": "ledger",
+            "message_id": 700101,
+            "task_id": "DOGFOOD_ROUNDS_REVISION",
+            "stage_id": "REFRESH_CONSUMED_ROUNDS_V2",
+            "attempt": 1,
+            "commit_id": "completion-700101-3edf22139d440a89e205fa46",
+            "project_id": "v13-dogfood-001",
+            "producer": "GLM-5.3",
+            "committed_at": "2026-09-12T20:35:54+00:00",
+            "published_at": "2026-09-12T20:34:04+00:00",
+            "receipt_created_at": null,
+            "completion_status": "COMPLETION_SEALED",
+            "completion_integrity": "OK",
+            "ledger_file": "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+            "source": "legacy_staging_and_publication",
+            "historical_content_retained": false
+          },
+          "verification": "verified",
+          "actual_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003"
+        }
+      }
+    },
+    "/artifacts/d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e/preview": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e",
+          "path": "evidence/dogfood-rounds.csv",
+          "format": "csv",
+          "verification": "verified"
+        },
+        "preview": {
+          "kind": "table",
+          "state": "OK",
+          "rows": [
+            [
+              "MESSAGE_ID",
+              "TASK_ID",
+              "STAGE_ID",
+              "ATTEMPT",
+              "LEDGER_STATE",
+              "EVIDENCE_POINTER"
+            ],
+            [
+              "700100",
+              "DOGFOOD_DELIVERABLES",
+              "DRAFT_AND_EVIDENCE_V1",
+              "1",
+              "COMPLETION_CONSUMED",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json"
+            ]
+          ],
+          "rows_returned": 2,
+          "total_bytes": 212,
+          "returned_bytes": 212,
+          "truncated": false
+        }
+      }
+    },
+    "/rounds/700102": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "round": {
+          "message_id": 700102,
+          "found": true,
+          "identity": {
+            "message_id": 700102,
+            "task_id": "DOGFOOD_FINAL_VERIFICATION",
+            "stage_id": "GENERAL_FV_V1_CHECK",
+            "attempt": 1,
+            "nonce": "65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8"
+          },
+          "dispatch": {
+            "available": true,
+            "integrity": "AUTHORIZED_VALID",
+            "trust_status": "AUTHORIZED_VALID",
+            "exact_dispatch": "MESSAGE_ID: 700102\nTASK_ID: DOGFOOD_FINAL_VERIFICATION\nSTAGE_ID: GENERAL_FV_V1_CHECK\n\n```json\n{\n  \"PROTOCOL_VERSION\": 2,\n  \"CLAIM_PROTOCOL_VERSION\": 1,\n  \"MESSAGE_ID\": 700102,\n  \"TASK_ID\": \"DOGFOOD_FINAL_VERIFICATION\",\n  \"STAGE_ID\": \"GENERAL_FV_V1_CHECK\",\n  \"ATTEMPT\": 1,\n  \"NONCE\": \"65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8\",\n  \"ISSUED_AT\": \"2026-09-12T20:35:56+00:00\",\n  \"PROJECT_ID\": \"v13-dogfood-001\",\n  \"TASK_KIND\": \"FINAL_VERIFICATION\",\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"OBJECTIVE\": \"Perform one bounded, adversarial GENERAL_FV_V1 verification of the four decision-critical claims. Verify the existing deliverables and authoritative local Runtime evidence without modifying them, then publish one structured verification report and commit the completion receipt.\",\n  \"INPUTS\": [\n    \"docs/ARCHITECTURE.md (Runtime-root source, read-only)\",\n    \"projects/v13-dogfood-001/workspace/dogfood-note.md (read-only)\",\n    \"projects/v13-dogfood-001/evidence/dogfood-rounds.csv (read-only)\",\n    \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json (read-only)\",\n    \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json (read-only)\",\n    \"handoff/completion_ledger/audit.jsonl (read-only)\",\n    \"existing local Web Console / Artifact Center path-discovery and artifact-resolution implementation or focused offline tests (read-only)\"\n  ],\n  \"OUTPUTS\": [\n    \"reports/final-verification-700102.json\"\n  ],\n  \"FINAL_VERIFICATION_GATE\": {\n    \"POLICY_ID\": \"GENERAL_FV_V1\",\n    \"POLICY_VERSION\": 1,\n    \"CLAIMS_HASH\": \"a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74\",\n    \"CLAIM_COUNT\": 4,\n    \"CRITICAL_CLAIMS\": [\n      {\n        \"claim_id\": \"C1\",\n        \"claim\": \"workspace/dogfood-note.md is a concise and accurate summary of the normal public protocol flow and major agent/control roles described in docs/ARCHITECTURE.md.\",\n        \"claim_type\": \"SOURCE_SUPPORT\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\"workspace/dogfood-note.md\", \"docs/ARCHITECTURE.md\"],\n        \"verification_standard\": \"Adversarially compare each material statement in the note with the architecture source; fail on any unsupported or materially misleading protocol statement.\"\n      },\n      {\n        \"claim_id\": \"C2\",\n        \"claim\": \"evidence/dogfood-rounds.csv has the required schema and records every and only authoritative consumed dogfood round available at its declared collection cutoff, including 700100 and excluding then-unconsumed 700101.\",\n        \"claim_type\": \"NUMERICAL\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\"evidence/dogfood-rounds.csv\", \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\", \"handoff/completion_ledger/audit.jsonl\"],\n        \"verification_standard\": \"Parse the CSV, reconstruct the qualifying ledger set at the declared cutoff, and fail on any missing, extra, duplicated, invented, or mismatched row.\"\n      },\n      {\n        \"claim_id\": \"C3\",\n        \"claim\": \"Both required deliverables exist at the goal paths and are readable through the normal local Web Console and Artifact Center resolution workflow.\",\n        \"claim_type\": \"DELIVERABLE_INTEGRITY\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\"workspace/dogfood-note.md\", \"evidence/dogfood-rounds.csv\"],\n        \"verification_standard\": \"Verify exact paths, readable bytes, Markdown and CSV integrity, and the existing local Artifact Center discovery/resolution path without GUI or network access; fail if either artifact cannot be resolved and read normally.\"\n      },\n      {\n        \"claim_id\": \"C4\",\n        \"claim\": \"The dogfood work preserved Runtime safety constraints: authorized stages used the claim, fence, publication, and completion lifecycle and changed no user-facing artifacts beyond the two goal deliverables.\",\n        \"claim_type\": \"CONSTRAINT_COMPLIANCE\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\", \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\", \"workspace/dogfood-note.md\", \"evidence/dogfood-rounds.csv\"],\n        \"verification_standard\": \"Adversarially inspect authoritative receipts and publication records for both stages; fail on any bypass, direct canonical write evidence, forbidden dependency or network use, or extra user-facing output.\"\n      }\n    ]\n  },\n  \"ACCEPTANCE_CRITERIA\": [\n    \"Recompute the canonical claims hash using JSON key sorting and compact separators and require it to equal a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74 before verification.\",\n    \"Evaluate C1-C4 independently and adversarially as PASS, FAIL, or INCONCLUSIVE; for every claim cite inspected evidence, state the check performed, and identify the concrete evidence that would falsify it.\",\n    \"C1 must compare every material protocol statement in the note against docs/ARCHITECTURE.md; concision alone is insufficient.\",\n    \"C2 must parse the CSV, verify the exact required header and RFC 4180 compatibility, reconstruct the authoritative consumed set at cutoff 2026-09-12T20:31:16.888225+00:00, and explain why post-cutoff lifecycle events do not retroactively alter that point-in-time evidence set.\",\n    \"C3 must verify both files are discoverable/resolvable/readable through the existing normal local Artifact Center workflow using source inspection or a focused offline test only; filesystem readability by itself is insufficient. If normal workflow evidence is unavailable, return INCONCLUSIVE rather than guessing.\",\n    \"C4 must inspect authoritative completion receipts plus available claim/fence/publication evidence for MESSAGE_IDs 700100 and 700101 and check that only the two goal deliverables were published as user-facing artifacts and no forbidden action is evidenced.\",\n    \"The report must include POLICY_ID, POLICY_VERSION, CLAIMS_HASH, per-claim results, an OVERALL_RESULT, limitations, inspected evidence pointers, and timestamps. OVERALL_RESULT is PASS only if all four claims PASS; any FAIL yields FAIL and any remaining uncertainty yields INCONCLUSIVE.\",\n    \"Publish only reports/final-verification-700102.json through executor_fence.py publish; do not modify either deliverable, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifacts.\",\n    \"The completion receipt must repeat the exact gate identity/hash, per-claim results, OVERALL_RESULT, report SHA-256, failed methods, limitations, and evidence pointers.\"\n  ],\n  \"MAX_TIME\": 900,\n  \"MAX_RETRIES\": 0,\n  \"SCHEDULER_GRACE_SECONDS\": 3600,\n  \"SUPERVISOR_REVIEW_EFFORT\": \"high\",\n  \"FORBIDDEN_ACTIONS\": [\n    \"Do not use network access, browsers, GUI automation, Computer Use, mouse/keyboard simulation, or ZCode CLI.\",\n    \"Do not modify workspace/dogfood-note.md or evidence/dogfood-rounds.csv.\",\n    \"Do not modify Runtime Core, control-plane semantics, PROJECT_GOAL.md, project_state.json, RESEARCH_STATE.md, TO_ZCODE.md, or Runtime-owned completion/compatibility artifacts.\",\n    \"Do not add dependencies, start services, bypass authorization, infer missing evidence, or broaden inspection beyond the four claims.\",\n    \"Do not treat the prior Executor PASS labels as verification evidence by themselves.\"\n  ],\n  \"STOP_CONDITIONS\": [\n    \"Stop and report INCONCLUSIVE if any required authoritative evidence cannot be read or tied to the exact claim.\",\n    \"Stop and report FAIL if a deliverable is altered, unsupported, unreadable through the normal local artifact path, or inconsistent with authoritative ledger evidence.\",\n    \"Stop immediately after COMPLETION_COMMITTED; never select or begin another stage.\"\n  ],\n  \"EXECUTOR_PROTOCOL\": [\n    \"After reading the task identity, run exactly: python scripts/executor_claim.py acquire --message-id 700102 --task-id \\\"DOGFOOD_FINAL_VERIFICATION\\\" --stage-id \\\"GENERAL_FV_V1_CHECK\\\" --attempt 1 --nonce \\\"65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8\\\".\",\n    \"Exit code 0 / CLAIM_ACQUIRED means this instance owns the attempt and may proceed; retain the returned claim token.\",\n    \"Exit code 10 / CLAIM_EXISTS or 11 / ALREADY_PROCESSED means stop this Scheduled Automation run immediately and silently without research, output mutation, completion staging, helper calls, or root artifacts.\",\n    \"Any other claim-helper failure must fail closed and stop without touching stage outputs.\",\n    \"After claim acquisition, run executor_fence.py prepare with the exact identity and claim token; put every mutation and subprocess output in the returned attempt workspace and treat canonical inputs as read-only.\",\n    \"Run executor_fence.py check on resume and before every work batch, mutation-capable command, publication, and completion; a prior successful check is not a reusable write grant.\",\n    \"Publish the verification report only with executor_fence.py publish using the exact identity, token, project-relative path, and candidate SHA-256; never write canonical outputs directly.\",\n    \"Before completion, run a final fence check, then create one staging directory under the active project's completion_staging containing staging.json with COMPLETION_STAGING_SCHEMA_VERSION 1, exact stable identity, PROJECT_ID v13-dogfood-001, STATUS STAGING_READY, timezone-aware CREATED_AT, and the full matching receipt.\",\n    \"Run python scripts/executor_completion.py commit --staging-dir \\\"<staging dir>\\\" --claim-token \\\"<claim token>\\\".\",\n    \"Exit code 0 / COMPLETION_COMMITTED means stop immediately and never edit, repair, or republish root SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, or ZCODE_DONE.flag.\",\n    \"Exit codes 10 / ALREADY_COMMITTED, 11 / COMPLETION_SEALED, 12 / COMPLETION_NOT_AUTHORIZED, 13 / COMPLETION_CLAIM_MISMATCH, or 14 / INVALID_COMPLETION_STAGING require fail-closed stop with no publication.\",\n    \"Never delete a claim directory, reuse or transfer a claim/token, continue a retired identity, choose the next stage, or bypass authentication, CAPTCHA, access controls, or fencing.\"\n  ]\n}\n```\n",
+            "error": null,
+            "archived_at": "2026-09-12T20:45:55+00:00",
+            "dispatch_sha256": "806272a805f7031d9c6f817e5bf5b18cea6d3dc8e8c07e6146eac4a8753c2dd7",
+            "supervisor_turn_id": "supervisor-turn-1a50635214964384a323c3af3460216d",
+            "decision_receipt_sha256": "562461f4c40a595cb5bc34f201ce9f02f24e6dcfcd288692d9b2c746eab26729",
+            "originating_control_revision": 0,
+            "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700102-c3df95c1cbbe992824f58363.json",
+            "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700102-c3df95c1cbbe992824f58363.md",
+            "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700102-c3df95c1cbbe992824f58363.authorized.json"
+          },
+          "completion": {
+            "available": true,
+            "status": "COMPLETION_SEALED",
+            "integrity": "OK",
+            "committed_at": "2026-09-12T21:02:38+00:00",
+            "consumed_at": "2026-09-12T21:02:38+00:00",
+            "sealed_at": "2026-09-12T21:08:08+00:00",
+            "commit_id": "completion-700102-c3df95c1cbbe992824f58363",
+            "claim_dir": "handoff/executor_claims/700102-c3df95c1cbbe992824f58363.claim",
+            "ledger_file": "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+            "receipt": {
+              "MESSAGE_ID": 700102,
+              "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+              "STAGE_ID": "GENERAL_FV_V1_CHECK",
+              "ATTEMPT": 1,
+              "NONCE": "65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8",
+              "PROJECT_ID": "v13-dogfood-001",
+              "STATUS": "COMPLETED",
+              "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+              "COMPLETED_AT": "2026-09-13T05:01:10.165564+08:00",
+              "OBJECTIVE_SUMMARY": "Performed one bounded, adversarial GENERAL_FV_V1 verification of the four decision-critical claims for PROJECT_ID v13-dogfood-001. The canonical claims hash was recomputed with JSON key sorting and compact separators and matched the gate value exactly before any claim evaluation. All existing deliverables and authoritative local Runtime evidence were inspected read-only; the only canonical output published is reports/final-verification-700102.json via executor_fence.py publish. OVERALL_RESULT is PASS: C1, C2, C3, and C4 each independently evaluate to PASS. No deliverable, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifact was modified.",
+              "FINAL_VERIFICATION_GATE": {
+                "POLICY_ID": "GENERAL_FV_V1",
+                "POLICY_VERSION": 1,
+                "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+                "CLAIM_COUNT": 4
+              },
+              "CLAIMS_HASH_RECOMPUTED": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+              "CLAIMS_HASH_RECIPE": "sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, sort_keys=True, separators=(',', ':')); recomputed value equals the gate CLAIMS_HASH, verified before any claim evaluation.",
+              "VERIFIED_AT": "2026-09-12T20:58:48.895888+00:00",
+              "PER_CLAIM_RESULTS": [
+                {
+                  "claim_id": "C1",
+                  "claim_type": "SOURCE_SUPPORT",
+                  "decision_impact": "HIGH",
+                  "result": "PASS",
+                  "check_performed": "Adversarial statement-by-statement comparison of every material protocol assertion in workspace/dogfood-note.md against all sections of docs/ARCHITECTURE.md: role definitions, identity tuple semantics and inbox-hash binding consequences, all seven round steps (archive-before-authorize, permanent claim exit codes, fence token/attempt workspace/publish-only copies, staging fields, completion validation targets and ledger binding fields, compatibility artifact generation order, consume/seal monotonicity), authority-vs-wake-hints, concurrency/isolation, control plane and human decisions, and profiles/Final Verification all trace to matching source statements; no contradiction, misattribution, or material overstatement found. The two beyond-source elements (Web Console/Artifact Center naming and the v1.3 source label) are explicitly disclosed in the note itself, are not protocol statements, and the note's console-boundary assertion was implementation-verified.",
+                  "falsifying_evidence": "A material note statement contradicting or undisclosed beyond docs/ARCHITECTURE.md; none found."
+                },
+                {
+                  "claim_id": "C2",
+                  "claim_type": "NUMERICAL",
+                  "decision_impact": "HIGH",
+                  "result": "PASS",
+                  "check_performed": "Parsed the 212-byte CSV under the RFC 4180 dialect: header exactly MESSAGE_ID,TASK_ID,STAGE_ID,ATTEMPT,LEDGER_STATE,EVIDENCE_POINTER and exactly one data row (700100,DOGFOOD_DELIVERABLES,DRAFT_AND_EVIDENCE_V1,1,COMPLETION_CONSUMED,handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json), every field tracing to the named ledger artifact. Reconstructed the authoritative consumed set at the declared cutoff 2026-09-12T20:31:16.888225+00:00 from the ledger and audit trail: 700100 was COMMITTED 20:25:00+00:00 and CONSUMED 20:25:01+00:00 (matching COMPLETION_CONSUMED audit event) before the cutoff, so it qualifies (its SEALED 20:29:39+00:00 status advances the same consumed entry without un-consuming it); 700101 was committed 20:35:54+00:00 and consumed 20:35:56+00:00, both after the cutoff, so it is correctly absent. Reconstructed set equals the CSV row set exactly, no duplicates. Post-cutoff events cannot retroactively alter the point-in-time set because ledger status is monotonic and irreversible and the CSV is a declared point-in-time collection, not a live view. Current CSV SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003 matches the producing receipt and publication record.",
+                  "falsifying_evidence": "A missing, extra, duplicated, invented, or mismatched row relative to the cutoff-qualified ledger set; none found."
+                },
+                {
+                  "claim_id": "C3",
+                  "claim_type": "DELIVERABLE_INTEGRITY",
+                  "decision_impact": "HIGH",
+                  "result": "PASS",
+                  "check_performed": "Focused offline test replaying the exact production resolution workflow of scripts/web_console_server.py via the pure layer scripts/web_console_artifacts.py with no GUI, HTTP server, or network: production control-plane ledger query (supervisor_control.py feedback --json, both entries integrity OK), bounded walk of authorized roots (exactly the two deliverables), catalog listing of both paths, normalize_artifact_path acceptance with artifact ids matching the publication-record identifiers, resolution to real files inside the active project (note 6276 bytes, CSV 212 bytes), and bounded previews returned state OK (markdown text preview starting '# General Agent Runtime: protocol flow in brief'; CSV table preview with exactly header plus the 700100 row). Exact paths, readable bytes, and Markdown/CSV integrity verified; filesystem readability alone was not relied upon.",
+                  "falsifying_evidence": "Artifact absent from catalog, normalization or resolution refused, or an unreadable/unsupported preview; none found. Console honesty reports provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; that is a receipt-schema honesty outcome, not a resolution failure, and the artifact hashes were independently verified against publication records."
+                },
+                {
+                  "claim_id": "C4",
+                  "claim_type": "CONSTRAINT_COMPLIANCE",
+                  "decision_impact": "HIGH",
+                  "result": "PASS",
+                  "check_performed": "Adversarial inspection of authoritative lifecycle records for MESSAGE_IDs 700100 and 700101: permanent claims exist under handoff/executor_claims/ for both identities; handoff/executor_publications/ contains exactly three records, all for PROJECT_ID v13-dogfood-001, covering only workspace/dogfood-note.md (700100, sha256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58) and evidence/dogfood-rounds.csv (700100 initial 11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242, republished by 700101 at b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003); canonical workspace/, evidence/, and reports/ contain exactly the two goal deliverables and nothing else; both completions were committed through scripts/executor_completion.py with intact receipt/brief/staging-manifest hash bindings (control-plane integrity OK); audit.jsonl shows only normal COMMITTED -> CONSUMED (-> SEALED for 700100) sequences; the 700101 receipt verifies byte-for-byte preservation of the note, whose hash is unchanged today. No bypass, direct canonical write, forbidden dependency, network/GUI use, or extra user-facing output is evidenced anywhere, and no evidence contradicts the receipts' affirmations.",
+                  "falsifying_evidence": "A publication or canonical user-facing file beyond the two goal deliverables, a hash contradiction, a missing lifecycle step, or direct-write/forbidden-tool evidence; none found. Verified as absence of adverse evidence across all inspectable authoritative records."
+                }
+              ],
+              "OVERALL_RESULT": "PASS",
+              "OVERALL_RATIONALE": "All four decision-critical claims independently evaluate to PASS; no claim is FAIL and no residual uncertainty blocks any individual verdict.",
+              "REPORT_PATH": "reports/final-verification-700102.json",
+              "REPORT_SHA256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+              "FAILED_METHODS": [],
+              "METHODS_NOTE": "No network access, browser, GUI automation, Computer Use, mouse/keyboard simulation, or ZCode CLI was used; verification used only local read-only inspection plus two offline Python check scripts executed inside the fenced attempt workspace (fv_checks.py/fv_checks_result.json and fv_console_test.py/fv_console_test_result.json), with the production read-only 'feedback --json' control-plane query as the C3 ledger source, matching what the console server itself invokes.",
+              "LIMITATIONS_AND_UNCERTAINTIES": [
+                "Point-in-time verification: results reflect the state at VERIFIED_AT 2026-09-12T20:58:48.895888+00:00; authoritative lifecycle state may legitimately advance afterwards (700101 not yet sealed) without altering any verified fact, since every verified claim is anchored to recorded, monotonic facts.",
+                "The CSV uses bare LF record separators rather than the CRLF that RFC 4180's ABNF literally specifies; fields require no quoting and the file parses byte-exactly under the RFC 4180 csv dialect (minimal-quoting re-serialization with LF reproduces the bytes exactly), so the claim's substance is unaffected.",
+                "The Artifact Center reports provenance 'unbound' and hash verification 'unverified' for both artifacts because the 700100/700101 receipts embed no PUBLISHED_PATHS list; console discovery/resolution/readability were fully verified and artifact hashes were independently verified against publication records.",
+                "C4 is verified as absence of adverse evidence across all inspectable authoritative records (claims, publication records, ledger, audit, canonical inventory); a bounded offline verifier cannot re-observe every internal step of prior Executor sessions.",
+                "docs/ARCHITECTURE.md does not describe Web Console/Artifact Center internals beyond the supervisor_control.py boundary; C3 therefore exercised the existing implementation's own workflow code path as the acceptance criteria direct."
+              ],
+              "EVIDENCE_POINTERS_INSPECTED": [
+                "TO_ZCODE.md",
+                "docs/ARCHITECTURE.md",
+                "workspace/dogfood-note.md",
+                "evidence/dogfood-rounds.csv",
+                "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+                "handoff/completion_ledger/audit.jsonl",
+                "handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/ (2 publication records)",
+                "handoff/executor_publications/completion-700101-3edf22139d440a89e205fa46/ (1 publication record)",
+                "handoff/executor_claims/700100-d190a8b3e8efef383fc55ae7.claim",
+                "handoff/executor_claims/700101-3edf22139d440a89e205fa46.claim",
+                "scripts/web_console_server.py",
+                "scripts/web_console_artifacts.py",
+                "scripts/supervisor_control.py"
+              ],
+              "ACCEPTANCE_CRITERIA_SELF_CHECK": [
+                {
+                  "criterion": "Recompute the canonical claims hash using JSON key sorting and compact separators and require equality with a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74 before verification.",
+                  "result": "PASS",
+                  "note": "Recomputed sha256 over json.dumps(CRITICAL_CLAIMS, sort_keys=True, separators=(',',':')) equals the gate value; equality was required and confirmed before any claim was evaluated."
+                },
+                {
+                  "criterion": "Evaluate C1-C4 independently and adversarially as PASS, FAIL, or INCONCLUSIVE; for every claim cite inspected evidence, state the check performed, and identify concrete falsifying evidence.",
+                  "result": "PASS",
+                  "note": "Four independent verdicts (all PASS) with per-claim check_performed, evidence_inspected, and falsifying_evidence in the published report."
+                },
+                {
+                  "criterion": "C1 must compare every material protocol statement in the note against docs/ARCHITECTURE.md; concision alone is insufficient.",
+                  "result": "PASS",
+                  "note": "Section-by-section adversarial comparison documented in the report's C1 check_performed; two beyond-source elements examined and found disclosed and non-protocol."
+                },
+                {
+                  "criterion": "C2 must parse the CSV, verify the exact required header and RFC 4180 compatibility, reconstruct the authoritative consumed set at cutoff 2026-09-12T20:31:16.888225+00:00, and explain why post-cutoff lifecycle events do not retroactively alter that point-in-time evidence set.",
+                  "result": "PASS",
+                  "note": "All four elements performed and documented, including the monotonic-lifecycle explanation and the explicit LF-vs-CRLF line-ending nuance (documented, not failing: parses byte-exactly under the RFC 4180 dialect)."
+                },
+                {
+                  "criterion": "C3 must verify both files are discoverable/resolvable/readable through the existing normal local Artifact Center workflow using source inspection or a focused offline test only; filesystem readability by itself is insufficient; INCONCLUSIVE if normal workflow evidence is unavailable.",
+                  "result": "PASS",
+                  "note": "Focused offline test exercised the actual workflow code path (walk, index, catalog, normalize, resolve, hash, detail, preview) with the production control-plane ledger query; both artifacts resolved and read normally. Normal workflow evidence was available, so no INCONCLUSIVE fallback was needed."
+                },
+                {
+                  "criterion": "C4 must inspect authoritative completion receipts plus available claim/fence/publication evidence for MESSAGE_IDs 700100 and 700101 and check that only the two goal deliverables were published as user-facing artifacts and no forbidden action is evidenced.",
+                  "result": "PASS",
+                  "note": "Both receipts, both permanent claims, all three publication records, the audit trail, and the canonical inventory inspected; exactly the two goal deliverables are user-facing and no forbidden action is evidenced."
+                },
+                {
+                  "criterion": "The report must include POLICY_ID, POLICY_VERSION, CLAIMS_HASH, per-claim results, an OVERALL_RESULT, limitations, inspected evidence pointers, and timestamps; OVERALL_RESULT is PASS only if all four claims PASS.",
+                  "result": "PASS",
+                  "note": "reports/final-verification-700102.json contains all required elements; all four claims PASS, so OVERALL_RESULT is PASS."
+                },
+                {
+                  "criterion": "Publish only reports/final-verification-700102.json through executor_fence.py publish; do not modify either deliverable, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifacts.",
+                  "result": "PASS",
+                  "note": "Exactly one publication performed (PUBLICATION_COMMITTED for reports/final-verification-700102.json); no other canonical or Runtime-owned file written; deliverable hashes verified unchanged (note 8ba6f737..., CSV b076c865...)."
+                },
+                {
+                  "criterion": "The completion receipt must repeat the exact gate identity/hash, per-claim results, OVERALL_RESULT, report SHA-256, failed methods, limitations, and evidence pointers.",
+                  "result": "PASS",
+                  "note": "This receipt carries FINAL_VERIFICATION_GATE (POLICY_ID/POLICY_VERSION/CLAIMS_HASH), PER_CLAIM_RESULTS, OVERALL_RESULT, REPORT_SHA256, FAILED_METHODS, LIMITATIONS_AND_UNCERTAINTIES, and EVIDENCE_POINTERS_INSPECTED."
+                }
+              ],
+              "SUGGESTED_MEMORY_UPDATES": [
+                "Suggested for Supervisor consideration (not Executor-written): project memory for v13-dogfood-001 can record that GENERAL_FV_V1 final verification (700102/GENERAL_FV_V1_CHECK) passed all four claims with OVERALL_RESULT PASS; two documented nuances for future stages are that the Artifact Center binds provenance only from receipts carrying a PUBLISHED_PATHS list (700100/700101 receipts predate that convention, so catalog items show 'unbound'), and that the rounds CSV uses LF record separators which future writers should either keep consistent or normalize to CRLF if strict RFC 4180 ABNF conformance is ever required."
+              ]
+            },
+            "receipt_status": "COMPLETED",
+            "receipt_outcome": null
+          },
+          "interventions": [],
+          "artifacts": {
+            "available": true,
+            "reason": null,
+            "paths": [
+              {
+                "path": "reports/final-verification-700102.json",
+                "sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b"
+              }
+            ],
+            "note": "Verified Runtime publication metadata; historical bytes are not retained. Current-content preview is available in Artifact Center only when its hash matches this publication."
+          },
+          "decision": {
+            "available": true,
+            "verified": true,
+            "reason": null,
+            "turn_id": "supervisor-turn-1a50635214964384a323c3af3460216d",
+            "committed_at": "2026-09-12T20:45:55+00:00",
+            "resulting_status": "WAITING_EXECUTOR",
+            "decision_decision": "CONTINUE",
+            "decision_reason": "Repair the rejected Final Verification dispatch by restoring the mechanically required PENDING gate state; the claim set, standards, and task identity remain unchanged.",
+            "decision_history_index": 3,
+            "intervention_ids": [],
+            "originating_control_revision": 0
+          },
+          "honesty": {
+            "notes": [],
+            "control": [],
+            "contradictions": []
+          }
+        }
+      }
+    },
+    "/artifacts?message_id=700102": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:47:01+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": 700102,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 1,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [
+            {
+              "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b",
+              "path": "reports/final-verification-700102.json",
+              "name": "final-verification-700102.json",
+              "root": "reports",
+              "format": "json",
+              "size_bytes": 19811,
+              "availability": "present",
+              "expected_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700102,
+                "task_id": "DOGFOOD_FINAL_VERIFICATION",
+                "stage_id": "GENERAL_FV_V1_CHECK",
+                "attempt": 1,
+                "commit_id": "completion-700102-c3df95c1cbbe992824f58363",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T21:02:38+00:00",
+                "published_at": "2026-09-12T21:00:57+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            }
+          ],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    },
+    "/artifacts/176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b",
+          "path": "reports/final-verification-700102.json",
+          "name": "final-verification-700102.json",
+          "root": "reports",
+          "format": "json",
+          "size_bytes": 19811,
+          "availability": "present",
+          "expected_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+          "provenance": {
+            "class": "ledger",
+            "message_id": 700102,
+            "task_id": "DOGFOOD_FINAL_VERIFICATION",
+            "stage_id": "GENERAL_FV_V1_CHECK",
+            "attempt": 1,
+            "commit_id": "completion-700102-c3df95c1cbbe992824f58363",
+            "project_id": "v13-dogfood-001",
+            "producer": "GLM-5.3",
+            "committed_at": "2026-09-12T21:02:38+00:00",
+            "published_at": "2026-09-12T21:00:57+00:00",
+            "receipt_created_at": null,
+            "completion_status": "COMPLETION_SEALED",
+            "completion_integrity": "OK",
+            "ledger_file": "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+            "source": "legacy_staging_and_publication",
+            "historical_content_retained": false
+          },
+          "verification": "verified",
+          "actual_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b"
+        }
+      }
+    },
+    "/artifacts/176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b/preview": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifact": {
+          "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b",
+          "path": "reports/final-verification-700102.json",
+          "format": "json",
+          "verification": "verified"
+        },
+        "preview": {
+          "kind": "json",
+          "state": "OK",
+          "content": "{\n  \"ATTEMPT\": 1,\n  \"CLAIMS_HASH_EXPECTED\": \"a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74\",\n  \"CLAIMS_HASH_RECIPE\": \"sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, sort_keys=True, separators=(',', ':')) with ensure_ascii=True; the ensure_ascii=False variant produces the identical digest for this ASCII-only claims array\",\n  \"CLAIMS_HASH_RECOMPUTED\": \"a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74\",\n  \"CLAIM_COUNT\": 4,\n  \"CLAIM_RESULTS\": [\n    {\n      \"check_performed\": \"Adversarial statement-by-statement comparison of every material protocol assertion in workspace/dogfood-note.md against docs/ARCHITECTURE.md (Components; Identity model; Supervisor control plane v1.2; Concurrency and instance isolation; Post-claim publication fencing EXECUTOR-FENCE-V1; Completion lifecycle COMPLETION-SEAL-V1; Profiles and Final Verification; Project isolation; Human decisions). The note's role definitions (deterministic Orchestrator that never calls a model or does stage work; Supervisor compressed-context prompt returning exactly one machine-readable decision among the same five options; Executor one-stage-at-a-time JSON task in TO_ZCODE.md with a single fenced JSON receipt), the identity tuple semantics (monotonic MESSAGE_ID with retired ids never re-issued, NONCE uniqueness, ATTEMPT as first-class revision history, inbox-snapshot SHA-256 binding with unclaimable/uninjectable/permanently-rejected consequences), all seven round steps (archive-before-authorize with quarantine of rejected candidates and rejection of unclaimed legacy authorizations; permanent claim with exit codes 0/10/11 and quiet losers; opaque token with only its hash stored, attempt workspace via executor_fence.py prepare/check, publish-only canonical replacement as per-file copies, retirement persisted before recovery; staging fields and never-authoritative status; executor_completion.py validation targets and ledger binding fields including claim identity hash, receipt hash, brief hash, staging manifest hash and deterministic commit_id; compatibility artifact generation order SUPERVISOR_BRIEF.md -> ZCODE_LAST_PROCESSED.txt -> ZCODE_DONE.flag last; consumption conditions, receipt archiving, SEALED after the single Supervisor lifecycle decision, monotonic irreversible COMMITTED -> CONSUMED -> SEALED across restarts), the authority-vs-wake-hints section (ledger authoritative, derived artifacts, UNKNOWN_RAW_COMPLETION quarantine), the concurrency/isolation section (one orchestrator per root, exclusive lock with dead-owner reclaim, independent roots never sharing locks/state/stop flags/claims, activate_project_scope rebinding with fail-closed traversal), the control-plane/human-decisions section (supervisor_control.py JSON forms as stable backend boundary, later v1.3 browser console, immutable interventions under handoff/supervisor_interventions/<project>/, monotonically increasing control revision quarantining post-prompt candidates, pause vs STOP vs HUMAN_REVIEW, interrupt retirement revoking fence authority, console banner + USER_ATTENTION.json, hash-bound resume_human_review.py receipts with ledgered non-replayable consumption), and the profiles/Final Verification section (PROFILE.json, role guidance, FINAL_VERIFICATION_POLICY.json, mechanical gate blocking unsatisfied COMPLETE) each trace to a matching source statement. No note statement contradicts, misattributes, or materially overstates the source.\",\n      \"claim\": \"workspace/dogfood-note.md is a concise and accurate summary of the normal public protocol flow and major agent/control roles described in docs/ARCHITECTURE.md.\",\n      \"claim_id\": \"C1\",\n      \"claim_type\": \"SOURCE_SUPPORT\",\n      \"decision_impact\": \"HIGH\",\n      \"evidence_inspected\": [\n        \"workspace/dogfood-note.md\",\n        \"docs/ARCHITECTURE.md\"\n      ],\n      \"falsifying_evidence\": \"Any material note statement that contradicts docs/ARCHITECTURE.md, or an undisclosed beyond-source claim presented as source-derived. None found.\",\n      \"notes\": \"Two beyond-source elements were examined and are not failures. (1) The note's parenthetical names the 'Web Console / Artifact Center' experience while stating explicitly that the architecture document does not describe console internals beyond the supervisor_control.py boundary; that naming exists in Runtime product documentation (V1.3_PRODUCT_SPEC.md, docs/WEB_CONSOLE_DEVELOPMENT.md) and the note's substantive assertion (console served through the supervisor_control.py JSON boundary) was implementation-verified in this attempt's C3 focused offline test, where the console's ledger source was literally the supervisor_control.py 'feedback --json' query. (2) The source label '(v1.3)' aligns with the Runtime's product-spec naming; ARCHITECTURE.md itself self-describes a v1.2 control plane and a planned v1.3 console. Neither item is a protocol statement, and neither is presented as coming from the source.\",\n      \"result\": \"PASS\"\n    },\n    {\n      \"check_performed\": \"Parsed the 212-byte CSV (no BOM, UTF-8) with the Python csv module under the RFC 4180 dialect: header is exactly MESSAGE_ID,TASK_ID,STAGE_ID,ATTEMPT,LEDGER_STATE,EVIDENCE_POINTER and there is exactly one data row, 700100,DOGFOOD_DELIVERABLES,DRAFT_AND_EVIDENCE_V1,1,COMPLETION_CONSUMED,handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json, with no duplicated, missing, extra, or invented rows; every field traces to the named ledger artifact (re-parsed entry matches every field). Reconstructed the authoritative consumed set at the declared cutoff 2026-09-12T20:31:16.888225+00:00 (declared in the producing stage's receipt, completion-700101-3edf22139d440a89e205fa46.json EVIDENCE_COLLECTION_CUTOFF, corroborated by the task gate) from handoff/completion_ledger/: entry completion-700100-d190a8b3e8efef383fc55ae7.json was COMMITTED 2026-09-12T20:25:00+00:00 and CONSUMED 2026-09-12T20:25:01+00:00 with the matching COMPLETION_CONSUMED audit event at 20:25:01+00:00 in audit.jsonl, all before the cutoff, so it qualifies; its STATUS field today reads COMPLETION_SEALED because sealing (20:29:39+00:00) also precedes the cutoff, and sealing advances the same entry without un-consuming it, so LEDGER_STATE COMPLETION_CONSUMED in the CSV is correct. Entry completion-700101-3edf22139d440a89e205fa46.json was committed 20:35:54+00:00 and consumed 20:35:56+00:00, both after the cutoff, so it is correctly absent. Post-cutoff lifecycle events do not retroactively alter the point-in-time set because ledger status is monotonic and irreversible (COMPLETION_COMMITTED -> COMPLETION_CONSUMED -> COMPLETION_SEALED per docs/ARCHITECTURE.md), consumption is a recorded timestamped fact, and the CSV is a declared point-in-time collection rather than a live view: later commits/consumptions can only add future rows under a fresh cutoff, never change what was consumed at the recorded instant. The reconstructed qualifying set equals the CSV row set exactly.\",\n      \"claim\": \"evidence/dogfood-rounds.csv has the required schema and records every and only authoritative consumed dogfood round available at its declared collection cutoff, including 700100 and excluding then-unconsumed 700101.\",\n      \"claim_id\": \"C2\",\n      \"claim_type\": \"NUMERICAL\",\n      \"decision_impact\": \"HIGH\",\n      \"evidence_inspected\": [\n        \"evidence/dogfood-rounds.csv\",\n        \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n        \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\",\n        \"handoff/completion_ledger/audit.jsonl\"\n      ],\n      \"falsifying_evidence\": \"A ledger entry consumed at or before the cutoff missing from the CSV; an extra, unknown, duplicated, or fabricated row; any field mismatch against the named ledger artifact; or a cutoff-qualified set differing from the emitted rows. None found.\",\n      \"notes\": \"Line-ending nuance, documented not failing: the file uses bare LF record separators (2 LF, 0 CRLF) rather than the CRLF that RFC 4180's ABNF literally specifies. No field contains comma, quote, CR, or LF, so the quoting rules are trivially satisfied; the file parses back to exactly the intended header and row under the RFC 4180 csv dialect, and minimal-quoting re-serialization with the LF terminator reproduces the bytes exactly (byte-identical round trip). The claim's substance (schema plus every-and-only qualifying row) is fully verified; the current file SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003 matches the producing receipt's FINAL_CSV_SHA256 and its publication record.\",\n      \"result\": \"PASS\"\n    },\n    {\n      \"check_performed\": \"Focused offline test (attempt workspace file fv_console_test.py, results in fv_console_test_result.json) replaying the exact production resolution workflow of scripts/web_console_server.py using the pure layer scripts/web_console_artifacts.py, with no GUI, HTTP server, or network: (1) the ledger document came from the same control-plane query the server runs (supervisor_control.py feedback --json; exit 0; both entries integrity OK); (2) the bounded read-only walk over the authorized roots workspace/evidence/reports found exactly the two deliverable files; (3) build_artifact_index joined walk results with verified receipts; (4) the catalog query listed both paths; (5) normalize_artifact_path accepted both goal paths and artifact_id_for_path reproduced the publication-record identifiers; (6) both catalog records resolved via the server's path-resolution rule to real files inside the active project (workspace/dogfood-note.md 6276 bytes, evidence/dogfood-rounds.csv 212 bytes); (7) project_artifact_detail composed the detail view and project_preview returned readable documents: markdown preview state OK (6260 chars, begins '# General Agent Runtime: protocol flow in brief') and CSV table preview state OK with exactly the header plus the 700100 row. Exact paths verified; bytes readable; Markdown and CSV integrity verified (UTF-8 decode clean, heading structure intact, RFC 4180 dialect parse exact). Filesystem readability was not relied upon alone: the workflow code path itself performed the discovery, resolution, hashing, and preview.\",\n      \"claim\": \"Both required deliverables exist at the goal paths and are readable through the normal local Web Console and Artifact Center resolution workflow.\",\n      \"claim_id\": \"C3\",\n      \"claim_type\": \"DELIVERABLE_INTEGRITY\",\n      \"decision_impact\": \"HIGH\",\n      \"evidence_inspected\": [\n        \"workspace/dogfood-note.md\",\n        \"evidence/dogfood-rounds.csv\",\n        \"scripts/web_console_server.py\",\n        \"scripts/web_console_artifacts.py\",\n        \"scripts/supervisor_control.py\",\n        \"attempt workspace fv_console_test_result.json (focused offline test output)\"\n      ],\n      \"falsifying_evidence\": \"Either artifact absent from the catalog index, path normalization refused, resolution failing to a file outside the project, or a preview returning NOT_UTF8 / MALFORMED_JSON / UNSUPPORTED / missing content. None found.\",\n      \"notes\": \"The console's honesty block reports provenance class 'unbound' and hash verification 'unverified' for both artifacts with explicit notes that the ledger receipts carry no usable PUBLISHED_PATHS list; this reflects the receipt schema used by stages 700100/700101, not a resolution or readability failure, and is surfaced by the console rather than hidden by it. Independently of that console feature, the actual bytes were hash-verified in this verification: the note hashes to 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58 and the CSV to b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003, each matching the authoritative publication records and receipts.\",\n      \"result\": \"PASS\"\n    },\n    {\n      \"check_performed\": \"Adversarial inspection of the authoritative lifecycle records for MESSAGE_IDs 700100 and 700101. Permanent claims exist at handoff/executor_claims/700100-d190a8b3e8efef383fc55ae7.claim and handoff/executor_claims/700101-3edf22139d440a89e205fa46.claim. handoff/executor_publications/ contains exactly three publication records, all for PROJECT_ID v13-dogfood-001, each binding the full stage identity and content hash: 700100 published workspace/dogfood-note.md (sha256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58) and evidence/dogfood-rounds.csv (then sha256 11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242, the initial header-only version); 700101 republished only evidence/dogfood-rounds.csv (sha256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003). No publication record names any other path; the canonical workspace/, evidence/, and reports/ directories contain exactly the two goal deliverables and nothing else. Both completions went through scripts/executor_completion.py: ledger entries bind COMMIT_ID, claim identity hash, RECEIPT_SHA256, BRIEF_SHA256, STAGING_MANIFEST_SHA256, and COMMITTED_AT; audit.jsonl shows the normal COMMITTED -> CONSUMED (-> SEALED for 700100) sequences with no anomalous events, and the control plane's feedback --json integrity check reports both entries integrity OK. The 700101 receipt verifies the note was preserved byte-for-byte across its publication, and the note's hash today still equals the 700100 publication hash. No inspected record shows a direct canonical write outside executor_fence.py publish, a forbidden dependency, network access, browser/GUI automation, or any user-facing output beyond the two goal deliverables; both receipts affirm none was used, and no evidence contradicts that.\",\n      \"claim\": \"The dogfood work preserved Runtime safety constraints: authorized stages used the claim, fence, publication, and completion lifecycle and changed no user-facing artifacts beyond the two goal deliverables.\",\n      \"claim_id\": \"C4\",\n      \"claim_type\": \"CONSTRAINT_COMPLIANCE\",\n      \"decision_impact\": \"HIGH\",\n      \"evidence_inspected\": [\n        \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n        \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\",\n        \"handoff/completion_ledger/audit.jsonl\",\n        \"handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/\",\n        \"handoff/executor_publications/completion-700101-3edf22139d440a89e205fa46/\",\n        \"handoff/executor_claims/\",\n        \"workspace/dogfood-note.md\",\n        \"evidence/dogfood-rounds.csv\"\n      ],\n      \"falsifying_evidence\": \"A publication record or canonical user-facing file for any path other than the two goal deliverables; a canonical deliverable whose hash contradicts its publication record; a missing claim/completion lifecycle step (no claim dir, no ledger entry, no audit event, or integrity mismatch); direct-write or forbidden-tool evidence in any authoritative record. None found.\",\n      \"notes\": \"This is verified as absence of adverse evidence across every inspectable authoritative record (claims, publication records, ledger, audit, canonical inventory), which is the strongest evidence available to a bounded offline verifier; it is not a claim of having observed every internal step of the prior Executor sessions. Runtime-owned internals (control plane state, dispatch archives) were corroborated only through the control plane's own integrity verdicts, per the task's bounded inspection scope.\",\n      \"result\": \"PASS\"\n    }\n  ],\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"FAILED_METHODS\": [],\n  \"INSPECTED_EVIDENCE\": [\n    \"TO_ZCODE.md (dispatch and gate, read-only)\",\n    \"docs/ARCHITECTURE.md\",\n    \"projects/v13-dogfood-001/workspace/dogfood-note.md\",\n    \"projects/v13-dogfood-001/evidence/dogfood-rounds.csv\",\n    \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n    \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\",\n    \"handoff/completion_ledger/audit.jsonl\",\n    \"handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/2005d4d2fcd2b4050d49f0c43e8b7a648a7311763e1575faf22a0b98cd93f389.json\",\n    \"handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/8f821738db77dd8d7dac9c4b8d052999c8bd927b36b68ed0c074910597f20e21.json\",\n    \"handoff/executor_publications/completion-700101-3edf22139d440a89e205fa46/8f821738db77dd8d7dac9c4b8d052999c8bd927b36b68ed0c074910597f20e21.json\",\n    \"handoff/executor_claims/700100-d190a8b3e8efef383fc55ae7.claim\",\n    \"handoff/executor_claims/700101-3edf22139d440a89e205fa46.claim\",\n    \"scripts/web_console_server.py (artifact workflow source, read-only)\",\n    \"scripts/web_console_artifacts.py (artifact workflow source, read-only)\",\n    \"scripts/supervisor_control.py (feedback --json control-plane query, read-only)\",\n    \"projects/v13-dogfood-001/attempt_workspaces/700102-c3df95c1cbbe992824f58363/fv_checks_result.json (mechanical check output)\",\n    \"projects/v13-dogfood-001/attempt_workspaces/700102-c3df95c1cbbe992824f58363/fv_console_test_result.json (focused offline console test output)\"\n  ],\n  \"LIMITATIONS\": [\n    \"Point-in-time verification: results reflect the state at VERIFIED_AT; authoritative lifecycle state may legitimately advance afterwards (e.g. 700101 is not yet sealed) without altering any verified fact, since every verified claim is anchored to recorded, monotonic facts.\",\n    \"The CSV uses bare LF record separators rather than the CRLF that RFC 4180's ABNF literally specifies; fields require no quoting and the file parses byte-exactly under the RFC 4180 csv dialect, so the claim's substance is unaffected (documented in C2).\",\n    \"The Artifact Center reports provenance 'unbound' and hash verification 'unverified' for both artifacts because the 700100/700101 receipts embed no PUBLISHED_PATHS list; console discovery/resolution/readability were fully verified and the artifact hashes were independently verified against publication records (documented in C3).\",\n    \"C4 is verified as absence of adverse evidence across all inspectable authoritative records; a bounded offline verifier cannot re-observe every internal step of prior Executor sessions.\",\n    \"docs/ARCHITECTURE.md does not describe Web Console/Artifact Center internals beyond the supervisor_control.py boundary; C3 therefore exercised the existing implementation's own workflow code path, as the acceptance criteria direct, rather than any console behavior the architecture document does not define.\"\n  ],\n  \"MESSAGE_ID\": 700102,\n  \"METHODS_NOTE\": \"No network access, browser, GUI automation, Computer Use, mouse/keyboard simulation, or ZCode CLI was used at any point; verification used only local read-only file inspection plus two offline Python check scripts executed inside the fenced attempt workspace. The control-plane 'feedback --json' read-only query was used as the production ledger source for the C3 workflow test, matching what the console server itself invokes.\",\n  \"NONCE\": \"65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8\",\n  \"OVERALL_RATIONALE\": \"All four decision-critical claims independently evaluate to PASS; no claim is FAIL and no residual uncertainty blocks any individual verdict.\",\n  \"OVERALL_RESULT\": \"PASS\",\n  \"POLICY_ID\": \"GENERAL_FV_V1\",\n  \"POLICY_VERSION\": 1,\n  \"PROJECT_ID\": \"v13-dogfood-001\",\n  \"PUBLICATION\": {\n    \"note\": \"This report is published through executor_fence.py publish; its SHA-256 is recorded in the completion receipt of MESSAGE_ID 700102.\",\n    \"path\": \"reports/final-verification-700102.json\"\n  },\n  \"SCHEMA_VERSION\": 1,\n  \"STAGE_ID\": \"GENERAL_FV_V1_CHECK\",\n  \"TASK_ID\": \"DOGFOOD_FINAL_VERIFICATION\",\n  \"VERIFICATION_ID\": \"FINAL-VERIFICATION-700102\",\n  \"VERIFIED_AT\": \"2026-09-12T20:58:48.895888+00:00\",\n  \"VERIFIED_AT_LOCAL\": \"2026-09-13T04:58:48.895888+08:00\"\n}",
+          "error": null,
+          "total_bytes": 19811,
+          "returned_bytes": 19811,
+          "truncated": false
+        }
+      }
+    },
+    "/rounds/700103": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "round": {
+          "message_id": 700103,
+          "found": true,
+          "identity": {
+            "message_id": 700103,
+            "task_id": "DOGFOOD_FINAL_VERIFICATION",
+            "stage_id": "GENERAL_FV_V1_RECEIPT_REPAIR",
+            "attempt": 2,
+            "nonce": "d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e"
+          },
+          "dispatch": {
+            "available": true,
+            "integrity": "AUTHORIZED_VALID",
+            "trust_status": "AUTHORIZED_VALID",
+            "exact_dispatch": "MESSAGE_ID: 700103\nTASK_ID: DOGFOOD_FINAL_VERIFICATION\nSTAGE_ID: GENERAL_FV_V1_RECEIPT_REPAIR\n\n```json\n{\n  \"PROTOCOL_VERSION\": 2,\n  \"CLAIM_PROTOCOL_VERSION\": 1,\n  \"MESSAGE_ID\": 700103,\n  \"TASK_ID\": \"DOGFOOD_FINAL_VERIFICATION\",\n  \"STAGE_ID\": \"GENERAL_FV_V1_RECEIPT_REPAIR\",\n  \"ATTEMPT\": 2,\n  \"NONCE\": \"d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e\",\n  \"ISSUED_AT\": \"2026-09-12T21:02:38+00:00\",\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"TASK_KIND\": \"FINAL_VERIFICATION\",\n  \"OBJECTIVE\": \"Repair only the mechanically invalid GENERAL_FV_V1 completion receipt from MESSAGE_ID 700102. Reuse the existing substantive verification report only after focused integrity revalidation, then place the exact policy-required FINAL_VERIFICATION object directly in the new completion RECEIPT. Do not modify either deliverable and do not publish another canonical report.\",\n  \"INPUTS\": [\n    \"reports/final-verification-700102.json\",\n    \"workspace/dogfood-note.md\",\n    \"evidence/dogfood-rounds.csv\",\n    \"docs/ARCHITECTURE.md\",\n    \"handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json\",\n    \"profiles/GENERAL/FINAL_VERIFICATION_POLICY.json\",\n    \"orchestrator.py evaluate_final_verification_receipt implementation\"\n  ],\n  \"OUTPUTS\": [\n    \"One Runtime-committed completion receipt whose top-level payload contains a mechanically valid FINAL_VERIFICATION object\",\n    \"No canonical publication and no changes to existing reports, deliverables, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifacts\"\n  ],\n  \"FINAL_VERIFICATION_GATE\": {\n    \"POLICY_ID\": \"GENERAL_FV_V1\",\n    \"POLICY_VERSION\": 1,\n    \"CLAIMS_HASH\": \"a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74\",\n    \"CLAIM_COUNT\": 4,\n    \"EXECUTION_MODE\": \"LIVE_READ_ONLY\",\n    \"CRITICAL_CLAIMS\": [\n      {\n        \"claim_id\": \"C1\",\n        \"claim\": \"workspace/dogfood-note.md is a concise and accurate summary of the normal public protocol flow and major agent/control roles described in docs/ARCHITECTURE.md.\",\n        \"claim_type\": \"SOURCE_SUPPORT\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"workspace/dogfood-note.md\",\n          \"docs/ARCHITECTURE.md\"\n        ],\n        \"verification_standard\": \"Adversarially compare each material statement in the note with the architecture source; fail on any unsupported or materially misleading protocol statement.\"\n      },\n      {\n        \"claim_id\": \"C2\",\n        \"claim\": \"evidence/dogfood-rounds.csv has the required schema and records every and only authoritative consumed dogfood round available at its declared collection cutoff, including 700100 and excluding then-unconsumed 700101.\",\n        \"claim_type\": \"NUMERICAL\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"evidence/dogfood-rounds.csv\",\n          \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n          \"handoff/completion_ledger/audit.jsonl\"\n        ],\n        \"verification_standard\": \"Parse the CSV, reconstruct the qualifying ledger set at the declared cutoff, and fail on any missing, extra, duplicated, invented, or mismatched row.\"\n      },\n      {\n        \"claim_id\": \"C3\",\n        \"claim\": \"Both required deliverables exist at the goal paths and are readable through the normal local Web Console and Artifact Center resolution workflow.\",\n        \"claim_type\": \"DELIVERABLE_INTEGRITY\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"workspace/dogfood-note.md\",\n          \"evidence/dogfood-rounds.csv\"\n        ],\n        \"verification_standard\": \"Verify exact paths, readable bytes, Markdown and CSV integrity, and the existing local Artifact Center discovery/resolution path without GUI or network access; fail if either artifact cannot be resolved and read normally.\"\n      },\n      {\n        \"claim_id\": \"C4\",\n        \"claim\": \"The dogfood work preserved Runtime safety constraints: authorized stages used the claim, fence, publication, and completion lifecycle and changed no user-facing artifacts beyond the two goal deliverables.\",\n        \"claim_type\": \"CONSTRAINT_COMPLIANCE\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n          \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\",\n          \"workspace/dogfood-note.md\",\n          \"evidence/dogfood-rounds.csv\"\n        ],\n        \"verification_standard\": \"Adversarially inspect authoritative receipts and publication records for both stages; fail on any bypass, direct canonical write evidence, forbidden dependency or network use, or extra user-facing output.\"\n      }\n    ]\n  },\n  \"ACCEPTANCE_CRITERIA\": [\n    \"Before adopting any prior result, recompute the canonical CRITICAL_CLAIMS hash with ensure_ascii=false, sorted keys, and compact separators and require exact equality with a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74.\",\n    \"Perform only a focused integrity revalidation: require reports/final-verification-700102.json to exist with SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b, require it to cover exactly C1-C4 with PASS results, and confirm the two deliverables still have the report-recorded hashes. If any check fails, report FAIL or INCONCLUSIVE accurately rather than manufacturing PASS.\",\n    \"The full completion RECEIPT payload must contain a direct top-level FINAL_VERIFICATION object. Similar top-level fields such as FINAL_VERIFICATION_GATE, PER_CLAIM_RESULTS, or OVERALL_RESULT do not satisfy this requirement.\",\n    \"FINAL_VERIFICATION must contain POLICY_VERSION=1, CLAIMS_HASH equal to the dispatched hash, EXECUTION_MODE=LIVE_READ_ONLY, ISOLATION_INCIDENT=false, OVERALL_STATUS equal to PASS, FAIL, or INCONCLUSIVE, and CLAIM_RESULTS as a list covering exactly C1, C2, C3, and C4 without duplicates.\",\n    \"When focused revalidation supports the existing PASS result, every HIGH-impact claim result must use status SUPPORTED. C1 checks must contain a nonempty source_pointers list; C2 checks must contain calculation_check=PASS and a nonempty calculation_artifact; C3 checks must contain deliverable_check=PASS and a nonempty deliverable_path; C4 checks must contain constraint_check=PASS.\",\n    \"Use reports/final-verification-700102.json as the existing calculation/integrity artifact where appropriate and retain concise evidence pointers and limitations in the receipt. Do not publish reports/final-verification-700103.json or any other canonical file.\",\n    \"Completion staging must carry the exact MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, NONCE, and PROJECT_ID v13-dogfood-001, and the authoritative completion must be committed only through scripts/executor_completion.py.\",\n    \"Do not modify either goal deliverable, the existing verification report, project state, project memory, PROJECT_GOAL.md, Runtime Core, control-plane files, or Runtime-owned compatibility artifacts.\"\n  ],\n  \"MAX_TIME\": 600,\n  \"MAX_RETRIES\": 0,\n  \"SCHEDULER_GRACE_SECONDS\": 3600,\n  \"SUPERVISOR_REVIEW_EFFORT\": \"high\",\n  \"FORBIDDEN_ACTIONS\": [\n    \"No network access, browser, GUI automation, Computer Use, mouse or keyboard simulation, or ZCode CLI.\",\n    \"No broad re-execution of the substantive verification; inspect only the existing report and the precise integrity evidence needed to validate its reuse.\",\n    \"No direct canonical writes and no executor_fence.py publish call for this receipt-only repair.\",\n    \"Do not modify, delete, or republish any deliverable, report, project state, project memory, goal, Runtime Core file, control-plane file, claim, ledger entry, authorization record, or root completion artifact.\",\n    \"Do not fabricate a PASS, evidence pointer, hash, check result, lifecycle fact, or timestamp.\",\n    \"Do not choose or start a later stage.\"\n  ],\n  \"STOP_CONDITIONS\": [\n    \"Stop immediately and silently if executor_claim.py returns CLAIM_EXISTS or ALREADY_PROCESSED.\",\n    \"Fail closed without touching stage outputs if claim acquisition or any executor_fence.py check fails.\",\n    \"If the existing report, claims hash, claim coverage, or deliverable hashes do not match the dispatched evidence, record the accurate FAIL or INCONCLUSIVE result and do not attempt artifact repair.\",\n    \"Stop immediately after executor_completion.py returns COMPLETION_COMMITTED; on any other completion result, fail closed and publish nothing.\"\n  ],\n  \"EXECUTOR_PROTOCOL\": [\n    \"After reading the exact task identity, run: python scripts/executor_claim.py acquire --message-id 700103 --task-id \\\"DOGFOOD_FINAL_VERIFICATION\\\" --stage-id \\\"GENERAL_FV_V1_RECEIPT_REPAIR\\\" --attempt 2 --nonce \\\"d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e\\\".\",\n    \"Exit code 0 / CLAIM_ACQUIRED grants this instance ownership of the attempt; retain the returned claim token. Exit code 10 / CLAIM_EXISTS or 11 / ALREADY_PROCESSED requires immediate silent stop before any inspection or mutation. Any other claim-helper failure requires fail-closed stop.\",\n    \"After claim acquisition, run executor_fence.py prepare with the exact identity and claim token. Keep all temporary checks and subprocess outputs inside the returned attempt workspace; canonical inputs are read-only.\",\n    \"Run executor_fence.py check with the exact identity and token on resume, before every work batch or mutation-capable command, and immediately before building completion staging. A prior successful check is not a reusable write grant.\",\n    \"Do not call executor_fence.py publish in this receipt-only repair. Do not directly write any canonical project or Runtime path.\",\n    \"Build one completion staging directory under projects/v13-dogfood-001/completion_staging containing staging.json with COMPLETION_STAGING_SCHEMA_VERSION=1, the exact stable identity, PROJECT_ID=v13-dogfood-001, STATUS=STAGING_READY, a timezone-aware CREATED_AT, and the full RECEIPT payload. Put FINAL_VERIFICATION directly inside RECEIPT.\",\n    \"Run: python scripts/executor_completion.py commit --staging-dir \\\"<staging dir>\\\" --claim-token \\\"<claim token>\\\". Exit code 0 / COMPLETION_COMMITTED requires immediate stop. Exit codes 10, 11, 12, 13, or 14 require fail-closed stop with no publication or root artifact creation.\",\n    \"Never delete a claim directory, reuse or transfer the claim token, edit Runtime-generated SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, or ZCODE_DONE.flag, or continue after completion commit.\"\n  ]\n}\n```\n",
+            "error": null,
+            "archived_at": "2026-09-12T21:08:08+00:00",
+            "dispatch_sha256": "0a619d427f2e3edae4fab3f71737c9c243bf93baec24c4c3b1f671f5b9069377",
+            "supervisor_turn_id": "supervisor-turn-76125fc57cef4b92b57b22721967662a",
+            "decision_receipt_sha256": "e0c5d8b95b114a0e9c2991db1bc6db856878cf494341fad0e350ac17203626e8",
+            "originating_control_revision": 0,
+            "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700103-e0aefba229597b814e933d30.json",
+            "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700103-e0aefba229597b814e933d30.md",
+            "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700103-e0aefba229597b814e933d30.authorized.json"
+          },
+          "completion": {
+            "available": true,
+            "status": "COMPLETION_SEALED",
+            "integrity": "OK",
+            "committed_at": "2026-09-12T21:16:07+00:00",
+            "consumed_at": "2026-09-12T21:16:08+00:00",
+            "sealed_at": "2026-09-12T21:21:46+00:00",
+            "commit_id": "completion-700103-e0aefba229597b814e933d30",
+            "claim_dir": "handoff/executor_claims/700103-e0aefba229597b814e933d30.claim",
+            "ledger_file": "handoff/completion_ledger/completion-700103-e0aefba229597b814e933d30.json",
+            "receipt": {
+              "MESSAGE_ID": 700103,
+              "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+              "STAGE_ID": "GENERAL_FV_V1_RECEIPT_REPAIR",
+              "ATTEMPT": 2,
+              "NONCE": "d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e",
+              "PROJECT_ID": "v13-dogfood-001",
+              "STATUS": "COMPLETED",
+              "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+              "COMPLETED_AT": "2026-09-12T21:15:04.171675+00:00",
+              "OBJECTIVE_SUMMARY": "Receipt-only repair of the mechanically invalid GENERAL_FV_V1 completion receipt from MESSAGE_ID 700102 (that receipt carried FINAL_VERIFICATION_GATE/PER_CLAIM_RESULTS/OVERALL_RESULT but no direct top-level FINAL_VERIFICATION object, which the mechanical gate requires). No substantive re-verification was performed. The existing canonical report reports/final-verification-700102.json (SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b) was adopted only after a focused integrity revalidation, all checks of which passed: the dispatched CRITICAL_CLAIMS hash was recomputed with ensure_ascii=False, sorted keys, and compact separators and equaled a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74 exactly; the report file matched its dispatched hash byte-for-byte; it covers exactly C1-C4 with per-claim PASS and OVERALL_RESULT PASS; and both goal deliverables still hash to the report-recorded values (workspace/dogfood-note.md 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58, evidence/dogfood-rounds.csv b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003). This attempt performed no executor_fence.py publish and no canonical write; neither deliverable, the report, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifacts were modified.",
+              "FINAL_VERIFICATION": {
+                "POLICY_ID": "GENERAL_FV_V1",
+                "POLICY_VERSION": 1,
+                "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+                "EXECUTION_MODE": "LIVE_READ_ONLY",
+                "ISOLATION_INCIDENT": false,
+                "OVERALL_STATUS": "PASS",
+                "CLAIM_RESULTS": [
+                  {
+                    "claim_id": "C1",
+                    "claim_type": "SOURCE_SUPPORT",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "source_pointers": [
+                        "workspace/dogfood-note.md",
+                        "docs/ARCHITECTURE.md",
+                        "reports/final-verification-700102.json"
+                      ]
+                    },
+                    "summary": "Reuse of the 700102 result: its C1 PASS rests on a statement-by-statement adversarial comparison of workspace/dogfood-note.md against docs/ARCHITECTURE.md (full record in the reused report). Focused revalidation confirmed the reused report is byte-identical to its verified artifact (SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b) and the note is unchanged (SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58), so the source-support conclusion remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C1)",
+                      "workspace/dogfood-note.md",
+                      "docs/ARCHITECTURE.md"
+                    ]
+                  },
+                  {
+                    "claim_id": "C2",
+                    "claim_type": "NUMERICAL",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "calculation_check": "PASS",
+                      "calculation_artifact": "reports/final-verification-700102.json"
+                    },
+                    "summary": "Reuse of the 700102 result: its C2 PASS parsed evidence/dogfood-rounds.csv under the RFC 4180 dialect and reconstructed the consumed-at-cutoff ledger set (cutoff 2026-09-12T20:31:16.888225+00:00; 700100 in, 700101 correctly out). Focused revalidation reconfirmed the CSV is unchanged today (SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003, equal to the report-recorded and publication-record value), so the numerical conclusion remains supported; the reused report is the existing calculation artifact.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C2)",
+                      "evidence/dogfood-rounds.csv",
+                      "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                      "handoff/completion_ledger/audit.jsonl"
+                    ]
+                  },
+                  {
+                    "claim_id": "C3",
+                    "claim_type": "DELIVERABLE_INTEGRITY",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "deliverable_check": "PASS",
+                      "deliverable_path": "workspace/dogfood-note.md; evidence/dogfood-rounds.csv"
+                    },
+                    "summary": "Reuse of the 700102 result: its C3 PASS resolved and read both deliverables through the production local Web Console/Artifact Center workflow code path (focused offline test; no GUI or network). Focused revalidation reconfirmed both files still exist at the goal paths with the report-recorded hashes and readable bytes (note 6276 bytes / 8ba6f737..., CSV 212 bytes / b076c865...), so deliverable integrity remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C3)",
+                      "workspace/dogfood-note.md",
+                      "evidence/dogfood-rounds.csv"
+                    ]
+                  },
+                  {
+                    "claim_id": "C4",
+                    "claim_type": "CONSTRAINT_COMPLIANCE",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "constraint_check": "PASS"
+                    },
+                    "summary": "Reuse of the 700102 result: its C4 PASS inspected claims, publications, ledger, and audit records for MESSAGE_IDs 700100/700101 and found the lifecycle honored with no user-facing output beyond the two goal deliverables. This repair attempt adds no new constraint surface: it published nothing, wrote nothing canonical except this Runtime-committed receipt, and reconfirmed both deliverable hashes unchanged, so the constraint-compliance conclusion remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C4)",
+                      "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                      "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+                      "handoff/executor_publications/"
+                    ]
+                  }
+                ],
+                "OVERALL_RATIONALE": "All four decision-critical claims reuse the 700102 PASS results, and every focused integrity revalidation check required before adopting them passed: claims hash recomputed exactly, reused report byte-identical to its verified artifact, per-claim coverage exactly C1-C4 all PASS, and both deliverable hashes unchanged. No claim is FAIL and no residual uncertainty blocks the overall verdict.",
+                "REUSED_REPORT_PATH": "reports/final-verification-700102.json",
+                "REUSED_REPORT_SHA256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+                "CLAIMS_HASH_RECIPE": "sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, ensure_ascii=False, sort_keys=True, separators=(',', ':')); recomputed 2026-09-12T21:13:23.524750+00:00 from the dispatched TO_ZCODE.md gate, exact equality with the dispatched hash required and confirmed before adopting any prior result.",
+                "REVALIDATED_AT": "2026-09-12T21:13:23.524750+00:00",
+                "REUSE_BASIS": {
+                  "method": "Focused integrity revalidation only (no broad re-execution), per task acceptance criteria; check script and raw results in the attempt workspace of this attempt.",
+                  "checks": [
+                    "claims_hash_recomputed_matches_gate: PASS (recomputed == dispatched == gate)",
+                    "gate_identity_matches_inbox: PASS (MESSAGE_ID 700103, ATTEMPT 2, LIVE_READ_ONLY, POLICY_VERSION 1)",
+                    "report_exists: PASS (reports/final-verification-700102.json)",
+                    "report_sha256_matches: PASS (ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b)",
+                    "report_covers_C1_C4_all_PASS: PASS (exactly C1,C2,C3,C4; each result PASS)",
+                    "report_overall_PASS_and_gate_fields: PASS (OVERALL_RESULT PASS, POLICY_VERSION 1, CLAIMS_HASH fields equal dispatched)",
+                    "note_hash_matches_report_record: PASS (8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58)",
+                    "csv_hash_matches_report_record: PASS (b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003)"
+                  ],
+                  "revalidation_result_artifact": "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+                },
+                "LIMITATIONS": [
+                  "Receipt-only repair: no substantive re-verification was performed; per-claim substance is adopted from reports/final-verification-700102.json (VERIFIED_AT 2026-09-12T20:58:48.895888+00:00) after the focused integrity revalidation documented above.",
+                  "Point-in-time: revalidation reflects the state at REVALIDATED_AT; later lifecycle or artifact changes are outside this receipt's scope.",
+                  "Known nuances carried from the reused report remain: the rounds CSV uses bare LF record separators (parses byte-exactly under the RFC 4180 csv dialect); the Artifact Center shows provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; C4 is verified as absence of adverse evidence across inspectable authoritative records; docs/ARCHITECTURE.md does not describe Web Console internals beyond the supervisor_control.py boundary.",
+                  "This attempt produced no new canonical artifact: the repaired receipt itself is the only output, carried in this completion."
+                ],
+                "EVIDENCE_POINTERS_INSPECTED": [
+                  "TO_ZCODE.md (dispatched task and FINAL_VERIFICATION_GATE, read-only)",
+                  "reports/final-verification-700102.json",
+                  "workspace/dogfood-note.md",
+                  "evidence/dogfood-rounds.csv",
+                  "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+                  "profiles/GENERAL/FINAL_VERIFICATION_POLICY.json",
+                  "orchestrator.py (evaluate_final_verification_receipt implementation, read-only)",
+                  "scripts/executor_completion.py (staging schema validation, read-only)",
+                  "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate.py",
+                  "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+                ]
+              },
+              "REPAIR_NOTE": "Prior commit completion-700102-c3df95c1cbbe992824f58363 was consumed/sealed with a receipt whose verification payload used FINAL_VERIFICATION_GATE, PER_CLAIM_RESULTS, and OVERALL_RESULT top-level fields; the mechanical gate requires a direct top-level FINAL_VERIFICATION object. This attempt supplies exactly that object, reusing the verified 700102 report after focused integrity revalidation, per the dispatched repair task.",
+              "NO_PUBLICATION_PERFORMED": true,
+              "PUBLISHED_PATHS": [],
+              "SUGGESTED_MEMORY_UPDATES": [
+                "Suggested for Supervisor consideration (not Executor-written): project memory for v13-dogfood-001 can record that 700103/GENERAL_FV_V1_RECEIPT_REPAIR committed the repaired GENERAL_FV_V1 receipt with OVERALL_STATUS PASS, reusing the 700102 report after focused integrity revalidation (all eight checks PASS, no canonical publication).",
+                "Convention note for future FV stages: the completion RECEIPT must embed a direct top-level FINAL_VERIFICATION object containing POLICY_VERSION, CLAIMS_HASH, EXECUTION_MODE, ISOLATION_INCIDENT, OVERALL_STATUS, and CLAIM_RESULTS (per-claim status plus the policy-required checks fields); fields named FINAL_VERIFICATION_GATE, PER_CLAIM_RESULTS, or OVERALL_RESULT do not satisfy the mechanical gate."
+              ]
+            },
+            "receipt_status": "COMPLETED",
+            "receipt_outcome": null
+          },
+          "interventions": [],
+          "artifacts": {
+            "available": true,
+            "reason": null,
+            "paths": [],
+            "note": "Verified Runtime publication metadata; historical bytes are not retained. Current-content preview is available in Artifact Center only when its hash matches this publication."
+          },
+          "decision": {
+            "available": true,
+            "verified": true,
+            "reason": null,
+            "turn_id": "supervisor-turn-76125fc57cef4b92b57b22721967662a",
+            "committed_at": "2026-09-12T21:08:08+00:00",
+            "resulting_status": "WAITING_EXECUTOR",
+            "decision_decision": "REVISE",
+            "decision_reason": "The substantive verification report passed all four claims, but Runtime mechanical acceptance failed because the completion receipt omitted the required FINAL_VERIFICATION object; repair only that receipt envelope under a fresh identity.",
+            "decision_history_index": 4,
+            "intervention_ids": [],
+            "originating_control_revision": 0
+          },
+          "honesty": {
+            "notes": [],
+            "control": [],
+            "contradictions": []
+          }
+        }
+      }
+    },
+    "/artifacts?message_id=700103": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:47:02+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": 700103,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 0,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    },
+    "/rounds/700104": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "round": {
+          "message_id": 700104,
+          "found": true,
+          "identity": {
+            "message_id": 700104,
+            "task_id": "DOGFOOD_FINAL_VERIFICATION",
+            "stage_id": "GENERAL_FV_V1_BINDING_REPAIR",
+            "attempt": 3,
+            "nonce": "305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924"
+          },
+          "dispatch": {
+            "available": true,
+            "integrity": "AUTHORIZED_VALID",
+            "trust_status": "AUTHORIZED_VALID",
+            "exact_dispatch": "MESSAGE_ID: 700104\nTASK_ID: DOGFOOD_FINAL_VERIFICATION\nSTAGE_ID: GENERAL_FV_V1_BINDING_REPAIR\n\n```json\n{\n  \"PROTOCOL_VERSION\": 2,\n  \"CLAIM_PROTOCOL_VERSION\": 1,\n  \"MESSAGE_ID\": 700104,\n  \"TASK_ID\": \"DOGFOOD_FINAL_VERIFICATION\",\n  \"STAGE_ID\": \"GENERAL_FV_V1_BINDING_REPAIR\",\n  \"ATTEMPT\": 3,\n  \"NONCE\": \"305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924\",\n  \"ISSUED_AT\": \"2026-09-12T21:16:08+00:00\",\n  \"EXECUTOR_MODEL_FAMILY\": \"GLM-5.3\",\n  \"TASK_KIND\": \"FINAL_VERIFICATION\",\n  \"OBJECTIVE\": \"Repair only the Runtime acceptance binding for the mechanically rejected GENERAL_FV_V1 receipt from MESSAGE_ID 700103. Reuse its already validated direct FINAL_VERIFICATION object after focused integrity confirmation and commit it under this fresh identity. Do not modify either deliverable and do not publish another canonical report.\",\n  \"INPUTS\": [\n    \"reports/final-verification-700102.json\",\n    \"workspace/dogfood-note.md\",\n    \"evidence/dogfood-rounds.csv\",\n    \"handoff/completion_ledger/completion-700103-e0aefba229597b814e933d30.json\",\n    \"profiles/GENERAL/FINAL_VERIFICATION_POLICY.json\",\n    \"orchestrator.py authorized_final_verification_task and evaluate_final_verification_receipt implementations\"\n  ],\n  \"OUTPUTS\": [\n    \"One Runtime-committed completion receipt whose top-level payload contains the policy-valid FINAL_VERIFICATION object from authoritative completion 700103\",\n    \"No canonical publication and no changes to existing reports, deliverables, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifacts\"\n  ],\n  \"FINAL_VERIFICATION_GATE\": {\n    \"POLICY_ID\": \"GENERAL_FV_V1\",\n    \"POLICY_VERSION\": 1,\n    \"CLAIMS_HASH\": \"a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74\",\n    \"CLAIM_COUNT\": 4,\n    \"EXECUTION_MODE\": \"LIVE_READ_ONLY\",\n    \"CRITICAL_CLAIMS\": [\n      {\n        \"claim_id\": \"C1\",\n        \"claim\": \"workspace/dogfood-note.md is a concise and accurate summary of the normal public protocol flow and major agent/control roles described in docs/ARCHITECTURE.md.\",\n        \"claim_type\": \"SOURCE_SUPPORT\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"workspace/dogfood-note.md\",\n          \"docs/ARCHITECTURE.md\"\n        ],\n        \"verification_standard\": \"Adversarially compare each material statement in the note with the architecture source; fail on any unsupported or materially misleading protocol statement.\"\n      },\n      {\n        \"claim_id\": \"C2\",\n        \"claim\": \"evidence/dogfood-rounds.csv has the required schema and records every and only authoritative consumed dogfood round available at its declared collection cutoff, including 700100 and excluding then-unconsumed 700101.\",\n        \"claim_type\": \"NUMERICAL\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"evidence/dogfood-rounds.csv\",\n          \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n          \"handoff/completion_ledger/audit.jsonl\"\n        ],\n        \"verification_standard\": \"Parse the CSV, reconstruct the qualifying ledger set at the declared cutoff, and fail on any missing, extra, duplicated, invented, or mismatched row.\"\n      },\n      {\n        \"claim_id\": \"C3\",\n        \"claim\": \"Both required deliverables exist at the goal paths and are readable through the normal local Web Console and Artifact Center resolution workflow.\",\n        \"claim_type\": \"DELIVERABLE_INTEGRITY\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"workspace/dogfood-note.md\",\n          \"evidence/dogfood-rounds.csv\"\n        ],\n        \"verification_standard\": \"Verify exact paths, readable bytes, Markdown and CSV integrity, and the existing local Artifact Center discovery/resolution path without GUI or network access; fail if either artifact cannot be resolved and read normally.\"\n      },\n      {\n        \"claim_id\": \"C4\",\n        \"claim\": \"The dogfood work preserved Runtime safety constraints: authorized stages used the claim, fence, publication, and completion lifecycle and changed no user-facing artifacts beyond the two goal deliverables.\",\n        \"claim_type\": \"CONSTRAINT_COMPLIANCE\",\n        \"decision_impact\": \"HIGH\",\n        \"evidence_pointers\": [\n          \"handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json\",\n          \"handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json\",\n          \"workspace/dogfood-note.md\",\n          \"evidence/dogfood-rounds.csv\"\n        ],\n        \"verification_standard\": \"Adversarially inspect authoritative receipts and publication records for both stages; fail on any bypass, direct canonical write evidence, forbidden dependency or network use, or extra user-facing output.\"\n      }\n    ]\n  },\n  \"ACCEPTANCE_CRITERIA\": [\n    \"Before adopting any prior result, recompute the canonical CRITICAL_CLAIMS hash with ensure_ascii=false, sorted keys, and compact separators and require exact equality with a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74.\",\n    \"Perform only focused integrity confirmation: require authoritative completion 700103 to contain direct FINAL_VERIFICATION with CLAIMS_HASH a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74, exactly C1-C4, and policy-valid SUPPORTED checks; require reports/final-verification-700102.json to retain SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b; and confirm the two deliverables retain the receipt-recorded hashes. If any check fails, report FAIL or INCONCLUSIVE accurately rather than manufacturing PASS.\",\n    \"The full completion RECEIPT payload must contain a direct top-level FINAL_VERIFICATION object copied value-for-value from authoritative completion 700103 after the focused confirmations. Similar top-level fields such as FINAL_VERIFICATION_GATE, PER_CLAIM_RESULTS, or OVERALL_RESULT do not satisfy this requirement.\",\n    \"FINAL_VERIFICATION must contain POLICY_VERSION=1, CLAIMS_HASH equal to the dispatched hash, EXECUTION_MODE=LIVE_READ_ONLY, ISOLATION_INCIDENT=false, OVERALL_STATUS equal to PASS, FAIL, or INCONCLUSIVE, and CLAIM_RESULTS as a list covering exactly C1, C2, C3, and C4 without duplicates.\",\n    \"When focused revalidation supports the existing PASS result, every HIGH-impact claim result must use status SUPPORTED. C1 checks must contain a nonempty source_pointers list; C2 checks must contain calculation_check=PASS and a nonempty calculation_artifact; C3 checks must contain deliverable_check=PASS and a nonempty deliverable_path; C4 checks must contain constraint_check=PASS.\",\n    \"Use reports/final-verification-700102.json as the existing calculation/integrity artifact and completion 700103 as the authoritative receipt template. Retain its concise evidence pointers and limitations. Do not publish reports/final-verification-700104.json or any other canonical file.\",\n    \"Completion staging must carry the exact MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, NONCE, and PROJECT_ID v13-dogfood-001, and the authoritative completion must be committed only through scripts/executor_completion.py.\",\n    \"Do not modify either goal deliverable, the existing verification report, project state, project memory, PROJECT_GOAL.md, Runtime Core, control-plane files, or Runtime-owned compatibility artifacts.\"\n  ],\n  \"MAX_TIME\": 600,\n  \"MAX_RETRIES\": 0,\n  \"SCHEDULER_GRACE_SECONDS\": 3600,\n  \"SUPERVISOR_REVIEW_EFFORT\": \"high\",\n  \"FORBIDDEN_ACTIONS\": [\n    \"No network access, browser, GUI automation, Computer Use, mouse or keyboard simulation, or ZCode CLI.\",\n    \"No broad re-execution of the substantive verification; inspect only completion 700103, the existing report, and the precise hashes needed to validate reuse.\",\n    \"No direct canonical writes and no executor_fence.py publish call for this receipt-only repair.\",\n    \"Do not modify, delete, or republish any deliverable, report, project state, project memory, goal, Runtime Core file, control-plane file, claim, ledger entry, authorization record, or root completion artifact.\",\n    \"Do not fabricate a PASS, evidence pointer, hash, check result, lifecycle fact, or timestamp.\",\n    \"Do not choose or start a later stage.\"\n  ],\n  \"STOP_CONDITIONS\": [\n    \"Stop immediately and silently if executor_claim.py returns CLAIM_EXISTS or ALREADY_PROCESSED.\",\n    \"Fail closed without touching stage outputs if claim acquisition or any executor_fence.py check fails.\",\n    \"If the existing report, claims hash, claim coverage, or deliverable hashes do not match the dispatched evidence, record the accurate FAIL or INCONCLUSIVE result and do not attempt artifact repair.\",\n    \"Stop immediately after executor_completion.py returns COMPLETION_COMMITTED; on any other completion result, fail closed and publish nothing.\"\n  ],\n  \"EXECUTOR_PROTOCOL\": [\n    \"After reading the exact task identity, run: python scripts/executor_claim.py acquire --message-id 700104 --task-id \\\"DOGFOOD_FINAL_VERIFICATION\\\" --stage-id \\\"GENERAL_FV_V1_BINDING_REPAIR\\\" --attempt 3 --nonce \\\"305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924\\\".\",\n    \"Exit code 0 / CLAIM_ACQUIRED grants this instance ownership of the attempt; retain the returned claim token. Exit code 10 / CLAIM_EXISTS or 11 / ALREADY_PROCESSED requires immediate silent stop before any inspection or mutation. Any other claim-helper failure requires fail-closed stop.\",\n    \"After claim acquisition, run executor_fence.py prepare with the exact identity and claim token. Keep all temporary checks and subprocess outputs inside the returned attempt workspace; canonical inputs are read-only.\",\n    \"Run executor_fence.py check with the exact identity and token on resume, before every work batch or mutation-capable command, and immediately before building completion staging. A prior successful check is not a reusable write grant.\",\n    \"Do not call executor_fence.py publish in this receipt-only repair. Do not directly write any canonical project or Runtime path.\",\n    \"Build one completion staging directory under projects/v13-dogfood-001/completion_staging containing staging.json with COMPLETION_STAGING_SCHEMA_VERSION=1, the exact stable identity, PROJECT_ID=v13-dogfood-001, STATUS=STAGING_READY, a timezone-aware CREATED_AT, and the full RECEIPT payload. Put FINAL_VERIFICATION directly inside RECEIPT.\",\n    \"Run: python scripts/executor_completion.py commit --staging-dir \\\"<staging dir>\\\" --claim-token \\\"<claim token>\\\". Exit code 0 / COMPLETION_COMMITTED requires immediate stop. Exit codes 10, 11, 12, 13, or 14 require fail-closed stop with no publication or root artifact creation.\",\n    \"Never delete a claim directory, reuse or transfer the claim token, edit Runtime-generated SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, or ZCODE_DONE.flag, or continue after completion commit.\"\n  ]\n}\n```\n",
+            "error": null,
+            "archived_at": "2026-09-12T21:21:46+00:00",
+            "dispatch_sha256": "4723a1203918efc1741e50fd4aa5be115c38c74bb89e1a9f51faa2175877c1d7",
+            "supervisor_turn_id": "supervisor-turn-5bc8f54b448c4385b6b93aac2c9edf59",
+            "decision_receipt_sha256": "027a12a0407fb01542a376b8638142aae4aad85b92fdc6c4f037272a1672351e",
+            "originating_control_revision": 0,
+            "metadata_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.json",
+            "archive_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.md",
+            "authorization_file": "handoff/supervisor_dispatch_archive/v13-dogfood-001/dispatch-700104-c4da760b77911a636ac789fb.authorized.json"
+          },
+          "completion": {
+            "available": true,
+            "status": "COMPLETION_SEALED",
+            "integrity": "OK",
+            "committed_at": "2026-09-12T21:34:07+00:00",
+            "consumed_at": "2026-09-12T21:34:08+00:00",
+            "sealed_at": "2026-09-12T21:38:39+00:00",
+            "commit_id": "completion-700104-c4da760b77911a636ac789fb",
+            "claim_dir": "handoff/executor_claims/700104-c4da760b77911a636ac789fb.claim",
+            "ledger_file": "handoff/completion_ledger/completion-700104-c4da760b77911a636ac789fb.json",
+            "receipt": {
+              "MESSAGE_ID": 700104,
+              "TASK_ID": "DOGFOOD_FINAL_VERIFICATION",
+              "STAGE_ID": "GENERAL_FV_V1_BINDING_REPAIR",
+              "ATTEMPT": 3,
+              "NONCE": "305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924",
+              "PROJECT_ID": "v13-dogfood-001",
+              "STATUS": "COMPLETED",
+              "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+              "COMPLETED_AT": "2026-09-12T21:33:42.895656+00:00",
+              "OBJECTIVE_SUMMARY": "Receipt-only binding repair of the mechanically rejected GENERAL_FV_V1 receipt from MESSAGE_ID 700103. Completion 700103 carried the policy-valid direct FINAL_VERIFICATION object (OVERALL_STATUS PASS, claims hash a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74, exactly C1-C4 all SUPPORTED), but its consume-time acceptance binding recorded mechanical_pass=false with an empty bound claims hash because the consumed identity was not bound to a validated FINAL_VERIFICATION_GATE authorization record at consume time. This attempt re-commits that already validated FINAL_VERIFICATION object value-for-value under the fresh identity 700104/GENERAL_FV_V1_BINDING_REPAIR, whose Runtime authorized_dispatch record carries IS_FINAL_VERIFICATION=true and the full validated gate, so the mechanical acceptance binding can be established at consume time. Before adoption, focused integrity confirmation re-ran all 28 checks and every one passed: the dispatched CRITICAL_CLAIMS hash was recomputed (ensure_ascii=False, sorted keys, compact separators) with exact equality to a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74; completion 700103 is COMPLETION_SEALED and contains the direct policy-valid FINAL_VERIFICATION (POLICY_VERSION 1, LIVE_READ_ONLY, no isolation incident, exactly C1/C2/C3/C4, all SUPPORTED with the policy-required checks fields); reports/final-verification-700102.json retains SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b; and both goal deliverables retain the receipt-recorded hashes (workspace/dogfood-note.md 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58, evidence/dogfood-rounds.csv b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003). No substantive re-verification was performed, no executor_fence.py publish was called, and no canonical file, project state, project memory, goal, Runtime Core, control plane, or root compatibility artifact was modified.",
+              "FINAL_VERIFICATION": {
+                "POLICY_ID": "GENERAL_FV_V1",
+                "POLICY_VERSION": 1,
+                "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+                "EXECUTION_MODE": "LIVE_READ_ONLY",
+                "ISOLATION_INCIDENT": false,
+                "OVERALL_STATUS": "PASS",
+                "CLAIM_RESULTS": [
+                  {
+                    "claim_id": "C1",
+                    "claim_type": "SOURCE_SUPPORT",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "source_pointers": [
+                        "workspace/dogfood-note.md",
+                        "docs/ARCHITECTURE.md",
+                        "reports/final-verification-700102.json"
+                      ]
+                    },
+                    "summary": "Reuse of the 700102 result: its C1 PASS rests on a statement-by-statement adversarial comparison of workspace/dogfood-note.md against docs/ARCHITECTURE.md (full record in the reused report). Focused revalidation confirmed the reused report is byte-identical to its verified artifact (SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b) and the note is unchanged (SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58), so the source-support conclusion remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C1)",
+                      "workspace/dogfood-note.md",
+                      "docs/ARCHITECTURE.md"
+                    ]
+                  },
+                  {
+                    "claim_id": "C2",
+                    "claim_type": "NUMERICAL",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "calculation_check": "PASS",
+                      "calculation_artifact": "reports/final-verification-700102.json"
+                    },
+                    "summary": "Reuse of the 700102 result: its C2 PASS parsed evidence/dogfood-rounds.csv under the RFC 4180 dialect and reconstructed the consumed-at-cutoff ledger set (cutoff 2026-09-12T20:31:16.888225+00:00; 700100 in, 700101 correctly out). Focused revalidation reconfirmed the CSV is unchanged today (SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003, equal to the report-recorded and publication-record value), so the numerical conclusion remains supported; the reused report is the existing calculation artifact.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C2)",
+                      "evidence/dogfood-rounds.csv",
+                      "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                      "handoff/completion_ledger/audit.jsonl"
+                    ]
+                  },
+                  {
+                    "claim_id": "C3",
+                    "claim_type": "DELIVERABLE_INTEGRITY",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "deliverable_check": "PASS",
+                      "deliverable_path": "workspace/dogfood-note.md; evidence/dogfood-rounds.csv"
+                    },
+                    "summary": "Reuse of the 700102 result: its C3 PASS resolved and read both deliverables through the production local Web Console/Artifact Center workflow code path (focused offline test; no GUI or network). Focused revalidation reconfirmed both files still exist at the goal paths with the report-recorded hashes and readable bytes (note 6276 bytes / 8ba6f737..., CSV 212 bytes / b076c865...), so deliverable integrity remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C3)",
+                      "workspace/dogfood-note.md",
+                      "evidence/dogfood-rounds.csv"
+                    ]
+                  },
+                  {
+                    "claim_id": "C4",
+                    "claim_type": "CONSTRAINT_COMPLIANCE",
+                    "decision_impact": "HIGH",
+                    "status": "SUPPORTED",
+                    "checks": {
+                      "constraint_check": "PASS"
+                    },
+                    "summary": "Reuse of the 700102 result: its C4 PASS inspected claims, publications, ledger, and audit records for MESSAGE_IDs 700100/700101 and found the lifecycle honored with no user-facing output beyond the two goal deliverables. This repair attempt adds no new constraint surface: it published nothing, wrote nothing canonical except this Runtime-committed receipt, and reconfirmed both deliverable hashes unchanged, so the constraint-compliance conclusion remains supported.",
+                    "evidence_pointers": [
+                      "reports/final-verification-700102.json (CLAIM_RESULTS C4)",
+                      "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                      "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+                      "handoff/executor_publications/"
+                    ]
+                  }
+                ],
+                "OVERALL_RATIONALE": "All four decision-critical claims reuse the 700102 PASS results, and every focused integrity revalidation check required before adopting them passed: claims hash recomputed exactly, reused report byte-identical to its verified artifact, per-claim coverage exactly C1-C4 all PASS, and both deliverable hashes unchanged. No claim is FAIL and no residual uncertainty blocks the overall verdict.",
+                "REUSED_REPORT_PATH": "reports/final-verification-700102.json",
+                "REUSED_REPORT_SHA256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+                "CLAIMS_HASH_RECIPE": "sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, ensure_ascii=False, sort_keys=True, separators=(',', ':')); recomputed 2026-09-12T21:13:23.524750+00:00 from the dispatched TO_ZCODE.md gate, exact equality with the dispatched hash required and confirmed before adopting any prior result.",
+                "REVALIDATED_AT": "2026-09-12T21:13:23.524750+00:00",
+                "REUSE_BASIS": {
+                  "method": "Focused integrity revalidation only (no broad re-execution), per task acceptance criteria; check script and raw results in the attempt workspace of this attempt.",
+                  "checks": [
+                    "claims_hash_recomputed_matches_gate: PASS (recomputed == dispatched == gate)",
+                    "gate_identity_matches_inbox: PASS (MESSAGE_ID 700103, ATTEMPT 2, LIVE_READ_ONLY, POLICY_VERSION 1)",
+                    "report_exists: PASS (reports/final-verification-700102.json)",
+                    "report_sha256_matches: PASS (ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b)",
+                    "report_covers_C1_C4_all_PASS: PASS (exactly C1,C2,C3,C4; each result PASS)",
+                    "report_overall_PASS_and_gate_fields: PASS (OVERALL_RESULT PASS, POLICY_VERSION 1, CLAIMS_HASH fields equal dispatched)",
+                    "note_hash_matches_report_record: PASS (8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58)",
+                    "csv_hash_matches_report_record: PASS (b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003)"
+                  ],
+                  "revalidation_result_artifact": "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+                },
+                "LIMITATIONS": [
+                  "Receipt-only repair: no substantive re-verification was performed; per-claim substance is adopted from reports/final-verification-700102.json (VERIFIED_AT 2026-09-12T20:58:48.895888+00:00) after the focused integrity revalidation documented above.",
+                  "Point-in-time: revalidation reflects the state at REVALIDATED_AT; later lifecycle or artifact changes are outside this receipt's scope.",
+                  "Known nuances carried from the reused report remain: the rounds CSV uses bare LF record separators (parses byte-exactly under the RFC 4180 csv dialect); the Artifact Center shows provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; C4 is verified as absence of adverse evidence across inspectable authoritative records; docs/ARCHITECTURE.md does not describe Web Console internals beyond the supervisor_control.py boundary.",
+                  "This attempt produced no new canonical artifact: the repaired receipt itself is the only output, carried in this completion."
+                ],
+                "EVIDENCE_POINTERS_INSPECTED": [
+                  "TO_ZCODE.md (dispatched task and FINAL_VERIFICATION_GATE, read-only)",
+                  "reports/final-verification-700102.json",
+                  "workspace/dogfood-note.md",
+                  "evidence/dogfood-rounds.csv",
+                  "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+                  "profiles/GENERAL/FINAL_VERIFICATION_POLICY.json",
+                  "orchestrator.py (evaluate_final_verification_receipt implementation, read-only)",
+                  "scripts/executor_completion.py (staging schema validation, read-only)",
+                  "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate.py",
+                  "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+                ]
+              },
+              "REPAIR_NOTE": "Binding repair only. The rejected receipt belongs to MESSAGE_ID 700103 (completion-700103-e0aefba229597b814e933d30, STAGE_ID GENERAL_FV_V1_RECEIPT_REPAIR): its consume recorded overall_status=PASS but mechanical_pass=false with an empty bound claims_hash in control/orchestrator_runtime.json (final_verification_receipt_ledger entry consumed_at 2026-09-12T21:16:08+00:00). The FINAL_VERIFICATION object embedded in this receipt is copied value-for-value from that authoritative completion after the focused integrity confirmation required by the dispatched task (all checks PASS, revalidation artifact in this attempt's workspace).",
+              "NO_PUBLICATION_PERFORMED": true,
+              "PUBLISHED_PATHS": [],
+              "REVALIDATION_ARTIFACT": "projects/v13-dogfood-001/attempt_workspaces/700104-c4da760b77911a636ac789fb/fv_binding_repair_revalidation.json",
+              "LIMITATIONS": [
+                "Receipt-only binding repair: no substantive re-verification was performed; the per-claim substance is adopted value-for-value from authoritative completion 700103, which itself reused reports/final-verification-700102.json after focused integrity revalidation.",
+                "Point-in-time: the focused confirmation reflects the artifact state at the time of this attempt; later lifecycle or artifact changes are outside this receipt's scope.",
+                "Known nuances carried from the reused verification remain: the rounds CSV uses bare LF record separators (parses byte-exactly under the RFC 4180 csv dialect); the Artifact Center shows provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; C4 is verified as absence of adverse evidence across inspectable authoritative records.",
+                "This attempt produced no new canonical artifact: the repaired binding receipt itself is the only output, carried in this completion."
+              ],
+              "SUGGESTED_MEMORY_UPDATES": [
+                "Suggested for Supervisor consideration (not Executor-written): project memory for v13-dogfood-001 can record that 700104/GENERAL_FV_V1_BINDING_REPAIR re-committed the policy-valid GENERAL_FV_V1 FINAL_VERIFICATION object (OVERALL_STATUS PASS) from completion 700103 under a fresh identity whose authorized_dispatch carries the validated gate, after all 28 focused integrity checks passed; no canonical publication was performed.",
+                "Convention note for future FV stages: a policy-valid FINAL_VERIFICATION object is necessary but not sufficient - the consume-time acceptance binding also requires the consumed identity to match a Runtime authorized_dispatch record with IS_FINAL_VERIFICATION=true and the validated FINAL_VERIFICATION_GATE; otherwise mechanical_pass is recorded false with an empty bound claims hash even when the receipt object itself is valid."
+              ]
+            },
+            "receipt_status": "COMPLETED",
+            "receipt_outcome": null
+          },
+          "interventions": [],
+          "artifacts": {
+            "available": true,
+            "reason": null,
+            "paths": [],
+            "note": "Verified Runtime publication metadata; historical bytes are not retained. Current-content preview is available in Artifact Center only when its hash matches this publication."
+          },
+          "decision": {
+            "available": true,
+            "verified": true,
+            "reason": null,
+            "turn_id": "supervisor-turn-5bc8f54b448c4385b6b93aac2c9edf59",
+            "committed_at": "2026-09-12T21:21:46+00:00",
+            "resulting_status": "WAITING_EXECUTOR",
+            "decision_decision": "REVISE",
+            "decision_reason": "Receipt 700103 contains the correct four-claim PASS envelope, but Runtime evaluated it against a gate-less current-task view and therefore expected an empty hash and claim set; retry the same receipt-only repair once with Final Verification resolved exclusively from the Runtime-authorized dispatch binding.",
+            "decision_history_index": 5,
+            "intervention_ids": [],
+            "originating_control_revision": 0
+          },
+          "honesty": {
+            "notes": [],
+            "control": [],
+            "contradictions": []
+          }
+        }
+      }
+    },
+    "/artifacts?message_id=700104": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:47:03+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": 700104,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 0,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    },
+    "/artifacts": {
+      "status": 200,
+      "document": {
+        "schema_version": 1,
+        "ok": true,
+        "runtime": {
+          "id": "51042462032cbc1f",
+          "label": "v1.3 Dogfood",
+          "root": "C:\\general-agent-runtime-v13-dogfood"
+        },
+        "artifacts": {
+          "schema_version": 1,
+          "generated_at": "2026-09-13T04:47:03+00:00",
+          "query": {
+            "page": 1,
+            "page_size": 20,
+            "root": null,
+            "type": null,
+            "message_id": null,
+            "task": null,
+            "q": "",
+            "status": null
+          },
+          "totals": {
+            "artifacts": 5,
+            "pages": 1,
+            "index_size": 5
+          },
+          "artifacts": [
+            {
+              "artifact_id": "17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62",
+              "path": "evidence/dogfood-rounds.csv",
+              "name": "dogfood-rounds.csv",
+              "root": "evidence",
+              "format": "csv",
+              "size_bytes": 212,
+              "availability": "present",
+              "expected_sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700100,
+                "task_id": "DOGFOOD_DELIVERABLES",
+                "stage_id": "DRAFT_AND_EVIDENCE_V1",
+                "attempt": 1,
+                "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:25:00+00:00",
+                "published_at": "2026-09-12T20:22:55+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            },
+            {
+              "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e",
+              "path": "evidence/dogfood-rounds.csv",
+              "name": "dogfood-rounds.csv",
+              "root": "evidence",
+              "format": "csv",
+              "size_bytes": 212,
+              "availability": "present",
+              "expected_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700101,
+                "task_id": "DOGFOOD_ROUNDS_REVISION",
+                "stage_id": "REFRESH_CONSUMED_ROUNDS_V2",
+                "attempt": 1,
+                "commit_id": "completion-700101-3edf22139d440a89e205fa46",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:35:54+00:00",
+                "published_at": "2026-09-12T20:34:04+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            },
+            {
+              "artifact_id": "fd13db12f32637d4e22c47d0423fb557d29f3a84b1f89af0045a136a0ffedfd5",
+              "path": "reports/final-report.md",
+              "name": "final-report.md",
+              "root": "reports",
+              "format": "markdown",
+              "size_bytes": 2414,
+              "availability": "present",
+              "expected_sha256": null,
+              "provenance": {
+                "class": "unbound",
+                "message_id": null,
+                "task_id": null,
+                "stage_id": null,
+                "attempt": null
+              }
+            },
+            {
+              "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b",
+              "path": "reports/final-verification-700102.json",
+              "name": "final-verification-700102.json",
+              "root": "reports",
+              "format": "json",
+              "size_bytes": 19811,
+              "availability": "present",
+              "expected_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700102,
+                "task_id": "DOGFOOD_FINAL_VERIFICATION",
+                "stage_id": "GENERAL_FV_V1_CHECK",
+                "attempt": 1,
+                "commit_id": "completion-700102-c3df95c1cbbe992824f58363",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T21:02:38+00:00",
+                "published_at": "2026-09-12T21:00:57+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            },
+            {
+              "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c",
+              "path": "workspace/dogfood-note.md",
+              "name": "dogfood-note.md",
+              "root": "workspace",
+              "format": "markdown",
+              "size_bytes": 6276,
+              "availability": "present",
+              "expected_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+              "provenance": {
+                "class": "ledger",
+                "message_id": 700100,
+                "task_id": "DOGFOOD_DELIVERABLES",
+                "stage_id": "DRAFT_AND_EVIDENCE_V1",
+                "attempt": 1,
+                "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+                "project_id": "v13-dogfood-001",
+                "producer": "GLM-5.3",
+                "committed_at": "2026-09-12T20:25:00+00:00",
+                "published_at": "2026-09-12T20:22:49+00:00",
+                "receipt_created_at": null,
+                "completion_status": "COMPLETION_SEALED",
+                "completion_integrity": "OK",
+                "ledger_file": "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+                "source": "legacy_staging_and_publication",
+                "historical_content_retained": false
+              }
+            }
+          ],
+          "honesty": {
+            "unusable_publication_paths": {
+              "count": 0,
+              "examples": []
+            },
+            "untrusted_ledger_entries": {
+              "count": 0,
+              "examples": []
+            },
+            "notes": []
+          }
+        }
+      }
+    }
+  }
+}

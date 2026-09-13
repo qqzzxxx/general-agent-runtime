@@ -1,0 +1,117 @@
+{
+  "inspected_at": "2026-09-12T22:15:16.335194+00:00",
+  "runtime_root": "C:\\general-agent-runtime-v13-dogfood",
+  "project_id": "v13-dogfood-001",
+  "mode": "read_only_workspace_reader_no_deployment",
+  "authoritative_files_unchanged": true,
+  "authoritative_files_checked": 15,
+  "authoritative_file_sha256": {
+    "handoff/completion_ledger/audit.jsonl": "440be1bb51da347418759d36379cb278ddafd31ab2cafdf825939d277ae9c10e",
+    "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json": "862abc1f9e2fb6d6dbe8f61ed78c58ac89ef0dfcaab8e1ef27d98b2d93e73b14",
+    "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json": "1821f7fbae36c477558e60fceeb0eba7f7f7fd917b614172a39c884557e4739d",
+    "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json": "357d2d6650527ee14d49d34f5c388b23e734240270855bbe6426e46a2489fe63",
+    "handoff/completion_ledger/completion-700103-e0aefba229597b814e933d30.json": "492f2e9d61f5a0688a4aa4f676d521d9c9b41d26c29ba36c58ba7c872c7a469e",
+    "handoff/completion_ledger/completion-700104-c4da760b77911a636ac789fb.json": "6f83dd62c35ec010896b7dc7a721509edd950d7bc1c80846cdf32a36c5f38672",
+    "handoff/completion_ledger/staged/completion-700100-d190a8b3e8efef383fc55ae7/staging.json": "2a917c95b78c89d757ab18c479f305bbb9e68412d97bd529ed183f9675296af0",
+    "handoff/completion_ledger/staged/completion-700101-3edf22139d440a89e205fa46/staging.json": "dc79ffa3bcf3f406ed3b16cec9e7f954292e767fd816bb47844c30b47e6335d6",
+    "handoff/completion_ledger/staged/completion-700102-c3df95c1cbbe992824f58363/staging.json": "8a25601b3efb551d671d5d4257b2639213b6ef86c99a900e9d470bc22f141613",
+    "handoff/completion_ledger/staged/completion-700103-e0aefba229597b814e933d30/staging.json": "80ad2d80b7fb1a07a86ffba28691e6569a67a923ef2ff50c3947b6338838d670",
+    "handoff/completion_ledger/staged/completion-700104-c4da760b77911a636ac789fb/staging.json": "bbdbf16b561a916c868cff7f58af946a7123f717f26b963b69f98bf93d9a0c88",
+    "handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/2005d4d2fcd2b4050d49f0c43e8b7a648a7311763e1575faf22a0b98cd93f389.json": "23ec60864cf1f4d5afb861d83ea8f253e1b2f506c89fd53745b3db53b275caf3",
+    "handoff/executor_publications/completion-700100-d190a8b3e8efef383fc55ae7/8f821738db77dd8d7dac9c4b8d052999c8bd927b36b68ed0c074910597f20e21.json": "6447c8b67e11827f948bb739b491c2803e4faa3c9d4ec9c85006ae73e5836600",
+    "handoff/executor_publications/completion-700101-3edf22139d440a89e205fa46/8f821738db77dd8d7dac9c4b8d052999c8bd927b36b68ed0c074910597f20e21.json": "2cc4fa9f92bc46615693432459c44418bc7b9e97bb562ff52bd17d72abdd1a0a",
+    "handoff/executor_publications/completion-700102-c3df95c1cbbe992824f58363/7dd6f69454db686dd071ffc8cd2e7aeec7276e174bb371d4ca7863cb1991e19d.json": "3ede4d8917df14808866c810ae6917cf5947ab6d8a825606930ae466f3954868"
+  },
+  "rounds": [
+    {
+      "message_id": 700100,
+      "task_id": "DOGFOOD_DELIVERABLES",
+      "stage_id": "DRAFT_AND_EVIDENCE_V1",
+      "completion_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+      "ledger_integrity": "OK",
+      "provenance_integrity": "OK",
+      "source": "legacy_staging_and_publication",
+      "publications": [
+        {
+          "path": "evidence/dogfood-rounds.csv",
+          "published_sha256": "11e76e182c77c81e8b4b1b6626f34df685f899d33d1991617181de3f52727242",
+          "current_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+          "current_matches_publication": false,
+          "preview_permitted": false,
+          "artifact_id": "17aa81663eb4a8d74a8fb49bc4580a6bb03201cd5a88fae892dd34da976a0f62"
+        },
+        {
+          "path": "workspace/dogfood-note.md",
+          "published_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+          "current_sha256": "8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58",
+          "current_matches_publication": true,
+          "preview_permitted": true,
+          "artifact_id": "5eaab2c39835e37c6dc930dacfc324488b851af142cfc3592f8a305863d0760c"
+        }
+      ],
+      "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."
+    },
+    {
+      "message_id": 700101,
+      "task_id": "DOGFOOD_ROUNDS_REVISION",
+      "stage_id": "REFRESH_CONSUMED_ROUNDS_V2",
+      "completion_id": "completion-700101-3edf22139d440a89e205fa46",
+      "ledger_integrity": "OK",
+      "provenance_integrity": "OK",
+      "source": "legacy_staging_and_publication",
+      "publications": [
+        {
+          "path": "evidence/dogfood-rounds.csv",
+          "published_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+          "current_sha256": "b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003",
+          "current_matches_publication": true,
+          "preview_permitted": true,
+          "artifact_id": "d913e7af8eb9a3bd03a9b19f6aef32a38dd6740962856766088440b861c6277e"
+        }
+      ],
+      "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."
+    },
+    {
+      "message_id": 700102,
+      "task_id": "DOGFOOD_FINAL_VERIFICATION",
+      "stage_id": "GENERAL_FV_V1_CHECK",
+      "completion_id": "completion-700102-c3df95c1cbbe992824f58363",
+      "ledger_integrity": "OK",
+      "provenance_integrity": "OK",
+      "source": "legacy_staging_and_publication",
+      "publications": [
+        {
+          "path": "reports/final-verification-700102.json",
+          "published_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+          "current_sha256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+          "current_matches_publication": true,
+          "preview_permitted": true,
+          "artifact_id": "176d284cc404666a1486e09dc450f54900e15e732be15a62def1bfa2bf2f392b"
+        }
+      ],
+      "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."
+    },
+    {
+      "message_id": 700103,
+      "task_id": "DOGFOOD_FINAL_VERIFICATION",
+      "stage_id": "GENERAL_FV_V1_RECEIPT_REPAIR",
+      "completion_id": "completion-700103-e0aefba229597b814e933d30",
+      "ledger_integrity": "OK",
+      "provenance_integrity": "OK",
+      "source": "legacy_staging_and_publication",
+      "publications": [],
+      "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."
+    },
+    {
+      "message_id": 700104,
+      "task_id": "DOGFOOD_FINAL_VERIFICATION",
+      "stage_id": "GENERAL_FV_V1_BINDING_REPAIR",
+      "completion_id": "completion-700104-c4da760b77911a636ac789fb",
+      "ledger_integrity": "OK",
+      "provenance_integrity": "OK",
+      "source": "legacy_staging_and_publication",
+      "publications": [],
+      "note": "Only publications corroborated by hash-bound archived staging are recovered; historical bytes are not retained."
+    }
+  ]
+}

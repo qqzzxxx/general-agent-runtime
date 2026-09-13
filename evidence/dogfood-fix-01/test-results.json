@@ -1,0 +1,190 @@
+{
+  "recorded_at": "2026-09-12T22:21:42.507056+00:00",
+  "runs": [
+    {
+      "label": "full-suite",
+      "command": "python -m unittest discover -s scripts -p 'test_*.py' -v",
+      "scope": "Full suite before the final post-manifest-IO fence recheck; includes the first nine new provenance tests.",
+      "tests_run": 1270,
+      "passed": 1267,
+      "skipped": [
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h1_harness_rebinds_active_project_file",
+          "reason": "'clean runtime has no active project pointer'\r"
+        },
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h2_original_suite_green_with_real_pointer",
+          "reason": "'clean runtime has no active project pointer'\r"
+        },
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h5_h8_real_candidate_preflight",
+          "reason": "'clean runtime has no active project pointer'\r"
+        }
+      ],
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 369.526,
+      "result": "OK",
+      "module_test_counts": {
+        "test_artifact_publication_provenance": 9,
+        "test_clean_release_startup": 1,
+        "test_completion_seal": 21,
+        "test_console_view": 18,
+        "test_dispatch_validation_recovery": 14,
+        "test_executor_fence": 24,
+        "test_final_verification_gate": 12,
+        "test_fresh_clone_preflight": 11,
+        "test_fv_identity_binding_fix": 17,
+        "test_fv_sandbox": 28,
+        "test_g2_profiles": 12,
+        "test_g3_project_isolation": 20,
+        "test_g4_generic_fv": 20,
+        "test_g5a5_1_hotfix": 7,
+        "test_g5a5_3_authorized_dispatch_fv_fix": 13,
+        "test_g5a_bootstrap": 24,
+        "test_goal_anchor": 19,
+        "test_instance_isolation": 6,
+        "test_orchestrator": 22,
+        "test_preflight_fv_status": 5,
+        "test_prepare_zcode_automation": 9,
+        "test_resume_human_review": 32,
+        "test_supervisor_control": 59,
+        "test_supervisor_observability": 27,
+        "test_supervisor_status_p9": 6,
+        "test_web_console_alerts": 46,
+        "test_web_console_artifacts": 52,
+        "test_web_console_artifacts_frontend": 20,
+        "test_web_console_artifacts_http": 30,
+        "test_web_console_backend": 34,
+        "test_web_console_cockpit": 16,
+        "test_web_console_control": 56,
+        "test_web_console_control_frontend": 21,
+        "test_web_console_control_http": 43,
+        "test_web_console_fresh_readiness": 12,
+        "test_web_console_frontend": 11,
+        "test_web_console_history": 42,
+        "test_web_console_p9_frontend": 30,
+        "test_web_console_p9_http": 29,
+        "test_web_console_registry": 36,
+        "test_web_console_runtime_create": 28,
+        "test_web_console_scripts": 15,
+        "test_web_console_settings": 39,
+        "test_web_console_setup": 50,
+        "test_web_console_setup_frontend": 17,
+        "test_web_console_setup_http": 31,
+        "test_web_console_shell_frontend": 7,
+        "test_web_console_state": 64,
+        "test_web_console_supervisor": 32,
+        "test_web_console_supervisor_frontend": 12,
+        "test_web_console_supervisor_http": 15,
+        "test_web_console_timeline": 22,
+        "test_web_console_timeline_frontend": 24
+      },
+      "test_ids": null,
+      "log": "full-suite.txt",
+      "source_log_sha256": "1a042655f9402cbb663003babd446a0320fd63a6b29ed8b6bab2943811c52b8d",
+      "windows_cleanup_warnings_in_log": true
+    },
+    {
+      "label": "final-runtime",
+      "command": "unittest loadTestsFromNames(sorted(p.stem for p in Path('scripts').glob('test_*.py') if not p.name.startswith('test_web_console')))",
+      "scope": "Final source: all Runtime tests plus all ten provenance regressions after the post-manifest-IO fence recheck.",
+      "tests_run": 437,
+      "passed": 434,
+      "skipped": [
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h1_harness_rebinds_active_project_file",
+          "reason": "'clean runtime has no active project pointer'\r"
+        },
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h2_original_suite_green_with_real_pointer",
+          "reason": "'clean runtime has no active project pointer'\r"
+        },
+        {
+          "test": "test_g5a5_1_hotfix.G5A5_1HotfixTests.test_h5_h8_real_candidate_preflight",
+          "reason": "'clean runtime has no active project pointer'\r"
+        }
+      ],
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 94.571,
+      "result": "OK",
+      "module_test_counts": {
+        "test_artifact_publication_provenance": 10,
+        "test_clean_release_startup": 1,
+        "test_completion_seal": 21,
+        "test_console_view": 18,
+        "test_dispatch_validation_recovery": 14,
+        "test_executor_fence": 24,
+        "test_final_verification_gate": 12,
+        "test_fresh_clone_preflight": 11,
+        "test_fv_identity_binding_fix": 17,
+        "test_fv_sandbox": 28,
+        "test_g2_profiles": 12,
+        "test_g3_project_isolation": 20,
+        "test_g4_generic_fv": 20,
+        "test_g5a5_1_hotfix": 7,
+        "test_g5a5_3_authorized_dispatch_fv_fix": 13,
+        "test_g5a_bootstrap": 24,
+        "test_goal_anchor": 19,
+        "test_instance_isolation": 6,
+        "test_orchestrator": 22,
+        "test_preflight_fv_status": 5,
+        "test_prepare_zcode_automation": 9,
+        "test_resume_human_review": 32,
+        "test_supervisor_control": 59,
+        "test_supervisor_observability": 27,
+        "test_supervisor_status_p9": 6
+      },
+      "test_ids": null,
+      "log": "final-runtime.txt",
+      "source_log_sha256": "b61613160960b2ba91612cd3eed316a9935ba02e8e88283578a30191484fd4de",
+      "windows_cleanup_warnings_in_log": false
+    },
+    {
+      "label": "production-provenance",
+      "command": "python -m unittest discover -s scripts -p test_artifact_publication_provenance.py -v",
+      "scope": "Final source: ten disposable real Runtime publication and HTTP regressions.",
+      "tests_run": 10,
+      "passed": 10,
+      "skipped": [],
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 6.808,
+      "result": "OK",
+      "module_test_counts": {
+        "test_artifact_publication_provenance": 10
+      },
+      "test_ids": [
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_ambiguous_ledger_never_binds_catalog_or_task_detail",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_expiry_during_manifest_io_still_blocks_completion",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_invalid_publication_blocks_commit",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_legacy_missing_corrupt_or_mismatched_records_fail_closed",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_legacy_recovery_is_hash_bound_and_read_only",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_preview_returns_only_the_snapshot_it_hashed",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_real_publication_completion_http_and_repeated_path",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_receipt_claims_without_runtime_evidence_cannot_bind",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_sealed_corruption_never_falls_back_to_valid_legacy_archive",
+        "test_artifact_publication_provenance.PublicationProvenanceTests.test_sealed_provenance_survives_archived_evidence_removal"
+      ],
+      "log": "production-provenance.txt",
+      "source_log_sha256": "179bf0c3a6c48d6a4da33aa80c6faf6de7b9ceaddca6cedbdc8f27bf39ea52f6",
+      "windows_cleanup_warnings_in_log": false
+    }
+  ],
+  "final_source_sha256": {
+    "scripts/executor_completion.py": "8d41eb241ad6edc2e3ef668135d14355d212ebd9c32e199c0197749513169dcb",
+    "scripts/executor_fence.py": "0bcaa6eff4768798785d88c108d1a2b55f48c4ae94bb9c7117c1f16fdf6ffcdb",
+    "scripts/supervisor_control.py": "0a26f637b5745eb0ac52b536c575de2e6431dc52fc04e533b791a1343dbdd71d",
+    "scripts/web_console_artifacts.py": "a1ba9402ef902d6a9b38186a6613df6d7f3c7ce8fd599748b17ad58f767b2ceb",
+    "scripts/web_console_history.py": "c3ad5b0c64d93837a5eb81e729df131edd072f2900ddab264fc6287e474ea19b",
+    "scripts/web_console_server.py": "f97815d3a35bf069008492eb5c90f3f7b05771fdc1c965e65463d731a49b6739",
+    "web_console/index.html": "b21a920ce71008e332fd988b5c05d5845bf3a099fd5a185466a9c4f3481295fe",
+    "scripts/test_artifact_publication_provenance.py": "df21a9b6dea5d553512f2fb74a00c475b8482bde3b6c39992a3b6ec6ca22798c"
+  },
+  "notes": [
+    "No provenance or control production path was mocked in the successful end-to-end regression.",
+    "The full suite emitted Windows server cleanup ResourceWarning/WinError messages; unittest completed with exit code 0. Raw logs are retained.",
+    "Three existing tests skipped because the clean Runtime has no active project pointer."
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "schema": "SUPERVISOR-TURN-OBSERVABILITY-V1",
+  "schema_version": 1,
+  "turn_id": "supervisor-turn-5b3ce70b5e4b497aa8344530be947d5d",
+  "PROJECT_ID": "v13-dogfood-001",
+  "invocation": {
+    "event": {
+      "archive": "handoff\\archive\\brief-700100-0f85db068543-consumed-e9e0adecb046.md",
+      "brief_sha256": "e9e0adecb04660c926d5387e5f95b3d0d6567f947157d48dd1407d3ff51d264e",
+      "commit_id": "completion-700100-d190a8b3e8efef383fc55ae7",
+      "committed_receipt_path": "C:\\general-agent-runtime-v13-dogfood\\handoff\\completion_ledger\\completion-700100-d190a8b3e8efef383fc55ae7.json",
+      "message_id": 700100,
+      "receipt_sha256": "b88e74c7ca7536ae56d8b0f9f9aae86b5f650ef8ebd28e478a7216607ee92014",
+      "stage_id": "DRAFT_AND_EVIDENCE_V1",
+      "status": "COMPLETED",
+      "task_id": "DOGFOOD_DELIVERABLES",
+      "type": "EXECUTOR_RESULT_READY"
+    },
+    "reason": "EXECUTOR_RESULT_READY"
+  },
+  "started_at": "2026-09-12T20:25:01+00:00",
+  "finished_at": "2026-09-12T20:29:39+00:00",
+  "duration_seconds": 277.08,
+  "supervisor_config": {
+    "source": "fixed_policy",
+    "config_revision": null,
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "queued_at": null
+  },
+  "usage": {
+    "reported": false,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null,
+    "source": null,
+    "note": "the Codex environment did not report token usage for this turn"
+  },
+  "context_manifest": {
+    "supervisor_rules": {
+      "path": "control/CODEX_SUPERVISOR_RUNTIME.md",
+      "present": true,
+      "truncated": true
+    },
+    "project_state": {
+      "path": "projects/v13-dogfood-001/project_state.json",
+      "present": true,
+      "truncated": false
+    },
+    "research_state": {
+      "path": "projects/v13-dogfood-001/RESEARCH_STATE.md",
+      "present": true,
+      "truncated": false
+    },
+    "project_goal": {
+      "path": "projects/v13-dogfood-001/PROJECT_GOAL.md",
+      "present": true,
+      "truncated": false
+    },
+    "profile": {
+      "project_type": "GENERAL"
+    },
+    "human_decision_receipt": null,
+    "interventions": [],
+    "executor_brief": {
+      "source": "provided"
+    },
+    "mechanical_event": {
+      "reason": "EXECUTOR_RESULT_READY",
+      "event_keys": [
+        "archive",
+        "brief_sha256",
+        "commit_id",
+        "committed_receipt_path",
+        "message_id",
+        "receipt_sha256",
+        "stage_id",
+        "status",
+        "task_id",
+        "type"
+      ]
+    }
+  },
+  "decision": {
+    "committed": true,
+    "receipt_file": "control/supervisor_decisions/supervisor-turn-5b3ce70b5e4b497aa8344530be947d5d.json",
+    "receipt_sha256": "bed1c76b9fddd41c6939aca1049c06dd3fa39ab6fc33c9a9d338410804ed9ed9",
+    "decision": {
+      "decision": "REVISE",
+      "at": "2026-09-12T20:25:01+00:00",
+      "reason": "Refresh only the rounds CSV because completion 700100 is now authoritative and consumed; preserve the accepted protocol note.",
+      "goal_alignment": {
+        "original_objective": "Produce the concise protocol note and authoritative consumed-round CSV, then finish through the normal verified Runtime lifecycle.",
+        "unmet_criteria": "The CSV omits newly consumed round 700100; Artifact Center readability and Final Verification remain unproven.",
+        "latest_result": "The note was published, but the CSV is header-only because it was collected before completion 700100 became consumed.",
+        "next_action_alignment": "Refresh only the CSV from Runtime-owned consumed ledger evidence and record the collection cutoff before verification.",
+        "scope_drift": "None; the accepted note is preserved and the revision is limited to the time-sensitive evidence file.",
+        "method": "Revise the smallest defective segment: the consumed-round CSV, using the same authoritative-ledger method."
+      }
+    },
+    "decision_sha256": "72e491b5040d6879d956020b6323ffeca81a667246bf9447330dedfb6e1d643b",
+    "decision_summary": "Refresh only the rounds CSV because completion 700100 is now authoritative and consumed; preserve the accepted protocol note.",
+    "decision_history_index": 1,
+    "resulting_status": "WAITING_EXECUTOR"
+  },
+  "dispatch_linkage": {
+    "MESSAGE_ID": 700101,
+    "TASK_ID": "DOGFOOD_ROUNDS_REVISION",
+    "STAGE_ID": "REFRESH_CONSUMED_ROUNDS_V2",
+    "ATTEMPT": 1,
+    "NONCE": "8ccfe854420f485ba0eb59a004c74672c3e7619a27af4a54",
+    "dispatch_sha256": "779ed829c48ad101a6010e2166bf5e16d00537b3ce8b9ef3e79dd79cf20dab3e"
+  },
+  "intervention_ids": [],
+  "outcome": {
+    "committed": true,
+    "stale": false,
+    "recovered_after_crash": false,
+    "candidate_validation_failed": false,
+    "error": null
+  }
+}

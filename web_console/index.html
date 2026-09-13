@@ -2377,7 +2377,7 @@ function renderDrawer() {
     }
     if (artifacts.paths.length === 0) {
       list.append(el("dt", null, "No published paths"));
-      list.append(el("dd", null, "the receipt reported none"));
+      list.append(el("dd", null, "no verified publications are available for this round"));
     }
     body.append(list);
     const acLink = el("button", "round-detail-open",
@@ -2732,15 +2732,15 @@ function renderArtifact(item) {
 
 function acVerificationLabel(value) {
   if (value === "verified") {
-    return "verified — the bytes match the authoritative receipt hash";
+    return "verified — current bytes match this publication hash";
   }
   if (value === "hash_mismatch") {
-    return "HASH MISMATCH — the bytes differ from the receipt";
+    return "HASH MISMATCH — current bytes differ from this publication; historical preview is unavailable";
   }
   if (value === "unavailable") {
     return "unavailable — the hash was not computed within the bounded cap";
   }
-  return "unverified — no authoritative receipt binds this file";
+  return "unverified — no authoritative publication binds this file";
 }
 
 function renderAcProvenance(artifact) {
@@ -2754,8 +2754,12 @@ function renderAcProvenance(artifact) {
     pairs.push(["Stage", prov.stage_id || "unavailable"]);
     pairs.push(["Attempt", prov.attempt]);
     pairs.push(["Producer", prov.producer || "unavailable"]);
-    pairs.push(["Published (receipt created)",
-      prov.receipt_created_at || "unavailable"]);
+    pairs.push(["Published by Runtime", prov.published_at || "unavailable"]);
+    pairs.push(["Publication SHA-256", artifact.expected_sha256 || "unavailable"]);
+    pairs.push(["Current SHA-256", artifact.actual_sha256 || "unavailable"]);
+    pairs.push(["Completion ID", prov.commit_id || "unavailable"]);
+    pairs.push(["Provenance source", prov.source || "unavailable"]);
+    pairs.push(["Content", "Historical bytes are not retained; preview requires current bytes to match this publication."]);
     pairs.push(["Completion committed", prov.committed_at || "unavailable"]);
     pairs.push(["completion status", prov.completion_status || "unavailable"]);
     if (prov.republished_by && prov.republished_by.length) {
@@ -2764,11 +2768,11 @@ function renderAcProvenance(artifact) {
     }
   } else {
     pairs.push(["Producing MESSAGE",
-      "unavailable — no verified completion receipt binds this file "
+      "unavailable — no verified Runtime publication binds this file "
       + "(unbound); the name alone is never proof"]);
   }
   pairs.push(["Binding", prov.class === "ledger"
-    ? "verified ledger receipt" : "unbound"]);
+    ? "verified Runtime publication" : "unbound"]);
   pairs.push(["Size", artifact.size_bytes === null
     || artifact.size_bytes === undefined
     ? "unavailable" : artifact.size_bytes + " bytes"]);
