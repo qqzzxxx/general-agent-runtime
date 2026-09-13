@@ -1,0 +1,31 @@
+{
+  "full_suite": {
+    "tests": 1299,
+    "skipped": 3,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 382.116
+  },
+  "final_fv_suite": {
+    "tests": 59,
+    "failures": 0
+  },
+  "new_regressions": 14,
+  "completion_suite": {
+    "tests": 21,
+    "failures": 0
+  },
+  "historical_files_checked": 17,
+  "historical_files_changed": [],
+  "source_sha256": {
+    "orchestrator.py": "37f14dd7b641b3ecc9e19c7403236871c0ee9a33e111acef912672a46e6cf446",
+    "scripts/final_verification_contract.py": "1fce8c7325069ba2a09fe8c258260b52a21d4498be5c9d5580e3c264be216788",
+    "scripts/supervisor_control.py": "d4eb139c2aeafaa60f5bcdae61d1f8b2b06e5b92d2c0025dccdfce2c7d7122bd",
+    "scripts/executor_completion.py": "11049fd03f2d9074e7092fde0400f797a77e94ded818310f736fed02622295bb",
+    "scripts/test_fv_one_pass.py": "2acf632f8745bbfd156d7cdf9e29bf70a235ba36d5986ec152d43cd8511518de",
+    "control/CODEX_SUPERVISOR_RUNTIME.md": "01fad60da0174dff9225071a079e72de7f474cfcd95ec159ed2bd72784fa5c15",
+    "control/EXECUTOR_TASK_TEMPLATE.md": "c538d62713f9984a5ad7bd965ec9e01c950fad64ebc7621a740920adfee08a1d",
+    "control/FINAL_VERIFICATION_POLICY.md": "586dc71d6c654894bdbaee7e20e009583ab9561ff033febb18378ef873ab2fa8",
+    "control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md": "5802abd1de1b79453b755abd2a0cd6fdcbde5b790009c9339f0cb7e3cce34584"
+  }
+}

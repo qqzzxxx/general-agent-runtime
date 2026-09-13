@@ -1473,6 +1473,16 @@ def _decision_transaction(root: Path, turn: dict) -> tuple[dict, dict | None]:
         payload = _parse_dispatch_bytes(data)
         if normalize_identity(payload, "Supervisor dispatch") != identity:
             raise ControlError("Supervisor dispatch/current_task identity mismatch")
+        if "FINAL_VERIFICATION_REQUEST" in payload:
+            import final_verification_contract as fv_contract
+            state, payload = fv_contract.prepare(root, state, payload)
+            data = ("```json\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n```\n").encode("utf-8")
+            # Neither file is claimable before the decision receipt and archive
+            # seal. State first: a crash retains the explicit request and can
+            # idempotently prepare it against the same already-pinned claims.
+            _atomic_json(state_path, state)
+            _atomic_write_bytes(inbox, data)
+            state_bytes = state_path.read_bytes()
         candidate = {
             **identity,
             "dispatch_sha256": sha256_bytes(data),

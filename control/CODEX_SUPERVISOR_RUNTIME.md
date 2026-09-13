@@ -210,13 +210,22 @@ If `final_verification.required=true`, `COMPLETE` is mechanically forbidden unti
 active Profile's bound Final Verification policy has passed and FINAL_ACCEPTANCE is
 complete. Use the active Profile policy (its bound `policy_id`/`policy_version`):
 select 3–8 decision-critical claims within the Profile taxonomy, dispatch ONE bounded
-`TASK_KIND=FINAL_VERIFICATION` task with the exact nested gate below, and on FAIL/INCONCLUSIVE
+`TASK_KIND=FINAL_VERIFICATION` task using the one-pass request below, and on FAIL/INCONCLUSIVE
 apply only a narrow REVISE before reverifying. Only after a mechanically passing
 verification receipt and one FINAL_ACCEPTANCE turn may you set
 `final_verification.status=PASS` and `COMPLETE`.
 
-For every profile-routed Final Verification dispatch, these fields belong inside
-`FINAL_VERIFICATION_GATE` (never at task top level):
+For new decisions, record `decision=FINAL_VERIFICATION` in both decision records
+and publish `FINAL_VERIFICATION_REQUEST` with `CRITICAL_CLAIMS` and optional
+`EXECUTION_MODE`. Omit `FINAL_VERIFICATION_GATE`. Initial FV state may be
+`NOT_STARTED`; after substantive revision use `REVERIFY`. Runtime prepares PENDING,
+the canonical hash/count and immutable policy snapshot before the decision commit.
+Any state claims/hash/policy already supplied must agree exactly with the request.
+The Executor supplies `FINAL_VERIFICATION_RESULTS`; Runtime owns the receipt's
+protocol metadata, never its judgments. See `control/FINAL_VERIFICATION_POLICY.md`.
+
+In the resulting prepared task (or the retained legacy full-gate contract), these
+fields belong inside `FINAL_VERIFICATION_GATE` (never at task top level):
 
 ```json
 {
@@ -249,7 +258,8 @@ aliases, NOT accepted, and are rejected as missing fields:
 
 `CLAIMS_HASH` is the canonical SHA-256 of the exact claim list: hash the JSON produced
 by `json.dumps(claims, ensure_ascii=False, sort_keys=True, separators=(',', ':'))`.
-Store the same claim list and hash in `project_state.final_verification`.
+Runtime stores the same claim list and hash in `project_state.final_verification`
+for new requests. Only legacy full-gate dispatches require manual duplication.
 
 `POLICY_ID` is mandatory for profile-routed projects. Legacy V1.5 commercial tasks
 may omit only `POLICY_ID`; their remaining nested gate shape is unchanged.
@@ -265,12 +275,11 @@ When the commercial goal is otherwise satisfied:
    recommendation, spending decision, risk posture, or next action.
 3. Prefer the highest-consequence IP, economics, price, demand/pain, regulatory/safety, and
    winner-vs-rejected claims.
-4. Set `project_state.final_verification` to `policy_version=1`, `required=true`, `status=PENDING`,
-   store the exact claim list and canonical claim hash.
-5. Dispatch exactly one bounded `TASK_KIND=FINAL_VERIFICATION` task whose nested
-   `FINAL_VERIFICATION_GATE` contains the bound `POLICY_ID`, `POLICY_VERSION`, same
-   claim set, `CLAIMS_HASH`, and `CLAIM_COUNT`, with the normal fresh MESSAGE_ID/NONCE
-   and atomic Executor claim.
+4. Record a `FINAL_VERIFICATION` decision and choose the exact claims.
+5. Publish one bounded `TASK_KIND=FINAL_VERIFICATION` task with
+   `FINAL_VERIFICATION_REQUEST.CRITICAL_CLAIMS` and optional `EXECUTION_MODE`, using
+   a fresh MESSAGE_ID/NONCE and the ordinary claim protocol. Runtime prepares and
+   validates PENDING, claims hash/count and policy snapshot before authorization.
 6. The verifier must be adversarial and should try to falsify first. Do not reopen broad research.
 7. On FAIL/INCONCLUSIVE, use the smallest narrow REVISE necessary, then reverify.
 8. On PASS, perform one `FINAL_ACCEPTANCE` turn. You may inspect a few precise raw evidence
@@ -282,7 +291,9 @@ When the commercial goal is otherwise satisfied:
 FV identity binding (mechanical): the authoritative Final Verification identity is the
 MESSAGE_ID of the dispatch the Runtime itself validated and authorized — the Runtime records
 it and the exact `FINAL_VERIFICATION_GATE` in `control/orchestrator_runtime.json`
-(`authorized_dispatch`) at authorization time, and binds `last_final_verification_message_id`
+(`authorized_dispatch`) at authorization time. Consumption and crash replay verify
+the immutable dispatch archive and use its gate; a current_task mirror cannot override
+it. Runtime binds `last_final_verification_message_id`
 (+ receipt sha256, claims hash, overall status) when it consumes that receipt. Your
 `final_verification` acceptance must reference exactly that consumed MESSAGE_ID and
 `verification_receipt_sha256`; the COMPLETE gate compares those against the Runtime's own

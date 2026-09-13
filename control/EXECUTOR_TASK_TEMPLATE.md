@@ -74,7 +74,14 @@ Supervisor model note: all Codex turns are fixed to GPT-5.6 Sol + High by the Or
 
 ## Generic profile-bound final-verification specialization
 
-Ordinary tasks remain unchanged. For a `TASK_KIND: FINAL_VERIFICATION` stage, include:
+Ordinary tasks remain unchanged. For a new `TASK_KIND: FINAL_VERIFICATION` stage,
+the Supervisor records decision `FINAL_VERIFICATION` and supplies
+`FINAL_VERIFICATION_REQUEST` containing `CRITICAL_CLAIMS` and optional
+`EXECUTION_MODE`. Runtime prepares PENDING and the immutable gate before committing
+the decision. Do not author the gate or its hashes yourself. See
+`control/FINAL_VERIFICATION_POLICY.md` for the one-pass contract.
+
+The following is the legacy full-gate wire shape (also present in prepared tasks):
 
 ```json
 {
@@ -110,7 +117,11 @@ missing keys. A claim written with uppercase keys (`CLAIM_ID`, `TYPE`,
 `FALSIFIED_IF`, ...) is rejected as schema-invalid: the dispatch is quarantined, and
 the Supervisor gets one bounded repair turn.
 
-The Executor must add the `FINAL_VERIFICATION` receipt object defined in
+For gate `CONTRACT_VERSION=1`, the Executor supplies `FINAL_VERIFICATION_RESULTS`
+with `OVERALL_STATUS`, exact `CLAIM_RESULTS` and applicable sandbox/incident facts.
+The completion helper constructs `FINAL_VERIFICATION` metadata from the sealed
+dispatch; it never invents results. For legacy gates without a contract version,
+the Executor must add the `FINAL_VERIFICATION` receipt object defined in
 `control/FINAL_VERIFICATION_POLICY.md`.
 
 This task is bounded adversarial verification. Do not restart broad market research.

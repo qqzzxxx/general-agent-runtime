@@ -1,0 +1,360 @@
+{
+  "root": "C:\\general-agent-runtime-v13-dogfood",
+  "read_only": true,
+  "sha256": {
+    "logs\\orchestrator.jsonl": "5362b7020b28128eb0ab33f288801665dddfeb9980208833b0f2c288cdbe9bdb",
+    "control\\orchestrator_runtime.json": "9a9ebc5aebb86417f63753a390826ddc24bdc0734c4331fc1f5ce3dac51a22b0",
+    "projects\\v13-dogfood-001\\project_state.json": "44b2b7c0608b65bad719deaee425fcc52617c342b9a863aea1d25568b2c6c8fc",
+    "projects\\v13-dogfood-001\\reports\\final-verification-700102.json": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+    "handoff\\completion_ledger\\completion-700102-c3df95c1cbbe992824f58363.json": "357d2d6650527ee14d49d34f5c388b23e734240270855bbe6426e46a2489fe63",
+    "handoff\\completion_ledger\\completion-700103-e0aefba229597b814e933d30.json": "492f2e9d61f5a0688a4aa4f676d521d9c9b41d26c29ba36c58ba7c872c7a469e",
+    "handoff\\completion_ledger\\completion-700104-c4da760b77911a636ac789fb.json": "6f83dd62c35ec010896b7dc7a721509edd950d7bc1c80846cdf32a36c5f38672",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700102-c3df95c1cbbe992824f58363.authorized.json": "61e67ce5bd9eaa0f41172b3bbcc8f26768feebeb3f2a5064eb652fe944c21be1",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700102-c3df95c1cbbe992824f58363.json": "c4403ae3c10ea2539919ade4cf77a0c6515358266ec0d8c9a743706a8a116954",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700102-c3df95c1cbbe992824f58363.md": "806272a805f7031d9c6f817e5bf5b18cea6d3dc8e8c07e6146eac4a8753c2dd7",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700103-e0aefba229597b814e933d30.authorized.json": "5520b004fe144c3b6f25944253b89e9862885b191ea09e1d14778bf405db8465",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700103-e0aefba229597b814e933d30.json": "f0099e145ac07e50dc8994e6ea9fb152f2e0f3c2a765390468bc5a8b9821d3de",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700103-e0aefba229597b814e933d30.md": "0a619d427f2e3edae4fab3f71737c9c243bf93baec24c4c3b1f671f5b9069377",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700104-c4da760b77911a636ac789fb.authorized.json": "e41105244c114b94cb4b843c6cc45175fe4cfb9aef90f1968eb07e9fffe32872",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700104-c4da760b77911a636ac789fb.json": "fb56cf8f5f967e236255cbee409cd2866957047216ef80d70345585e9c63a6df",
+    "handoff\\supervisor_dispatch_archive\\v13-dogfood-001\\dispatch-700104-c4da760b77911a636ac789fb.md": "4723a1203918efc1741e50fd4aa5be115c38c74bb89e1a9f51faa2175877c1d7",
+    "handoff\\quarantine\\dispatch-700102-806272a805f7-rejected.md": "806272a805f7031d9c6f817e5bf5b18cea6d3dc8e8c07e6146eac4a8753c2dd7"
+  },
+  "verification_ledger": [
+    {
+      "message_id": 700102,
+      "nonce": "65e6a4af9bbb4cc9ab1dd7576abe87f6e9a58b790c434ea8",
+      "receipt_sha256": "2085cbf8e31adcfb537bb510df76f28ca9f28775cc2b042bde3f29e5a3032b12",
+      "claims_hash": "",
+      "overall_status": null,
+      "mechanical_pass": false,
+      "consumed_at": "2026-09-12T21:02:38+00:00"
+    },
+    {
+      "message_id": 700103,
+      "nonce": "d480d4d2307b4a35bd4c7e72c0b0b26e42acf1c2d66f4f3e",
+      "receipt_sha256": "dfaa3d55be8c6fb2c29c75c1d57f3ed6eaa78742ac17159607896364a386d36c",
+      "claims_hash": "",
+      "overall_status": "PASS",
+      "mechanical_pass": false,
+      "consumed_at": "2026-09-12T21:16:08+00:00"
+    },
+    {
+      "message_id": 700104,
+      "nonce": "305b8ff76f594cb492f8c1cce20513c18fc6f34b65b94924",
+      "receipt_sha256": "c61f8421f31a708ea74d0ccf8d5a6bb96a55277512f15bbb5fc7c62fbbf480bc",
+      "claims_hash": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+      "overall_status": "PASS",
+      "mechanical_pass": true,
+      "consumed_at": "2026-09-12T21:34:08+00:00"
+    }
+  ],
+  "receipts": [
+    {
+      "message_id": 700102,
+      "status": "COMPLETION_SEALED",
+      "receipt_keys": [
+        "ACCEPTANCE_CRITERIA_SELF_CHECK",
+        "ATTEMPT",
+        "CLAIMS_HASH_RECIPE",
+        "CLAIMS_HASH_RECOMPUTED",
+        "COMPLETED_AT",
+        "EVIDENCE_POINTERS_INSPECTED",
+        "EXECUTOR_MODEL_FAMILY",
+        "FAILED_METHODS",
+        "FINAL_VERIFICATION_GATE",
+        "LIMITATIONS_AND_UNCERTAINTIES",
+        "MESSAGE_ID",
+        "METHODS_NOTE",
+        "NONCE",
+        "OBJECTIVE_SUMMARY",
+        "OVERALL_RATIONALE",
+        "OVERALL_RESULT",
+        "PER_CLAIM_RESULTS",
+        "PROJECT_ID",
+        "REPORT_PATH",
+        "REPORT_SHA256",
+        "STAGE_ID",
+        "STATUS",
+        "SUGGESTED_MEMORY_UPDATES",
+        "TASK_ID",
+        "VERIFIED_AT"
+      ],
+      "final_verification": null
+    },
+    {
+      "message_id": 700103,
+      "status": "COMPLETION_SEALED",
+      "receipt_keys": [
+        "ATTEMPT",
+        "COMPLETED_AT",
+        "EXECUTOR_MODEL_FAMILY",
+        "FINAL_VERIFICATION",
+        "MESSAGE_ID",
+        "NONCE",
+        "NO_PUBLICATION_PERFORMED",
+        "OBJECTIVE_SUMMARY",
+        "PROJECT_ID",
+        "PUBLISHED_PATHS",
+        "REPAIR_NOTE",
+        "STAGE_ID",
+        "STATUS",
+        "SUGGESTED_MEMORY_UPDATES",
+        "TASK_ID"
+      ],
+      "final_verification": {
+        "POLICY_ID": "GENERAL_FV_V1",
+        "POLICY_VERSION": 1,
+        "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+        "EXECUTION_MODE": "LIVE_READ_ONLY",
+        "ISOLATION_INCIDENT": false,
+        "OVERALL_STATUS": "PASS",
+        "CLAIM_RESULTS": [
+          {
+            "claim_id": "C1",
+            "claim_type": "SOURCE_SUPPORT",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "source_pointers": [
+                "workspace/dogfood-note.md",
+                "docs/ARCHITECTURE.md",
+                "reports/final-verification-700102.json"
+              ]
+            },
+            "summary": "Reuse of the 700102 result: its C1 PASS rests on a statement-by-statement adversarial comparison of workspace/dogfood-note.md against docs/ARCHITECTURE.md (full record in the reused report). Focused revalidation confirmed the reused report is byte-identical to its verified artifact (SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b) and the note is unchanged (SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58), so the source-support conclusion remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C1)",
+              "workspace/dogfood-note.md",
+              "docs/ARCHITECTURE.md"
+            ]
+          },
+          {
+            "claim_id": "C2",
+            "claim_type": "NUMERICAL",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "calculation_check": "PASS",
+              "calculation_artifact": "reports/final-verification-700102.json"
+            },
+            "summary": "Reuse of the 700102 result: its C2 PASS parsed evidence/dogfood-rounds.csv under the RFC 4180 dialect and reconstructed the consumed-at-cutoff ledger set (cutoff 2026-09-12T20:31:16.888225+00:00; 700100 in, 700101 correctly out). Focused revalidation reconfirmed the CSV is unchanged today (SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003, equal to the report-recorded and publication-record value), so the numerical conclusion remains supported; the reused report is the existing calculation artifact.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C2)",
+              "evidence/dogfood-rounds.csv",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/audit.jsonl"
+            ]
+          },
+          {
+            "claim_id": "C3",
+            "claim_type": "DELIVERABLE_INTEGRITY",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "deliverable_check": "PASS",
+              "deliverable_path": "workspace/dogfood-note.md; evidence/dogfood-rounds.csv"
+            },
+            "summary": "Reuse of the 700102 result: its C3 PASS resolved and read both deliverables through the production local Web Console/Artifact Center workflow code path (focused offline test; no GUI or network). Focused revalidation reconfirmed both files still exist at the goal paths with the report-recorded hashes and readable bytes (note 6276 bytes / 8ba6f737..., CSV 212 bytes / b076c865...), so deliverable integrity remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C3)",
+              "workspace/dogfood-note.md",
+              "evidence/dogfood-rounds.csv"
+            ]
+          },
+          {
+            "claim_id": "C4",
+            "claim_type": "CONSTRAINT_COMPLIANCE",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "constraint_check": "PASS"
+            },
+            "summary": "Reuse of the 700102 result: its C4 PASS inspected claims, publications, ledger, and audit records for MESSAGE_IDs 700100/700101 and found the lifecycle honored with no user-facing output beyond the two goal deliverables. This repair attempt adds no new constraint surface: it published nothing, wrote nothing canonical except this Runtime-committed receipt, and reconfirmed both deliverable hashes unchanged, so the constraint-compliance conclusion remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C4)",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+              "handoff/executor_publications/"
+            ]
+          }
+        ],
+        "OVERALL_RATIONALE": "All four decision-critical claims reuse the 700102 PASS results, and every focused integrity revalidation check required before adopting them passed: claims hash recomputed exactly, reused report byte-identical to its verified artifact, per-claim coverage exactly C1-C4 all PASS, and both deliverable hashes unchanged. No claim is FAIL and no residual uncertainty blocks the overall verdict.",
+        "REUSED_REPORT_PATH": "reports/final-verification-700102.json",
+        "REUSED_REPORT_SHA256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+        "CLAIMS_HASH_RECIPE": "sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, ensure_ascii=False, sort_keys=True, separators=(',', ':')); recomputed 2026-09-12T21:13:23.524750+00:00 from the dispatched TO_ZCODE.md gate, exact equality with the dispatched hash required and confirmed before adopting any prior result.",
+        "REVALIDATED_AT": "2026-09-12T21:13:23.524750+00:00",
+        "REUSE_BASIS": {
+          "method": "Focused integrity revalidation only (no broad re-execution), per task acceptance criteria; check script and raw results in the attempt workspace of this attempt.",
+          "checks": [
+            "claims_hash_recomputed_matches_gate: PASS (recomputed == dispatched == gate)",
+            "gate_identity_matches_inbox: PASS (MESSAGE_ID 700103, ATTEMPT 2, LIVE_READ_ONLY, POLICY_VERSION 1)",
+            "report_exists: PASS (reports/final-verification-700102.json)",
+            "report_sha256_matches: PASS (ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b)",
+            "report_covers_C1_C4_all_PASS: PASS (exactly C1,C2,C3,C4; each result PASS)",
+            "report_overall_PASS_and_gate_fields: PASS (OVERALL_RESULT PASS, POLICY_VERSION 1, CLAIMS_HASH fields equal dispatched)",
+            "note_hash_matches_report_record: PASS (8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58)",
+            "csv_hash_matches_report_record: PASS (b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003)"
+          ],
+          "revalidation_result_artifact": "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+        },
+        "LIMITATIONS": [
+          "Receipt-only repair: no substantive re-verification was performed; per-claim substance is adopted from reports/final-verification-700102.json (VERIFIED_AT 2026-09-12T20:58:48.895888+00:00) after the focused integrity revalidation documented above.",
+          "Point-in-time: revalidation reflects the state at REVALIDATED_AT; later lifecycle or artifact changes are outside this receipt's scope.",
+          "Known nuances carried from the reused report remain: the rounds CSV uses bare LF record separators (parses byte-exactly under the RFC 4180 csv dialect); the Artifact Center shows provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; C4 is verified as absence of adverse evidence across inspectable authoritative records; docs/ARCHITECTURE.md does not describe Web Console internals beyond the supervisor_control.py boundary.",
+          "This attempt produced no new canonical artifact: the repaired receipt itself is the only output, carried in this completion."
+        ],
+        "EVIDENCE_POINTERS_INSPECTED": [
+          "TO_ZCODE.md (dispatched task and FINAL_VERIFICATION_GATE, read-only)",
+          "reports/final-verification-700102.json",
+          "workspace/dogfood-note.md",
+          "evidence/dogfood-rounds.csv",
+          "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+          "profiles/GENERAL/FINAL_VERIFICATION_POLICY.json",
+          "orchestrator.py (evaluate_final_verification_receipt implementation, read-only)",
+          "scripts/executor_completion.py (staging schema validation, read-only)",
+          "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate.py",
+          "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+        ]
+      }
+    },
+    {
+      "message_id": 700104,
+      "status": "COMPLETION_SEALED",
+      "receipt_keys": [
+        "ATTEMPT",
+        "COMPLETED_AT",
+        "EXECUTOR_MODEL_FAMILY",
+        "FINAL_VERIFICATION",
+        "LIMITATIONS",
+        "MESSAGE_ID",
+        "NONCE",
+        "NO_PUBLICATION_PERFORMED",
+        "OBJECTIVE_SUMMARY",
+        "PROJECT_ID",
+        "PUBLISHED_PATHS",
+        "REPAIR_NOTE",
+        "REVALIDATION_ARTIFACT",
+        "STAGE_ID",
+        "STATUS",
+        "SUGGESTED_MEMORY_UPDATES",
+        "TASK_ID"
+      ],
+      "final_verification": {
+        "POLICY_ID": "GENERAL_FV_V1",
+        "POLICY_VERSION": 1,
+        "CLAIMS_HASH": "a2e20dfe1d5982ecebe2fc6b6271aeeab59cd39a23b6b7e303a63340b461af74",
+        "EXECUTION_MODE": "LIVE_READ_ONLY",
+        "ISOLATION_INCIDENT": false,
+        "OVERALL_STATUS": "PASS",
+        "CLAIM_RESULTS": [
+          {
+            "claim_id": "C1",
+            "claim_type": "SOURCE_SUPPORT",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "source_pointers": [
+                "workspace/dogfood-note.md",
+                "docs/ARCHITECTURE.md",
+                "reports/final-verification-700102.json"
+              ]
+            },
+            "summary": "Reuse of the 700102 result: its C1 PASS rests on a statement-by-statement adversarial comparison of workspace/dogfood-note.md against docs/ARCHITECTURE.md (full record in the reused report). Focused revalidation confirmed the reused report is byte-identical to its verified artifact (SHA-256 ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b) and the note is unchanged (SHA-256 8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58), so the source-support conclusion remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C1)",
+              "workspace/dogfood-note.md",
+              "docs/ARCHITECTURE.md"
+            ]
+          },
+          {
+            "claim_id": "C2",
+            "claim_type": "NUMERICAL",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "calculation_check": "PASS",
+              "calculation_artifact": "reports/final-verification-700102.json"
+            },
+            "summary": "Reuse of the 700102 result: its C2 PASS parsed evidence/dogfood-rounds.csv under the RFC 4180 dialect and reconstructed the consumed-at-cutoff ledger set (cutoff 2026-09-12T20:31:16.888225+00:00; 700100 in, 700101 correctly out). Focused revalidation reconfirmed the CSV is unchanged today (SHA-256 b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003, equal to the report-recorded and publication-record value), so the numerical conclusion remains supported; the reused report is the existing calculation artifact.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C2)",
+              "evidence/dogfood-rounds.csv",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/audit.jsonl"
+            ]
+          },
+          {
+            "claim_id": "C3",
+            "claim_type": "DELIVERABLE_INTEGRITY",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "deliverable_check": "PASS",
+              "deliverable_path": "workspace/dogfood-note.md; evidence/dogfood-rounds.csv"
+            },
+            "summary": "Reuse of the 700102 result: its C3 PASS resolved and read both deliverables through the production local Web Console/Artifact Center workflow code path (focused offline test; no GUI or network). Focused revalidation reconfirmed both files still exist at the goal paths with the report-recorded hashes and readable bytes (note 6276 bytes / 8ba6f737..., CSV 212 bytes / b076c865...), so deliverable integrity remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C3)",
+              "workspace/dogfood-note.md",
+              "evidence/dogfood-rounds.csv"
+            ]
+          },
+          {
+            "claim_id": "C4",
+            "claim_type": "CONSTRAINT_COMPLIANCE",
+            "decision_impact": "HIGH",
+            "status": "SUPPORTED",
+            "checks": {
+              "constraint_check": "PASS"
+            },
+            "summary": "Reuse of the 700102 result: its C4 PASS inspected claims, publications, ledger, and audit records for MESSAGE_IDs 700100/700101 and found the lifecycle honored with no user-facing output beyond the two goal deliverables. This repair attempt adds no new constraint surface: it published nothing, wrote nothing canonical except this Runtime-committed receipt, and reconfirmed both deliverable hashes unchanged, so the constraint-compliance conclusion remains supported.",
+            "evidence_pointers": [
+              "reports/final-verification-700102.json (CLAIM_RESULTS C4)",
+              "handoff/completion_ledger/completion-700100-d190a8b3e8efef383fc55ae7.json",
+              "handoff/completion_ledger/completion-700101-3edf22139d440a89e205fa46.json",
+              "handoff/executor_publications/"
+            ]
+          }
+        ],
+        "OVERALL_RATIONALE": "All four decision-critical claims reuse the 700102 PASS results, and every focused integrity revalidation check required before adopting them passed: claims hash recomputed exactly, reused report byte-identical to its verified artifact, per-claim coverage exactly C1-C4 all PASS, and both deliverable hashes unchanged. No claim is FAIL and no residual uncertainty blocks the overall verdict.",
+        "REUSED_REPORT_PATH": "reports/final-verification-700102.json",
+        "REUSED_REPORT_SHA256": "ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b",
+        "CLAIMS_HASH_RECIPE": "sha256 over UTF-8 bytes of json.dumps(FINAL_VERIFICATION_GATE.CRITICAL_CLAIMS, ensure_ascii=False, sort_keys=True, separators=(',', ':')); recomputed 2026-09-12T21:13:23.524750+00:00 from the dispatched TO_ZCODE.md gate, exact equality with the dispatched hash required and confirmed before adopting any prior result.",
+        "REVALIDATED_AT": "2026-09-12T21:13:23.524750+00:00",
+        "REUSE_BASIS": {
+          "method": "Focused integrity revalidation only (no broad re-execution), per task acceptance criteria; check script and raw results in the attempt workspace of this attempt.",
+          "checks": [
+            "claims_hash_recomputed_matches_gate: PASS (recomputed == dispatched == gate)",
+            "gate_identity_matches_inbox: PASS (MESSAGE_ID 700103, ATTEMPT 2, LIVE_READ_ONLY, POLICY_VERSION 1)",
+            "report_exists: PASS (reports/final-verification-700102.json)",
+            "report_sha256_matches: PASS (ec5168385f5efff5138080b2649d2244371db370dc29267e3f8b1b3d4644450b)",
+            "report_covers_C1_C4_all_PASS: PASS (exactly C1,C2,C3,C4; each result PASS)",
+            "report_overall_PASS_and_gate_fields: PASS (OVERALL_RESULT PASS, POLICY_VERSION 1, CLAIMS_HASH fields equal dispatched)",
+            "note_hash_matches_report_record: PASS (8ba6f7379f424ad75cd2cfb88d68c5c0bd2902205c9b799b6095bdd0290f0f58)",
+            "csv_hash_matches_report_record: PASS (b076c865409dbcfd0c67c01e5714d021011037a9602207990074f711601ba003)"
+          ],
+          "revalidation_result_artifact": "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+        },
+        "LIMITATIONS": [
+          "Receipt-only repair: no substantive re-verification was performed; per-claim substance is adopted from reports/final-verification-700102.json (VERIFIED_AT 2026-09-12T20:58:48.895888+00:00) after the focused integrity revalidation documented above.",
+          "Point-in-time: revalidation reflects the state at REVALIDATED_AT; later lifecycle or artifact changes are outside this receipt's scope.",
+          "Known nuances carried from the reused report remain: the rounds CSV uses bare LF record separators (parses byte-exactly under the RFC 4180 csv dialect); the Artifact Center shows provenance 'unbound'/verification 'unverified' because the 700100/700101 receipts embed no PUBLISHED_PATHS list; C4 is verified as absence of adverse evidence across inspectable authoritative records; docs/ARCHITECTURE.md does not describe Web Console internals beyond the supervisor_control.py boundary.",
+          "This attempt produced no new canonical artifact: the repaired receipt itself is the only output, carried in this completion."
+        ],
+        "EVIDENCE_POINTERS_INSPECTED": [
+          "TO_ZCODE.md (dispatched task and FINAL_VERIFICATION_GATE, read-only)",
+          "reports/final-verification-700102.json",
+          "workspace/dogfood-note.md",
+          "evidence/dogfood-rounds.csv",
+          "handoff/completion_ledger/completion-700102-c3df95c1cbbe992824f58363.json",
+          "profiles/GENERAL/FINAL_VERIFICATION_POLICY.json",
+          "orchestrator.py (evaluate_final_verification_receipt implementation, read-only)",
+          "scripts/executor_completion.py (staging schema validation, read-only)",
+          "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate.py",
+          "projects/v13-dogfood-001/attempt_workspaces/700103-e0aefba229597b814e933d30/fv_repair_revalidate_result.json"
+        ]
+      }
+    }
+  ]
+}

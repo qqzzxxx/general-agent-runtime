@@ -288,6 +288,17 @@ Verify each claim adversarially and independently according to the provided stan
 
 Report the real per-claim result and overall result in the Executor receipt.
 
+For FINAL_VERIFICATION_GATE.CONTRACT_VERSION=1, put structured results in
+RECEIPT.FINAL_VERIFICATION_RESULTS: OVERALL_STATUS (PASS/FAIL/INCONCLUSIVE),
+CLAIM_RESULTS (one exact claim_id, policy status, checks, evidence_pointers and
+auditor_note per claim), plus applicable SANDBOX and ISOLATION_INCIDENT facts.
+Use the gate's POLICY_SNAPSHOT rules. Do not author FINAL_VERIFICATION or copy
+hash/policy/identity fields into the results. executor_completion.py constructs
+that envelope from the verified immutable dispatch and preserves your judgments.
+A prose report alone is insufficient. Invalid staging is rejected before commit;
+correct it only while the same claim/token remains authorized. Never retry a
+committed/sealed, retired or expired identity.
+
 Final Acceptance and COMPLETE belong only to the Codex Supervisor plus the Runtime mechanical gate.
 
 ==================================================

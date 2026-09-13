@@ -16,6 +16,41 @@ Typical decision-critical claims include:
 
 ## State contract
 
+New Supervisor decisions use the one-pass preparation contract. Record
+`decision=FINAL_VERIFICATION`, publish the ordinary fresh task identity with
+`TASK_KIND=FINAL_VERIFICATION`, and supply:
+
+```json
+{"FINAL_VERIFICATION_REQUEST": {"CRITICAL_CLAIMS": [], "EXECUTION_MODE": "LIVE_READ_ONLY"}}
+```
+
+Fill the list with the policy's required claims. Do not also author a gate.
+Before the decision receipt is committed, Runtime validates this explicit request,
+establishes `PENDING`, computes the exact claim hash/count, and snapshots the bound
+policy into `FINAL_VERIFICATION_GATE` with `CONTRACT_VERSION=1`. It archives and
+seals the resulting task bytes through the ordinary authorization path. Existing
+state metadata, if supplied, must agree; corrupt metadata is rejected, not fixed.
+Initial state may be `NOT_STARTED`; a substantive revision uses `REVERIFY`.
+STOP/HUMAN_REVIEW and retired, claimed, or completed identities cannot be prepared.
+
+For this contract the Executor stages `RECEIPT.FINAL_VERIFICATION_RESULTS` containing
+`OVERALL_STATUS`, exact `CLAIM_RESULTS`, and any `SANDBOX` / `ISOLATION_INCIDENT`
+facts. Claim result statuses remain the policy's statuses below; PASS/FAIL checks
+and overall PASS/FAIL/INCONCLUSIVE are model judgments. No prose-only report is
+accepted as structured results. The commit helper supplies `FINAL_VERIFICATION`
+policy ID/version/hash, claims hash, execution mode, task identity and dispatch
+hash from the verified archive. It preserves all authored results, including FAIL
+and INCONCLUSIVE, and hashes/seals the constructed receipt. It never infers PASS.
+Missing or malformed results are rejected before ledger commit; with authorization
+still valid, the owning worker may correct staging under its existing claim.
+
+Consumption and crash replay use the verified dispatch archive and its pinned
+policy, even if `current_task` has no gate or a stale gate mirror. Supervisor alone
+performs final acceptance against the consumed identity and receipt hash.
+
+The full manually authored gate and receipt examples below describe the retained
+legacy contract. Existing historical receipts are never automatically rewritten.
+
 `control/project_state.json`:
 
 ```json

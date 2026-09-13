@@ -1796,6 +1796,42 @@ def final_verification_gate_enforced(runtime: dict, state: dict) -> bool:
     return bool(cutoff and started and started >= cutoff)
 
 
+def evaluate_authorized_final_verification(runtime: dict, state: dict, receipt: dict) -> dict | None:
+    """One source for fresh consumption and crash replay: the sealed dispatch.
+
+    Only pre-archive compatibility identities retain the historical fallback.
+    A current_task mirror never overrides an available authoritative archive.
+    """
+    authorization = runtime.get("authorized_dispatch") or {}
+    current = state.get("current_task") or {}
+    try:
+        if "SUPERVISOR_DISPATCH_ARCHIVE" in authorization:
+            import final_verification_contract as fv_contract
+            task = fv_contract.archived_task(ROOT, authorization)
+            if not task_identity_matches(task, receipt):
+                raise RuntimeError("FV consumed identity differs from archived dispatch")
+            if not is_final_verification_task(task):
+                return None
+            task["TO_ZCODE_SHA256"] = authorization["TO_ZCODE_SHA256"]
+        else:
+            task = authorized_final_verification_task(runtime, receipt, receipt["MESSAGE_ID"])
+            if task is None and "IS_FINAL_VERIFICATION" not in authorization:
+                task = current if is_final_verification_task(current) else None
+            if task is None:
+                return None
+        gate = task.get("FINAL_VERIFICATION_GATE") or {}
+        if "CONTRACT_VERSION" in gate:
+            import final_verification_contract as fv_contract
+            policy = fv_contract.bound_policy(gate)
+        else:
+            policy, _ = _resolve_fv_policy_for_state(state)
+        return evaluate_final_verification_receipt(task, receipt, policy)
+    except (RuntimeError, ValueError, TypeError, KeyError, OSError) as exc:
+        return {"is_final_verification": True, "mechanical_pass": False,
+                "claims_hash": "", "overall_status": None, "claim_result_count": 0,
+                "issues": [str(exc)]}
+
+
 def validate_final_verification_dispatch(state: dict, task: dict) -> None:
     """Fail closed unless a verification dispatch exactly matches Supervisor-owned state."""
     if not is_final_verification_task(task):
@@ -1804,6 +1840,12 @@ def validate_final_verification_dispatch(state: dict, task: dict) -> None:
     gate = task.get("FINAL_VERIFICATION_GATE")
     if not isinstance(gate, dict):
         raise RuntimeError("FINAL_VERIFICATION task missing FINAL_VERIFICATION_GATE")
+    if "CONTRACT_VERSION" in gate:
+        import final_verification_contract as fv_contract
+        pinned = fv_contract.bound_policy(gate)
+        active, _ = _resolve_fv_policy_for_state(state)
+        if pinned != active:
+            raise RuntimeError("FINAL_VERIFICATION pinned policy differs from active dispatch policy")
     if int(gate.get("POLICY_VERSION") or 0) != FINAL_VERIFICATION_POLICY_VERSION:
         raise RuntimeError("FINAL_VERIFICATION_GATE policy version mismatch")
     # FV-SANDBOX-ISOLATION-V1: optional execution-mode pinning. Absent keeps the
@@ -1907,10 +1949,27 @@ def evaluate_final_verification_receipt(current_task: dict, brief: dict, policy:
         result["issues"].append("Receipt missing FINAL_VERIFICATION object")
         return result
 
-    if int(payload.get("POLICY_VERSION") or 0) != FINAL_VERIFICATION_POLICY_VERSION:
+    if type(payload.get("POLICY_VERSION")) is not int or payload["POLICY_VERSION"] != FINAL_VERIFICATION_POLICY_VERSION:
         result["issues"].append("Receipt FINAL_VERIFICATION policy version mismatch")
     if str(payload.get("CLAIMS_HASH") or "") != expected_hash:
         result["issues"].append("Receipt CLAIMS_HASH does not match dispatched gate")
+    if "POLICY_ID" in payload and payload["POLICY_ID"] != policy["policy_id"]:
+        result["issues"].append("Receipt POLICY_ID mismatch")
+    if "CONTRACT_VERSION" in gate:
+        import final_verification_contract as fv_contract
+        try:
+            pinned = fv_contract.bound_policy(gate)
+            if pinned != policy:
+                raise RuntimeError("FV evaluation policy differs from dispatched snapshot")
+            for key in ("POLICY_ID", "POLICY_VERSION", "POLICY_SHA256", "EXECUTION_MODE"):
+                if payload.get(key) != gate[key]:
+                    raise RuntimeError(f"FV receipt {key} binding mismatch")
+            if payload.get("TASK_IDENTITY") != {key: current_task.get(key) for key in IDENTITY_KEYS}:
+                raise RuntimeError("FV receipt task identity binding mismatch")
+            if payload.get("DISPATCH_SHA256") != current_task.get("TO_ZCODE_SHA256"):
+                raise RuntimeError("FV receipt dispatch hash binding mismatch")
+        except (RuntimeError, TypeError, ValueError, KeyError) as exc:
+            result["issues"].append(str(exc))
 
     overall = str(payload.get("OVERALL_STATUS") or "").upper()
     result["overall_status"] = overall
@@ -3708,9 +3767,11 @@ def build_codex_prompt(
             "Profile's bound Final Verification policy has passed and FINAL_ACCEPTANCE is "
             "complete. Use the active Profile policy and its bound policy_id/policy_version: "
             "select 3-8 decision-critical claims within the Profile taxonomy, dispatch ONE "
-            "bounded TASK_KIND=FINAL_VERIFICATION stage. Put POLICY_ID, POLICY_VERSION, "
-            "CLAIMS_HASH, CLAIM_COUNT, and CRITICAL_CLAIMS inside the nested "
-            "FINAL_VERIFICATION_GATE object (never at task top level). "
+            "bounded TASK_KIND=FINAL_VERIFICATION stage. Record decision=FINAL_VERIFICATION "
+            "in last_supervisor_decision and decision_history. Supply FINAL_VERIFICATION_REQUEST "
+            "with CRITICAL_CLAIMS and optional EXECUTION_MODE; omit FINAL_VERIFICATION_GATE. "
+            "Runtime establishes PENDING, POLICY_ID, POLICY_VERSION, CLAIMS_HASH, CLAIM_COUNT, "
+            "and the immutable FINAL_VERIFICATION_GATE policy snapshot before committing the decision. "
             "CRITICAL_CLAIMS element schema is mechanically enforced: EVERY element must be "
             "a JSON object containing EXACTLY these six lowercase keys — no uppercase "
             "variants, no aliases, no missing keys: "
@@ -3721,8 +3782,12 @@ def build_codex_prompt(
             "decision_impact must be HIGH or MEDIUM; evidence_pointers must be a JSON list "
             "of strings. CLAIMS_HASH is the canonical SHA-256 of the exact claim list: "
             "hash the JSON produced by json.dumps(claims, ensure_ascii=False, sort_keys=True, "
-            "separators=(',', ':')). The same claim list and hash must also be stored in "
-            "project_state.final_verification. A dispatch whose claims fail this schema is "
+            "separators=(',', ':')). Runtime stores the same list and hash in "
+            "project_state.final_verification; omit unauthored metadata, and never submit conflicting "
+            "state metadata. Initial state may be NOT_STARTED; after a real revision use REVERIFY. "
+            "The Executor authors FINAL_VERIFICATION_RESULTS with OVERALL_STATUS and CLAIM_RESULTS; "
+            "Runtime constructs the receipt envelope without changing any judgment. "
+            "A dispatch whose claims fail this schema is "
             "rejected, quarantined, and costs a bounded repair turn. On FAIL/INCONCLUSIVE "
             "apply only a narrow REVISE of the smallest affected claim/evidence segment "
             "before reverifying."
@@ -4775,15 +4840,7 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
         return True, None
 
     receipt = entry["RECEIPT"]
-    final_verification_result = None
-    fv_task_view = current if is_final_verification_task(current) else None
-    if fv_task_view is None:
-        # FV-IDENTITY-BINDING-V1: current_task mirrors only identity keys by wire
-        # contract, so FV-ness falls back to the Runtime's own authorization record.
-        fv_task_view = authorized_final_verification_task(runtime, receipt, msg_id)
-    if fv_task_view is not None:
-        policy, _ = _resolve_fv_policy_for_state(state)  # G4
-        final_verification_result = evaluate_final_verification_receipt(fv_task_view, receipt, policy)
+    final_verification_result = evaluate_authorized_final_verification(runtime, state, receipt)
 
     brief_hash = entry["BRIEF_SHA256"]
     archive = HANDOFF_ARCHIVE / f"brief-{msg_id}-{str(entry['NONCE'])[:12]}-consumed-{brief_hash[:12]}.md"
@@ -4928,6 +4985,8 @@ def replay_consumed_receipt_event(runtime: dict, current: dict, state: dict | No
             continue
         if not task_identity_matches(entry, current):
             continue
+        if not completion.entry_hashes_intact(entry):
+            return None
         event = {
             "type": "EXECUTOR_RESULT_READY",
             "message_id": entry["MESSAGE_ID"],
@@ -4940,11 +4999,10 @@ def replay_consumed_receipt_event(runtime: dict, current: dict, state: dict | No
             "committed_receipt_path": str(completion.entry_path(ROOT, entry["COMMIT_ID"])),
             "replayed_after_crash": True,
         }
-        if is_final_verification_task(current):
-            policy, _ = _resolve_fv_policy_for_state(state if state is not None else read_project_state())
-            event["final_verification"] = evaluate_final_verification_receipt(
-                current, entry.get("RECEIPT") or {}, policy
-            )
+        fv_result = evaluate_authorized_final_verification(
+            runtime, state if state is not None else read_project_state(), entry.get("RECEIPT") or {})
+        if fv_result is not None:
+            event["final_verification"] = fv_result
         return event
     if not HANDOFF_ARCHIVE.exists():
         return None

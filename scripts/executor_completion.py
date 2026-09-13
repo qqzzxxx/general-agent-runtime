@@ -737,6 +737,12 @@ def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
         fence.check_locked(root, identity, claim_token=claim_token)
         fence.validate_publications(root, identity, staging)
 
+    import final_verification_contract as fv_contract
+    try:
+        staging["RECEIPT"] = fv_contract.construct_receipt(
+            root, runtime["authorized_dispatch"], staging["RECEIPT"])
+    except (RuntimeError, ValueError, TypeError, KeyError) as exc:
+        raise CompletionError(EXIT_INVALID_STAGING, str(exc)) from exc
     entry = build_entry(staging, project_id, claim, root)
     if "FENCE_VERSION" in runtime["authorized_dispatch"]:
         try:
