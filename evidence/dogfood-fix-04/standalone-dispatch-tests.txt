@@ -1,0 +1,66 @@
+[2026-09-13T07:25:38+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_NOT_AUTHORIZED message_id=700017 reason=authorization_message_id_mismatch
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-53vuh8h_\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=8gMQrD2YO3XP0fzO9QbAnXyT_GXqNVh0nNZ0iNRlp0g
+CLAIM_EXISTS message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-53vuh8h_\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim
+ALREADY_PROCESSED message_id=700014 last_processed=700015
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+..CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-13T07:25:39+00:00] Starting Codex supervisor turn
+[2026-09-13T07:25:39+00:00] Codex supervisor profile fixed
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-13T07:25:39+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-13T07:25:39+00:00] Starting Codex supervisor turn
+[2026-09-13T07:25:39+00:00] Codex supervisor profile fixed
+[2026-09-13T07:25:39+00:00] Codex supervisor turn finished
+Supervisor decision:
+Decision : CONTINUE
+Scope    : -
+Status   : WAITING_EXECUTOR
+Turn     : EXECUTOR_RESULT_READY (0.0s)
+Reason   : fixture dispatch decision
+[2026-09-13T07:25:39+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+[2026-09-13T07:25:39+00:00] Fresh Executor task published
+>>> EXECUTOR_TASK_PUBLISHED: message_id=700015, task_id=task-final-verification, stage_id=final-verification-attempt-1, attempt=1
+[2026-09-13T07:25:39+00:00] Starting Codex supervisor turn
+[2026-09-13T07:25:39+00:00] Codex supervisor profile fixed
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-13T07:25:39+00:00] Supervisor result had no eligible committed decision; next turn retained
+[2026-09-13T07:25:39+00:00] Starting Codex supervisor turn
+[2026-09-13T07:25:39+00:00] Codex supervisor profile fixed
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-13T07:25:39+00:00] Supervisor decision retry budget exhausted; entering HUMAN_REVIEW
+[2026-09-13T07:25:39+00:00] Dispatch repair also exhausted after final invalid Supervisor result
+[2026-09-13T07:25:39+00:00] Supervisor result exhausted bounded retries; HUMAN_REVIEW finalized
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+...CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+.CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-13T07:25:39+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:39+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+.CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+CLAIM_NOT_AUTHORIZED message_id=700015 reason=authorization_missing
+[2026-09-13T07:25:40+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:40+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-13T07:25:40+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-4g9o2s98\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=jF9iUr5kgAMaQnv4JQhmIrNJcH7-p-FUW82s9vhU6Ac
+[2026-09-13T07:25:40+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:40+00:00] Dispatch validation failed; one bounded Supervisor repair turn armed
+[2026-09-13T07:25:40+00:00] Quarantined mechanically rejected dispatch candidate
+[2026-09-13T07:25:40+00:00] Dispatch validation failed again; terminal, no repair attempts left
+[2026-09-13T07:25:40+00:00] Task ISSUED_AT missing/unparseable; using orchestrator dispatch time as deadline base
+.......
+----------------------------------------------------------------------
+Ran 14 tests in 1.785s
+
+OK
+CLAIM_ACQUIRED message_id=700015 claim=C:\Users\qzxAl\AppData\Local\Temp\fvr-700102-hr5ye05w\handoff\executor_claims\700015-b1bd7bd330ad8ae30df17110.claim claim_token=mZJw23bgqQWpM2GmYQ7Om5w0DQ8jHrQRhNXc_nm2wdU

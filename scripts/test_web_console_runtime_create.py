@@ -293,7 +293,7 @@ class CopyContractTests(unittest.TestCase):
             .write_text("{}", encoding="utf-8")
         (root / "web_console" / "index.html").write_text("<html></html>",
                                                          encoding="utf-8")
-        for name in ("supervisor_control.py", "executor_claim.py",
+        for name in ("supervisor_control.py", "provider_usage.py", "executor_claim.py",
                      "executor_fence.py", "executor_completion.py",
                      "preflight.py", "start_project.py"):
             (root / "scripts" / name).write_text(f"# {name}\n",

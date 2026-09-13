@@ -1630,13 +1630,15 @@ function usageText(usage) {
   if (!usage || !usage.reported) { return "usage not reported"; }
   const parts = [];
   for (const [key, label] of [["input_tokens", "in"],
+                              ["cached_input_tokens", "cached input"],
+                              ["reasoning_output_tokens", "reasoning output"],
                               ["output_tokens", "out"],
                               ["total_tokens", "total"]]) {
     if (usage[key] !== null && usage[key] !== undefined) {
       parts.push(label + " " + usage[key]);
     }
   }
-  return parts.length ? tokensLabel(parts) : "usage not reported";
+  return parts.length ? tokensLabel(parts) + " · provider reported" : "usage not reported";
 }
 
 function tokensLabel(parts) {
@@ -1734,21 +1736,28 @@ function renderSupervisorTurns(document_) {
 
 function renderSupervisorUsage(usage) {
   const summary = document.getElementById("sv-usage-summary");
-  fillDetails(summary, [
-    ["Input tokens (reported)", usage.totals.input_tokens ?? "Not reported"],
-    ["Output tokens (reported)", usage.totals.output_tokens ?? "Not reported"],
-    ["Total tokens (reported)", usage.totals.total_tokens ?? "Not reported"],
-    ["Turns with reported usage", usage.turns_with_reported_usage
-      + " of " + usage.turns_total],
-    ["Average total per reported turn",
-      usage.average_total_per_reported_turn ?? "Not reported"],
-    ["Highest reported turn", usage.highest_total_turn
-      ? (usage.highest_total_turn.total_tokens + " tokens ("
-         + usage.highest_total_turn.turn_id + ")") : "Not reported"],
-    ["ZCode usage", usage.zcode_usage.reported
-      ? String(usage.zcode_usage.total_tokens) + " tokens"
-      : "Not reported"],
-  ]);
+  const fields = [["input_tokens", "Input tokens (reported)"],
+    ["cached_input_tokens", "Cached input tokens (reported)"],
+    ["output_tokens", "Output tokens (reported)"],
+    ["reasoning_output_tokens", "Reasoning output tokens (reported)"],
+    ["total_tokens", "Total tokens (reported)"]];
+  const facts = [
+    ["Usage scope", usage.sum_label || "Partial reported sums"],
+    ["Turns with reported usage", usage.turns_with_reported_usage + " of " + usage.turns_total],
+  ];
+  for (const [key, label] of fields) {
+    if (usage.totals[key] !== null && usage.totals[key] !== undefined) {
+      facts.push([label, usage.totals[key] + " · " + usage.coverage[key + "_reported"]
+        + " of " + usage.turns_total + " turns reported"]);
+    }
+  }
+  if (!usage.turns_with_reported_usage) { facts.push(["Usage", "Not reported"]); }
+  const executor = usage.zcode_usage;
+  facts.push(["ZCode usage", "Not reported"]);
+  facts.push(["Executor reported rounds", executor.rounds_total === null || executor.rounds_total === undefined
+    ? "unavailable" : "0 of " + executor.rounds_total + " authorized rounds"]);
+  if (usage.unusable_records) { facts.push(["Unusable turn records", usage.unusable_records]); }
+  fillDetails(summary, facts);
 }
 
 function renderSupervisorConfig(view) {
@@ -2109,6 +2118,7 @@ function renderRound(round) {
     badges.append(el("span", "badge bad", "contradiction · " + problem));
   }
   body.append(badges);
+  body.append(el("p", null, "Executor usage: Not reported"));
   const stamps = [];
   if (round.archived_at) { stamps.push("dispatch archived " + round.archived_at); }
   if (round.committed_at) { stamps.push("completion committed " + round.committed_at); }
@@ -2285,6 +2295,7 @@ function renderDrawer() {
       "Round status: " + (round.status || "unavailable")));
     fillDetails(body.appendChild(document.createElement("dl")), [
       ["Message ID", round.identity.message_id],
+      ["Executor usage", "Not reported"],
       ["Task", round.identity.task_id || "unavailable"],
       ["Stage", round.identity.stage_id || "unavailable"],
       ["Attempt", round.identity.attempt ?? "unavailable"],
@@ -2444,14 +2455,13 @@ function renderDrawer() {
         const turn = result.payload.supervisor_turn.turn;
         const facts = document.createElement("dl");
         fillDetails(facts, [
+          ["Executor usage", "Not reported"],
           ["Turn profile", turnProfileText(turn)],
           ["Duration", durationText(turn.duration_seconds)
             || "unavailable"],
-          ["Input tokens", turn.usage.input_tokens ?? "usage not reported"],
-          ["Output tokens", turn.usage.output_tokens
-            ?? "usage not reported"],
-          ["Total tokens", turn.usage.total_tokens
-            ?? "usage not reported"],
+          ["Usage", usageText(turn.usage)],
+          ["Usage source", turn.usage.status || "unavailable"],
+          ["Execution identity", turn.usage.execution_id || "unavailable"],
           ["Outcome", turn.outcome.recovered_after_crash
             ? "committed (recovered after crash)"
             : (turn.outcome.committed ? "committed" : "not committed")],

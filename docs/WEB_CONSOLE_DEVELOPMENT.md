@@ -685,15 +685,24 @@ keeps the original 64 KiB cap.
   resulting status), the resulting dispatch candidate, intervention ids,
   and the validation/error outcome. The recovery path (crash between the
   decision commit and the accounting write) writes the same record with
-  `recovered_after_crash: true` and no observation; an existing record is
-  never overwritten. Decision receipts themselves are unchanged.
+  `recovered_after_crash: true`; an existing record is never overwritten.
+  Dogfood Fix 04 recovers usage from the separately captured invocation receipt,
+  even when the transient observation is lost. Decision receipts are unchanged.
 - **Orchestrator observation.** `invoke_codex` records the effective
-  model/effort, elapsed time, a strict token-usage extraction from the
-  Codex output (`token_usage` with three non-negative integers — anything
-  else is not reported, never estimated), and the bounded context manifest
+  model/effort, elapsed time, and the bounded context manifest
   (input classes only: supervisor rules, project state, research state,
   goal, profile, human decision receipt, interventions, executor brief,
   mechanical event — never file contents or model reasoning).
+- **Authoritative usage (Dogfood Fix 04).** `codex exec --json` stdout supplies
+  `turn.completed.usage`; `-o` contains model-authored text and is never a usage
+  source. Runtime captures only `input_tokens`, `cached_input_tokens`,
+  `output_tokens`, and `reasoning_output_tokens` when supplied. No total is
+  calculated. Create-only invocation/capture files under
+  `control/supervisor_usage` bind the Runtime turn UUID, execution UUID, project,
+  Codex thread UUID, and canonical hashes. Live completion and recovery read the
+  same capture; Console validates its binding before displaying or summing it.
+  Old reported blocks without this evidence are read as unavailable, without
+  rewriting history. See [the complete trace and validation report](DOGFOOD_FIX_04_TOKEN_TELEMETRY.md).
 - **Explicit queued configuration (Runtime contract).**
   `supervisor_control.py queue-supervisor-config --model M --effort E`
   validates `{model, reasoning_effort}` (bounded model string;

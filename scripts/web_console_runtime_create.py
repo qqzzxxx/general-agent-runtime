@@ -89,6 +89,7 @@ COPY_EXCLUDED_SUFFIXES = (".pyc",)
 REQUIRED_RELEASE_PATHS = (
     "orchestrator.py",
     "scripts/supervisor_control.py",
+    "scripts/provider_usage.py",
     "scripts/executor_claim.py",
     "scripts/executor_fence.py",
     "scripts/executor_completion.py",

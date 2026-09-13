@@ -79,6 +79,13 @@ def commit_record_turn(root: Path, *, decision_reason: str,
                  "output_tokens": None, "total_tokens": None, "source": None,
                  "note": "the Codex environment did not report token usage "
                          "for this turn"}
+    if usage["reported"]:
+        import provider_usage as pu
+        capture = pu.Capture(root, turn)
+        for event in ({"type": "thread.started", "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"},
+                      {"type": "turn.started"}, {"type": "turn.completed", "usage": {
+                          "input_tokens": usage["input_tokens"], "output_tokens": usage["output_tokens"]}}):
+            capture.accept(json.dumps(event))
     sc.finish_supervisor_turn(root, turn, processed=True, observation={
         "model": model, "reasoning_effort": effort, "elapsed_seconds": 12.5,
         "usage": usage,
@@ -248,7 +255,8 @@ class SupervisorRouteTests(unittest.TestCase):
         summary = payload["supervisor_usage"]["usage"]
         self.assertEqual(summary["turns_total"], 3)
         self.assertEqual(summary["turns_with_reported_usage"], 2)
-        self.assertEqual(summary["totals"]["total_tokens"], 2100)
+        self.assertIsNone(summary["totals"]["total_tokens"])
+        self.assertEqual(summary["totals"]["input_tokens"], 1800)
         self.assertFalse(summary["zcode_usage"]["reported"])
         self.assertIn("not reported", json.dumps(summary).lower())
 

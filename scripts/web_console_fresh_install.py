@@ -21,6 +21,7 @@ CORE_SCRIPTS = (
     "executor_claim.py", "executor_completion.py", "executor_fence.py",
     "fv_sandbox.py", "migrate_goal_anchor.py", "preflight.py",
     "resume_human_review.py", "start_project.py", "supervisor_control.py",
+    "provider_usage.py",
 )
 MAX_TREE_ENTRIES = 10000
 MAX_FILE_BYTES = 16 * 1024 * 1024

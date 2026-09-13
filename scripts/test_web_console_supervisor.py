@@ -409,40 +409,42 @@ class UsageSummaryTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def reported(self, turn_id, fields, finished_at):
+        import provider_usage as pu
+        capture = pu.Capture(self.root, {"turn_id": turn_id, "PROJECT_ID": "demo-project"})
+        for event in ({"type": "thread.started", "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"},
+                      {"type": "turn.started"}, {"type": "turn.completed", "usage": fields}):
+            capture.accept(json.dumps(event))
+        write_record(self.root, sample_record(turn_id=turn_id, finished_at=finished_at,
+                     usage=pu.read_usage(self.root, turn_id, "demo-project")))
+
     def test_only_reported_values_are_summed(self):
-        write_record(self.root, sample_record(
-            turn_id="supervisor-turn-" + "0" * 24,
-            usage={"reported": True, "input_tokens": 1000,
-                   "output_tokens": 200, "total_tokens": 1200,
-                   "source": "codex_output_token_usage", "note": None},
-            finished_at="2026-09-12T10:00:00+00:00"))
-        write_record(self.root, sample_record(
-            turn_id="supervisor-turn-" + "1" * 24,
-            usage={"reported": False, "input_tokens": None,
-                   "output_tokens": None, "total_tokens": None,
-                   "source": None, "note": "not reported"},
-            finished_at="2026-09-12T11:00:00+00:00"))
-        write_record(self.root, sample_record(
-            turn_id="supervisor-turn-" + "2" * 24,
-            usage={"reported": True, "input_tokens": None,
-                   "output_tokens": 50, "total_tokens": 300,
-                   "source": "codex_output_token_usage", "note": None},
-            finished_at="2026-09-12T12:00:00+00:00"))
+        self.reported("supervisor-turn-0", {"input_tokens": 1000, "output_tokens": 200},
+                      "2026-09-12T10:00:00+00:00")
+        write_record(self.root, sample_record(turn_id="supervisor-turn-1"))
+        self.reported("supervisor-turn-2", {"output_tokens": 50}, "2026-09-12T12:00:00+00:00")
         document = wsup.build_usage_document(self.root, generated_at="now")
         summary = document["usage"]
         self.assertEqual(summary["turns_total"], 3)
         self.assertEqual(summary["turns_with_reported_usage"], 2)
-        self.assertEqual(summary["totals"]["total_tokens"], 1500)
+        self.assertIsNone(summary["totals"]["total_tokens"])
         self.assertEqual(summary["totals"]["output_tokens"], 250)
         self.assertEqual(summary["totals"]["input_tokens"], 1000)
         self.assertEqual(summary["coverage"]["input_tokens_reported"], 1)
         self.assertEqual(summary["coverage"]["output_tokens_reported"], 2)
-        self.assertEqual(summary["coverage"]["total_tokens_reported"], 2)
-        self.assertEqual(summary["average_total_per_reported_turn"], 750.0)
-        self.assertEqual(summary["highest_total_turn"]["turn_id"],
-                         "supervisor-turn-" + "0" * 24)
-        self.assertEqual(summary["highest_total_turn"]["total_tokens"], 1200)
+        self.assertEqual(summary["coverage"]["total_tokens_reported"], 0)
+        self.assertIsNone(summary["average_total_per_reported_turn"])
+        self.assertIsNone(summary["highest_total_turn"])
+        self.assertEqual(summary["sum_label"], "Partial reported sums")
         self.assertEqual(summary["zcode_usage"]["reported"], False)
+
+    def test_each_field_has_partial_coverage_even_when_every_turn_reports(self):
+        self.reported("supervisor-turn-0", {"input_tokens": 10, "output_tokens": 2}, "2026-09-12T10:00:00+00:00")
+        self.reported("supervisor-turn-1", {"output_tokens": 3}, "2026-09-12T11:00:00+00:00")
+        summary = wsup.build_usage_document(self.root, generated_at="now")["usage"]
+        self.assertEqual(summary["turns_with_reported_usage"], 2)
+        self.assertEqual(summary["coverage"]["input_tokens_reported"], 1)
+        self.assertEqual(summary["sum_label"], "Partial reported sums")
 
     def test_no_reported_usage_is_stated_plainly(self):
         write_record(self.root, sample_record(
@@ -457,12 +459,9 @@ class UsageSummaryTests(unittest.TestCase):
 
     def test_recent_usage_is_newest_first_and_bounded(self):
         for index in range(7):
-            write_record(self.root, sample_record(
-                turn_id=f"supervisor-turn-{index:024d}",
-                usage={"reported": True, "input_tokens": index,
-                       "output_tokens": index, "total_tokens": index * 10,
-                       "source": "s", "note": None},
-                finished_at=f"2026-09-12T1{index}:00:00+00:00"))
+            self.reported(f"supervisor-turn-{index:024d}",
+                          {"input_tokens": index, "output_tokens": index},
+                          f"2026-09-12T1{index}:00:00+00:00")
         document = wsup.build_usage_document(self.root, generated_at="now")
         recent = document["usage"]["recent_reported_turns"]
         self.assertEqual(len(recent), wsup.MAX_RECENT_REPORTED_TURNS)

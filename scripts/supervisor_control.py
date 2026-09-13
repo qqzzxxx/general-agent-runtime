@@ -1989,12 +1989,11 @@ def _write_supervisor_turn_record(root: Path, turn: dict, *, committed: bool,
         "resulting_status": (decision_source.get("resulting_status")
                              if decision_source else None),
     }
-    usage = observed.get("usage")
-    if not isinstance(usage, dict):
-        usage = {"reported": False, "input_tokens": None,
-                 "output_tokens": None, "total_tokens": None, "source": None,
-                 "note": "no Supervisor observation was recorded for this "
-                         "turn"}
+    # Usage authority comes exclusively from the captured CLI transport. Recovery
+    # reads the same immutable invocation receipt; observation/model prose cannot
+    # supply token counts, and decision replay never creates a second capture.
+    import provider_usage
+    usage = provider_usage.read_usage(root, turn.get("turn_id"), turn.get("PROJECT_ID"))
     record = {
         "schema": SUPERVISOR_TURN_RECORD_SCHEMA,
         "schema_version": SUPERVISOR_TURN_RECORD_SCHEMA_VERSION,

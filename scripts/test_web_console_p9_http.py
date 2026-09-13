@@ -214,7 +214,7 @@ class P9Fixture:
             "{}\n", encoding="utf-8")
         (console / "docs" / "a.md").write_text("docs\n", encoding="utf-8")
         scripts = console / "scripts"
-        for name in ("supervisor_control.py", "executor_claim.py",
+        for name in ("supervisor_control.py", "provider_usage.py", "executor_claim.py",
                      "executor_fence.py", "executor_completion.py",
                      "preflight.py", "start_project.py", "other.py"):
             if name == "supervisor_control.py" and complete:
@@ -557,10 +557,9 @@ class AlertsHttpTests(P9HttpTestCase):
             "zcode-pickup",
             {a["rule"] for a in after["alerts_document"]["alerts"]})
 
-    def test_usage_outlier_over_real_turn_records(self):
-        # Distinct timestamps pin the newest-first order: the LAST record
-        # (1000) is the newest turn, the three 100-total turns are its
-        # comparable baseline.
+    def test_unverified_legacy_totals_cannot_trigger_usage_outlier(self):
+        # These legacy records have no captured CLI usage evidence. Their
+        # fabricated totals must never trigger a provider-usage alert.
         totals = [100, 100, 100, 1000]
         records = [turn_record(f"supervisor-turn-{i:024d}", total,
                                index=i)
@@ -570,10 +569,8 @@ class AlertsHttpTests(P9HttpTestCase):
             path=f"/api/runtimes/{self.fixture.alpha_id}/alerts")
         alerts = document["alerts_document"]["alerts"]
         outlier = [a for a in alerts if a["rule"] == "usage-outlier"]
-        self.assertEqual(len(outlier), 1)
-        self.assertEqual(outlier[0]["severity"], "informational")
-        self.assertEqual(outlier[0]["notification_kind"], "HIGH_TOKEN_TURN")
-        self.assertEqual(outlier[0]["evidence"]["total_tokens"], 1000)
+        self.assertEqual(status, 200)
+        self.assertEqual(outlier, [])
         # Beta shares nothing.
         _, _, beta = self.fixture.json(
             path=f"/api/runtimes/{self.fixture.beta_id}/alerts")

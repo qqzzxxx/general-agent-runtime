@@ -105,7 +105,7 @@ class SupervisorPanelSafetyTests(unittest.TestCase):
         self.assertIsNotNone(context_tab)
         body = context_tab.group(0)
         for marker in ("supervisor/turns/", "context_manifest",
-                       "usage not reported"):
+                       "usageText(turn.usage)"):
             self.assertIn(marker, body, marker)
 
 

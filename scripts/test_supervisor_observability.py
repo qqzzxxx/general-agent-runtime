@@ -312,7 +312,7 @@ class SupervisorObservabilityTests(unittest.TestCase):
         self.assertTrue(record["outcome"]["committed"])
         self.assertFalse(record["outcome"]["recovered_after_crash"])
 
-    def test_finish_records_reported_usage_and_queued_profile(self):
+    def test_finish_rejects_model_usage_and_preserves_queued_profile(self):
         sc.queue_supervisor_config(
             self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
         usage = {"reported": True, "input_tokens": 1200, "output_tokens": 340,
@@ -329,7 +329,7 @@ class SupervisorObservabilityTests(unittest.TestCase):
         self.assertEqual(record["supervisor_config"]["reasoning_effort"],
                          "HIGH")
         self.assertEqual(record["supervisor_config"]["config_revision"], 1)
-        self.assertEqual(record["usage"], usage)
+        self.assertFalse(record["usage"]["reported"])
         self.assertIsNone(record["dispatch_linkage"],
                           "a terminal decision dispatches nothing")
 
@@ -545,10 +545,7 @@ class SupervisorProfileTests(unittest.TestCase):
             "token_usage": {"input_tokens": 100, "output_tokens": 20,
                             "total_tokens": 120}}), encoding="utf-8")
         usage = o.supervisor_turn_usage(output)
-        self.assertTrue(usage["reported"])
-        self.assertEqual((usage["input_tokens"], usage["output_tokens"],
-                          usage["total_tokens"]), (100, 20, 120))
-        self.assertEqual(usage["source"], "codex_output_token_usage")
+        self.assertFalse(usage["reported"], "final model JSON is never telemetry")
 
         cases = [
             ("missing file", None),
@@ -648,7 +645,7 @@ class SupervisorProfileTests(unittest.TestCase):
                                           "output_tokens": 450,
                                           "total_tokens": 1950}}
 
-        def fake_codex_run(cmd, cwd=None, input=None, timeout=None):
+        def fake_codex_run(cmd, cwd=None, input=None, timeout=None, stdout=None):
             self.assertIn("gpt-6", cmd)
             self.assertIn("model_reasoning_effort=medium", cmd)
             # The model "writes" its decision result exactly like the real
@@ -663,6 +660,12 @@ class SupervisorProfileTests(unittest.TestCase):
             state_path.write_text(json.dumps(current), encoding="utf-8")
             o.CODEX_LAST_OUTPUT.write_text(
                 json.dumps(usage_document), encoding="utf-8")
+            self.assertIn("--json", cmd)
+            stdout.write((json.dumps({"type": "thread.started", "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"}) + "\n"
+                          + json.dumps({"type": "turn.started"}) + "\n"
+                          + json.dumps({"type": "turn.completed", "usage": {"input_tokens": 1500,
+                              "cached_input_tokens": 1000, "output_tokens": 450,
+                              "reasoning_output_tokens": 20}}) + "\n").encode())
             return mock.Mock(returncode=0)
 
         with mock.patch.object(o, "find_codex", lambda: "codex-stub"), \
@@ -680,7 +683,8 @@ class SupervisorProfileTests(unittest.TestCase):
         self.assertEqual(record["supervisor_config"]["reasoning_effort"],
                          "MEDIUM")
         self.assertTrue(record["usage"]["reported"])
-        self.assertEqual(record["usage"]["total_tokens"], 1950)
+        self.assertIsNone(record["usage"]["total_tokens"])
+        self.assertEqual(record["usage"]["cached_input_tokens"], 1000)
         self.assertTrue(record["decision"]["committed"])
         self.assertEqual(record["decision"]["decision_summary"],
                          "queued-config observability probe")

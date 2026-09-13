@@ -2560,39 +2560,9 @@ def supervisor_turn_context_manifest(*, reason: str, event, goal_state: dict,
 
 
 def supervisor_turn_usage(output_path: Path) -> dict:
-    """Extract token usage only when the Codex output reliably reports it.
-
-    The only recognized source is a JSON output document with a
-    `token_usage` block whose three fields are all non-negative integers.
-    Anything else — missing, oversized, malformed, partial, or typed oddly —
-    is reported as not reported. Token counts are never estimated or
-    reconstructed.
-    """
-    not_reported = {"reported": False, "input_tokens": None,
-                    "output_tokens": None, "total_tokens": None,
-                    "source": None,
-                    "note": "the Codex environment did not report token "
-                            "usage for this turn"}
-    try:
-        if not output_path.is_file() \
-                or output_path.stat().st_size > 512 * 1024:
-            return not_reported
-        document = json.loads(output_path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return not_reported
-    if not isinstance(document, dict):
-        return not_reported
-    usage = document.get("token_usage")
-    if not isinstance(usage, dict):
-        return not_reported
-    counts = {}
-    for key in ("input_tokens", "output_tokens", "total_tokens"):
-        value = usage.get(key)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            return not_reported
-        counts[key] = value
-    return {"reported": True, **counts,
-            "source": "codex_output_token_usage", "note": None}
+    """Final agent messages are not provider telemetry (legacy API)."""
+    import provider_usage
+    return provider_usage.unavailable()
 
 
 def _read_profile_text(path: Path, what: str) -> str:
@@ -4254,6 +4224,7 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     cmd = [
         codex,
         "exec",
+        "--json",
         "-m",
         model,
         "-C",
@@ -4280,13 +4251,16 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         str(output_path),
         "-",
     ])
+    import provider_usage
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=str(ROOT),
-            input=prompt.encode("utf-8"),
-            timeout=CODEX_TIMEOUT_SECONDS,
-        )
+        with provider_usage.stdout_capture(ROOT, control_turn) as usage_stdout:
+            result = subprocess.run(
+                cmd,
+                cwd=str(ROOT),
+                input=prompt.encode("utf-8"),
+                timeout=CODEX_TIMEOUT_SECONDS,
+                stdout=usage_stdout,
+            )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"Codex supervisor turn timed out after {CODEX_TIMEOUT_SECONDS}s") from exc
 

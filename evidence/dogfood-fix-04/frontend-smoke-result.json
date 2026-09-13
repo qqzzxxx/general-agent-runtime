@@ -1,0 +1,5 @@
+{
+  "result": "PASS",
+  "checks": 11,
+  "scope": "actual frontend JavaScript syntax and rendering functions; synthetic test data only"
+}

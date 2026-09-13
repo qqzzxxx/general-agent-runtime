@@ -353,6 +353,7 @@ def project_round(group: _Round) -> dict:
         "message_id": group.message_id,
         "identity": identity,
         "status": status,
+        "executor_usage": {"reported": False, "status": "unavailable", "source": None},
         "has_dispatch": dispatch is not None,
         "has_completion": completion is not None,
         "dispatch_integrity": dispatch_integrity,
@@ -657,6 +658,7 @@ def interpret_round_detail(message_id: int, *, dispatch_result: dict,
         honesty_notes.append("no authoritative history source has a record "
                              "for this MESSAGE_ID")
     return {
+        "executor_usage": {"reported": False, "status": "unavailable", "source": None},
         "message_id": message_id,
         "found": found,
         "identity": identity,

@@ -24,6 +24,7 @@ import unicodedata
 import urllib.parse
 from pathlib import Path, PurePosixPath
 
+import provider_usage
 import web_console_control
 
 SUPERVISOR_SCHEMA_VERSION = 1
@@ -37,6 +38,7 @@ MAX_RECEIPT_BYTES = 1024 * 1024
 MAX_TURN_WALK = 5000
 MAX_UNUSABLE_LISTED = 20
 MAX_RECENT_REPORTED_TURNS = 5
+ID_PROJECT = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 TURN_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -170,6 +172,20 @@ def parse_turns_query(query: str) -> dict:
 
 
 def _validate_usage_block(usage) -> None:
+    if isinstance(usage, dict) and usage.get("source") == provider_usage.SOURCE:
+        expected = _USAGE_KEYS | {"status", "execution_id", "thread_id", "evidence_sha256"}
+        optional = {"cached_input_tokens", "reasoning_output_tokens"}
+        if (not expected <= set(usage) or set(usage) - expected - optional
+                or usage.get("status") != "provider_reported"
+                or usage.get("reported") is not True
+                or usage.get("total_tokens") is not None):
+            raise TurnRecordError("TURN_RECORD_UNUSABLE", "invalid provider usage projection")
+        try:
+            provider_usage.counts({key: usage[key] for key in provider_usage.FIELDS
+                                   if usage.get(key) is not None})
+        except ValueError as exc:
+            raise TurnRecordError("TURN_RECORD_UNUSABLE", str(exc)) from exc
+        return
     if not isinstance(usage, dict) or set(usage) != _USAGE_KEYS:
         raise TurnRecordError("TURN_RECORD_UNUSABLE",
                               "turn record usage block is invalid")
@@ -387,6 +403,16 @@ def load_turn_record(path: Path) -> dict:
             for item in record["intervention_ids"]):
         raise TurnRecordError("TURN_RECORD_UNUSABLE",
                               "turn record intervention_ids are invalid")
+    if path.stem != record["turn_id"]:
+        raise TurnRecordError("TURN_RECORD_UNUSABLE", "turn filename identity mismatch")
+    usage = record["usage"]
+    if usage.get("source") == provider_usage.SOURCE:
+        verified = provider_usage.read_usage(path.parent.parent.parent,
+                                             record["turn_id"], record["PROJECT_ID"])
+        if usage != verified:
+            record["usage"] = provider_usage.unavailable("Usage capture integrity or identity check failed")
+    elif usage.get("reported"):
+        record["usage"] = provider_usage.unavailable("Legacy final-message usage is not provider telemetry")
     return record
 
 
@@ -414,9 +440,20 @@ def load_turn_records(root: Path) -> tuple[list, list, list]:
         honesty.append(
             f"the turn record walk was truncated at {MAX_TURN_WALK} files")
         files = files[:MAX_TURN_WALK]
+    active_project = None
+    active_path = root / "control" / "ACTIVE_PROJECT.json"
+    if active_path.is_file():
+        try:
+            active_project = provider_usage.read_json(active_path)["project_id"]
+            if not isinstance(active_project, str) or not active_project:
+                raise ValueError("invalid active project")
+        except (OSError, ValueError, TypeError, KeyError):
+            return [], [], ["active project identity unavailable; project usage is unavailable"]
     for path in files:
         try:
-            records.append(load_turn_record(path))
+            record = load_turn_record(path)
+            if active_project is None or record["PROJECT_ID"] == active_project:
+                records.append(record)
         except TurnRecordError as exc:
             unusable.append({"file": path.name, "reason": str(exc)})
     if len(unusable) > MAX_UNUSABLE_LISTED:
@@ -503,9 +540,7 @@ def _project_turn(record: dict, integrity, *, detail: bool) -> dict:
         "duration_seconds": record["duration_seconds"],
         "supervisor_config": _config_presentation(
             record["supervisor_config"]),
-        "usage": {key: usage[key] for key in (
-            "reported", "input_tokens", "output_tokens", "total_tokens",
-            "source", "note")},
+        "usage": {**usage, "status": "provider_reported" if usage["reported"] else "unavailable"},
         "decision": {
             "committed": decision["committed"],
             "summary": decision["decision_summary"],
@@ -580,15 +615,39 @@ def build_turn_detail_document(root: Path, turn_id: str) -> dict:
             "honesty": {"notes": notes}}
 
 
+def executor_usage_summary(root: Path) -> dict:
+    """Current integration has no host/provider usage channel. Count only
+    mechanically validated authorized dispatch identities, including unclaimed
+    and failed rounds; this is not a count of opaque ZCode automation wakeups.
+    """
+    result = {**provider_usage.unavailable(ZCODE_USAGE_NOTE), "status": "unavailable",
+              "rounds_reported": 0, "rounds_total": None,
+              "coverage_scope": "authorized Executor MESSAGE_ID rounds (not automation wakeups)"}
+    try:
+        import supervisor_control
+        active = provider_usage.read_json(Path(root) / "control" / "ACTIVE_PROJECT.json")
+        project_id = active.get("project_id")
+        if (not isinstance(project_id, str) or not ID_PROJECT.fullmatch(project_id)
+                or project_id in {".", ".."}):
+            return result
+        dispatches = supervisor_control.list_dispatches(root, project_id)
+        result["rounds_total"] = len({item["MESSAGE_ID"] for item in dispatches
+                                      if item.get("integrity") == "AUTHORIZED_VALID"})
+        result["unusable_round_records"] = sum(item.get("integrity") != "AUTHORIZED_VALID"
+                                                for item in dispatches)
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return result
+
+
 def build_usage_document(root: Path, *, generated_at: str) -> dict:
     records, unusable, honesty = load_turn_records(root)
     if unusable:
         honesty.append(
             f"{len(unusable)} turn records were unusable and are excluded "
             "from this summary; they are listed by the turns document")
-    totals = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-    coverage = {"input_tokens_reported": 0, "output_tokens_reported": 0,
-                "total_tokens_reported": 0}
+    totals = {key: 0 for key in (*provider_usage.FIELDS, "total_tokens")}
+    coverage = {f"{key}_reported": 0 for key in totals}
     turns_with_reported_usage = 0
     reported_turns: list[dict] = []
     highest = None
@@ -599,7 +658,7 @@ def build_usage_document(root: Path, *, generated_at: str) -> dict:
         turns_with_reported_usage += 1
         counted = False
         for key in totals:
-            value = usage[key]
+            value = usage.get(key)
             if value is not None:
                 totals[key] += value
                 coverage[f"{key}_reported"] += 1
@@ -615,7 +674,14 @@ def build_usage_document(root: Path, *, generated_at: str) -> dict:
     presented_totals = {key: (value if coverage[f"{key}_reported"] else None)
                         for key, value in totals.items()}
     reported_turns = reported_turns[:MAX_RECENT_REPORTED_TURNS]
+    partial = (turns_with_reported_usage < len(records) or bool(unusable or honesty)
+               or any(0 < count < len(records) for count in coverage.values()))
+    if partial:
+        honesty.append("Partial reported sums only; missing or unusable turns are not zero usage")
     summary = {
+        "sum_label": "Partial reported sums" if partial else "Reported sums",
+        "scope": "finished Supervisor turn records; each counter sums only reporting turns",
+        "unusable_records": len(unusable),
         "turns_total": len(records),
         "turns_with_reported_usage": turns_with_reported_usage,
         "turns_without_reported_usage": len(records)
@@ -628,9 +694,7 @@ def build_usage_document(root: Path, *, generated_at: str) -> dict:
             if coverage["total_tokens_reported"] else None),
         "highest_total_turn": highest,
         "recent_reported_turns": reported_turns,
-        "zcode_usage": {"reported": False, "input_tokens": None,
-                        "output_tokens": None, "total_tokens": None,
-                        "source": None, "note": ZCODE_USAGE_NOTE},
+        "zcode_usage": executor_usage_summary(root),
     }
     if turns_with_reported_usage == 0:
         honesty.append(
