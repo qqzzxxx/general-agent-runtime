@@ -19,6 +19,7 @@ control/ACTIVE_PROJECT.json
 control/project_state.json
 control/STOP
 control/USER_ATTENTION.json
+control/ordinary_dispatch_preparations/
 
 # --- Handoff / claim / archive state ---
 handoff/executor_claims/*
@@ -36,6 +37,7 @@ handoff/quarantine/*
 !handoff/quarantine/.gitkeep
 handoff/completion_ledger/*
 !handoff/completion_ledger/.gitkeep
+handoff/executor_finishes/
 handoff/TO_ZCODE.md
 handoff/SUPERVISOR_BRIEF.md
 
@@ -68,5 +70,8 @@ reports/USER_STATUS.md
 # --- Human-review live authorization / receipts ---
 control/HUMAN_REVIEW
 control/HUMAN_DECISION_*.json
+# The template is a static release-skeleton seed (CONTROL_SEED_FILES), not
+# live state: it must ship with every checkout and never be ignored.
+!control/HUMAN_DECISION_TEMPLATE.json
 control/HUMAN_REVIEW_RECEIPT_*.json
 control/supervisor_control.json

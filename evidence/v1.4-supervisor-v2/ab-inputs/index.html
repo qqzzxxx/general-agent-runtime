@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Agent Project Console</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="wrap">
+
+<h2>AI Agent Project Console &mdash; runtime-web-console-revamp</h2>
+<div class="subtitle">instance: ab-fixture / generated 2026-09-14 / static local page, no backend</div>
+<hr>
+
+<div class="toolbar">
+  <span class="lbl">SYSTEM:</span>
+  <span id="sys-status" class="st-running">[RUNNING]</span>
+  <span class="lbl">orchestrator pid: 41288 (illustrative)</span>
+  <button id="btn-pause" type="button" onclick="doPause()">PAUSE</button>
+  <button id="btn-resume" type="button" onclick="doResume()" disabled>RESUME</button>
+  <button type="button" onclick="doReviewAll()">REVIEW ALL FLAGGED</button>
+</div>
+<hr>
+
+<h3>Project Status</h3>
+<table class="kv">
+<tr><td class="k">PROJECT_ID</td><td>proj-web-console-001</td><td class="k">STAGE</td><td>ui-implementation (attempt 2)</td></tr>
+<tr><td class="k">STATE</td><td id="state-cell">RUNNING</td><td class="k">SUPERVISOR</td><td>codex-supervisor-01</td></tr>
+<tr><td class="k">BUDGET</td><td>3.20M / 4.00M tokens</td><td class="k">DEADLINE</td><td>2026-09-16 18:00 (+08:00)</td></tr>
+<tr><td class="k">MESSAGES</td><td>700100 - 700219 (17 retired, 3 pending)</td><td class="k">LAST COMMIT</td><td>700212 fv-1 attempt 1, exit 0</td></tr>
+</table>
+
+<h3>Current Agent</h3>
+<table class="grid">
+<tr><th>AGENT</th><th>ROLE</th><th>STARTED</th><th>LAST HEARTBEAT</th><th>CURRENT TASK</th><th>CLAIM TOKEN</th></tr>
+<tr><td>codex-supervisor-01</td><td>Supervisor</td><td>2026-09-14 08:30:12</td><td>12s ago</td><td>dispatch msg 700214 (ui-impl-4) to executor</td><td>&mdash;</td></tr>
+<tr><td>zcode-executor-7f3a</td><td>Executor</td><td>2026-09-14 09:12:40</td><td>3s ago</td><td>ui-impl-4 attempt 1: web_console/app.js progress panel</td><td>ct-9f31c2...e81b</td></tr>
+<tr><td>fv-auditor-02</td><td>Final Verifier</td><td>idle</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Progress</h3>
+<table class="grid">
+<tr><th style="width:220px">STAGE</th><th style="width:180px">PROGRESS</th><th>%</th><th>NOTE</th></tr>
+<tr><td>spec-freeze</td><td><div class="bar"><div class="fill" style="width:100%"></div></div></td><td>100</td><td>frozen 2026-09-12</td></tr>
+<tr><td>scaffold-bootstrap</td><td><div class="bar"><div class="fill" style="width:100%"></div></div></td><td>100</td><td>bootstrap clean, exit 0</td></tr>
+<tr><td><b>ui-implementation</b> (current)</td><td><div class="bar"><div class="fill" style="width:62%"></div></div></td><td>62</td><td>13/21 subtasks published</td></tr>
+<tr><td>integration-regression</td><td><div class="bar"><div class="fill" style="width:0%"></div></div></td><td>0</td><td>blocked by ui-implementation</td></tr>
+<tr><td>release-candidate</td><td><div class="bar"><div class="fill" style="width:0%"></div></div></td><td>0</td><td>not started</td></tr>
+</table>
+
+<h3>Recent Activity</h3>
+<table class="grid" id="activity">
+<tr><th>TIME (+08:00)</th><th>ACTOR</th><th>EVENT</th></tr>
+<tr><td>09:12:40</td><td>executor zcode-executor-7f3a</td><td>CLAIM_ACQUIRED msg 700214 ui-impl-4 attempt 1</td></tr>
+<tr><td>09:11:58</td><td>supervisor</td><td>dispatch prepared: TO_ZCODE.md (msg 700214), fence nonce ok</td></tr>
+<tr><td>09:02:17</td><td>fv-auditor-02</td><td>COMPLETION_COMMITTED msg 700212 fv-1 attempt 1 (exit 0)</td></tr>
+<tr><td>08:58:03</td><td>executor zcode-executor-5d9c</td><td>PUBLICATION_COMMITTED workspace/reports/ui-ux-audit.md (sha256 4b7e...aa09)</td></tr>
+<tr><td>08:41:55</td><td>supervisor</td><td>budget check ok: 3.12M/4.00M after msg 700209</td></tr>
+<tr><td>08:30:12</td><td>system</td><td>supervisor turn started (scheduled automation, run #14)</td></tr>
+<tr><td>08:29:47</td><td>system</td><td>orchestrator resume from control/orchestrator_runtime.json</td></tr>
+<tr class="muted"><td>(live events append here)</td><td>&mdash;</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Artifacts</h3>
+<table class="grid">
+<tr><th>PATH</th><th>SIZE</th><th>SHA-256 (prefix)</th><th>STATUS</th><th>MSG</th></tr>
+<tr><td>web_console/index.html</td><td>18.4 KB</td><td>c41d...9f02</td><td>published</td><td>700208</td></tr>
+<tr><td>web_console/app.js</td><td>27.1 KB</td><td>8e60...1c77</td><td>published</td><td>700210</td></tr>
+<tr><td>web_console/styles.css</td><td>9.8 KB</td><td>d2ab...44e3</td><td>published</td><td>700210</td></tr>
+<tr><td>reports/ui-ux-audit.md</td><td>6.2 KB</td><td>4b7e...aa09</td><td>committed</td><td>700212</td></tr>
+<tr><td>evidence/ui-impl-3/snapshot.json</td><td>1.1 KB</td><td>77c0...b5d1</td><td>committed</td><td>700212</td></tr>
+<tr><td>docs/OPERATOR_PLAYBOOK.md</td><td>12.9 KB</td><td>f003...e6c8</td><td>committed</td><td>700199</td></tr>
+</table>
+
+<h3>Token Usage</h3>
+<table class="grid">
+<tr><th>AGENT</th><th>INPUT</th><th>OUTPUT</th><th>TOTAL</th><th>EST. COST</th><th>BUDGET SHARE</th></tr>
+<tr><td>codex-supervisor-01</td><td>1,412,880</td><td>184,220</td><td>1,597,100</td><td>$6.12</td><td>49.9%</td></tr>
+<tr><td>zcode executors (sum, 6 runs)</td><td>1,214,377</td><td>331,905</td><td>1,546,282</td><td>$6.88</td><td>48.3%</td></tr>
+<tr><td>fv-auditor-02</td><td>52,310</td><td>9,844</td><td>62,154</td><td>$0.31</td><td>1.9%</td></tr>
+<tr><td><b>TOTAL</b></td><td><b>2,679,567</b></td><td><b>525,969</b></td><td><b>3,205,536</b></td><td><b>$13.31</b></td><td><b>80.1% of 4.00M</b></td></tr>
+</table>
+
+<h3>Alerts — action required</h3>
+<table class="grid" id="alerts">
+<tr><th>#</th><th>SEVERITY</th><th>MESSAGE</th><th>RAISED</th><th>STATUS</th><th>ACTION</th></tr>
+<tr><td>1</td><td class="sev-high">HIGH</td><td>Human decision required: approve budget increase 3.2M -&gt; 4.0M tokens for ui-implementation (request BGT-2214). Supervisor paused dispatch of msg 700215 until decided.</td><td>09:05:41</td><td class="ast">PENDING</td><td><button type="button" onclick="doReview(this,1)">REVIEW</button></td></tr>
+<tr><td>2</td><td class="sev-med">MED</td><td>FV claim disputed on msg 700207 (ui-impl-2 attempt 2): auditor requests human arbitration, staging dir kept as evidence.</td><td>08:47:19</td><td class="ast">PENDING</td><td><button type="button" onclick="doReview(this,2)">REVIEW</button></td></tr>
+<tr><td>3</td><td class="sev-med">MED</td><td>Completion receipt awaiting human sign-off: msg 700199 (docs-refresh), committed exit 0 but outside auto-accept policy.</td><td>08:12:02</td><td class="ast">PENDING</td><td><button type="button" onclick="doReview(this,3)">REVIEW</button></td></tr>
+</table>
+<div id="review-out" class="reviewout"></div>
+
+<hr>
+<div class="footer">
+PAUSE suspends dispatch locally (fixture: status label only). RESUME restores. REVIEW marks the flagged item as acknowledged by the human operator.
+This page is a static local fixture for UI comparison &mdash; no backend, no network requests, data is illustrative.
+</div>
+
+</div>
+<script>
+function nowStr() {
+  var d = new Date();
+  function p(n){return (n<10?'0':'')+n;}
+  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function addActivity(actor, event) {
+  var t = document.getElementById('activity');
+  var row = t.insertRow(-1);
+  row.insertCell(0).textContent = nowStr();
+  row.insertCell(1).textContent = actor;
+  row.insertCell(2).textContent = event;
+}
+function setStatus(s) {
+  var el = document.getElementById('sys-status');
+  var st = document.getElementById('state-cell');
+  el.textContent = '[' + s + ']';
+  el.className = (s === 'RUNNING') ? 'st-running' : 'st-paused';
+  st.textContent = s;
+  document.getElementById('btn-pause').disabled = (s === 'PAUSED');
+  document.getElementById('btn-resume').disabled = (s === 'RUNNING');
+}
+function doPause() {
+  setStatus('PAUSED');
+  addActivity('user (console)', 'PAUSE requested - dispatcher suspended by operator');
+}
+function doResume() {
+  setStatus('RUNNING');
+  addActivity('user (console)', 'RESUME requested - dispatcher restored by operator');
+}
+function doReview(btn, n) {
+  var row = btn.parentNode.parentNode;
+  var cell = row.cells[4];
+  if (cell.textContent.indexOf('REVIEWED') === 0) { return; }
+  cell.textContent = 'REVIEWED ' + nowStr() + ' by operator';
+  btn.disabled = true;
+  addActivity('user (console)', 'REVIEW acknowledged alert #' + n);
+  var out = document.getElementById('review-out');
+  out.textContent = 'last review: alert #' + n + ' acknowledged at ' + nowStr() + ' (local only, fixture)';
+}
+function doReviewAll() {
+  var btns = document.getElementById('alerts').querySelectorAll('button');
+  var n = 0;
+  for (var i = 0; i < btns.length; i++) {
+    if (!btns[i].disabled) { doReview(btns[i], i + 1); n++; }
+  }
+  if (n === 0) {
+    document.getElementById('review-out').textContent = 'no pending alerts to review (' + nowStr() + ')';
+  }
+}
+</script>
+</body>
+</html>

@@ -111,11 +111,25 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
 
     # --- fixtures -----------------------------------------------------------
 
+    def record_gate_provenance(self, task):
+        # HUMAN-DECISION-FV-BRIDGE-V1: registration now enforces Runtime gate
+        # provenance; this suite hand-authors gates to exercise the claim-
+        # validation recovery layer, so record the prepared identity exactly as
+        # final_verification_contract.prepare() would.
+        gate = task.get("FINAL_VERIFICATION_GATE")
+        if isinstance(gate, dict) and gate.get("CLAIMS_HASH"):
+            import final_verification_contract as contract
+            contract.record_prepared_identity(
+                o.ROOT, o.load_runtime(),
+                {key: task[key] for key in o.IDENTITY_KEYS},
+                gate["CLAIMS_HASH"], o.stamp())
+
     def publish(self, task, state=None):
         if state is None:
             state = self.state_for(task)
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(task))
+        self.record_gate_provenance(task)
         return state
 
     def state_for(self, task, claims=None):
@@ -296,6 +310,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         fixed_state["status"] = "WAITING_EXECUTOR"
         o.atomic_json(o.PROJECT_STATE, fixed_state)
         o.atomic_write(o.TO_ZCODE, wire(fixed_task))
+        self.record_gate_provenance(fixed_task)
 
         registered = o.register_dispatched_task(self.runtime, fixed_state)
         self.assertEqual(registered["MESSAGE_ID"], 700015)
@@ -325,6 +340,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         state2["status"] = "WAITING_EXECUTOR"
         o.atomic_json(o.PROJECT_STATE, state2)
         o.atomic_write(o.TO_ZCODE, wire(task2))
+        self.record_gate_provenance(task2)
 
         with self.assertRaisesRegex(RuntimeError, "missing \\['claim_id'\\]"):
             o.handle_dispatch_registration_failure(
@@ -410,7 +426,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
 
     def test_supervisor_contract_documents_lowercase_claim_schema(self):
         for relative in (
-            "control/CODEX_SUPERVISOR_RUNTIME.md",
+            "control/SUPERVISOR_PROTOCOL_REFERENCE.md",
             "control/EXECUTOR_TASK_TEMPLATE.md",
             "control/FINAL_VERIFICATION_POLICY.md",
         ):
@@ -424,10 +440,9 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         prompt = o.build_codex_prompt(
             "EXECUTOR_RESULT_READY", {"type": "EXECUTOR_RESULT_READY"}, {"status": "WAITING_EXECUTOR"}
         )
-        self.assertIn('"claim_id"', prompt)
-        self.assertIn('"verification_standard"', prompt)
-        self.assertIn("six lowercase keys", prompt)
-        self.assertIn("sort_keys=True", prompt)
+        self.assertIn("control/SUPERVISOR_PROTOCOL_REFERENCE.md", prompt)
+        self.assertIn("control/EXECUTOR_TASK_TEMPLATE.md", prompt)
+        self.assertNotIn("sort_keys=True", prompt)  # Runtime owns new-request hashes.
 
     # --- integration: invoke_codex failure path arms the repair turn -----------
 
@@ -469,6 +484,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
             fixed_task["FINAL_VERIFICATION_GATE"]["CLAIM_COUNT"] = len(fixed)
             o.atomic_json(o.PROJECT_STATE, self.state_for(fixed_task, claims=fixed))
             o.atomic_write(o.TO_ZCODE, wire(fixed_task))
+            self.record_gate_provenance(fixed_task)
 
         o.acquire_lock()
         try:
@@ -509,6 +525,7 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
             worse_task["FINAL_VERIFICATION_GATE"]["CLAIM_COUNT"] = len(worse)
             o.atomic_json(o.PROJECT_STATE, self.state_for(worse_task, claims=worse))
             o.atomic_write(o.TO_ZCODE, wire(worse_task))
+            self.record_gate_provenance(worse_task)
 
         o.acquire_lock()
         try:
@@ -531,6 +548,134 @@ class DispatchValidationRecoveryTests(unittest.TestCase):
         self.assertEqual(self.runtime["pending_supervisor_event"]["decision_attempts"], 2)
         self.assertFalse(o.TO_ZCODE.exists())
         self.assertIsNone(self.runtime["authorized_dispatch"])
+
+    # --- incident replay: infrastructure faults never spend semantic repair --
+
+    def test_infrastructure_failure_does_not_consume_decision_budget(self):
+        self.publish(self.fv_task())
+        o.acquire_lock()
+        try:
+            with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
+                o.subprocess, "run",
+                side_effect=RuntimeError("Codex exited with code 1"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "exited with code 1"):
+                    o.invoke_codex(
+                        self.runtime, "EXECUTOR_RESULT_READY",
+                        {"type": "EXECUTOR_RESULT_READY"})
+        finally:
+            o.release_lock()
+
+        pending = self.runtime["pending_supervisor_event"]
+        self.assertEqual(pending["decision_attempts"], 0)
+        self.assertEqual(pending["infrastructure_failures"], 1)
+        self.assertIn("exited with code 1", pending["last_infrastructure_error"])
+        self.assertFalse(pending["retry_exhausted"])
+        self.assertNotEqual(o.read_project_state().get("status"), "HUMAN_REVIEW")
+
+    def test_provider_failure_then_recovered_decision_keeps_repair_entitlement(self):
+        # Fresh-start scene: lifecycle state exists, no dispatch was published yet
+        # (the invalid dispatch is produced BY the recovered turn, as in the incident).
+        bad_claims = [self.uppercase_claim(cid) for cid in ("C1", "C2", "C3")]
+        bad_task = self.fv_task(claims=bad_claims)
+        bad_task["FINAL_VERIFICATION_GATE"]["CLAIMS_HASH"] = o.canonical_claims_hash(bad_claims)
+        bad_task["FINAL_VERIFICATION_GATE"]["CLAIM_COUNT"] = len(bad_claims)
+        # Crash-time scene mirrors a fresh bootstrap: no decision, no current task.
+        o.atomic_json(o.PROJECT_STATE, {
+            "schema_version": 4, "profile": "GENERAL", "phase": "GENERAL",
+            "status": "SUPERVISOR_TURN", "infrastructure_status": "READY",
+            "current_task": None, "decision_history": [],
+        })
+
+        def publish_bad_dispatch():
+            o.atomic_json(o.PROJECT_STATE, self.state_for(bad_task, claims=bad_claims))
+            o.atomic_write(o.TO_ZCODE, wire(bad_task))
+            self.record_gate_provenance(bad_task)
+
+        def repair_action():
+            fixed = [valid_claim(cid) for cid in ("C1", "C2", "C3")]
+            fixed_task = self.fv_task(claims=fixed)
+            fixed_task["FINAL_VERIFICATION_GATE"]["CLAIMS_HASH"] = o.canonical_claims_hash(fixed)
+            fixed_task["FINAL_VERIFICATION_GATE"]["CLAIM_COUNT"] = len(fixed)
+            o.atomic_json(o.PROJECT_STATE, self.state_for(fixed_task, claims=fixed))
+            o.atomic_write(o.TO_ZCODE, wire(fixed_task))
+            self.record_gate_provenance(fixed_task)
+
+        o.acquire_lock()
+        try:
+            # Attempt 1 (the crash): provider/CLI failure before any decision.
+            with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
+                o.subprocess, "run",
+                side_effect=RuntimeError("Codex exited with code 1"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "exited with code 1"):
+                    o.invoke_codex(
+                        self.runtime, "EXECUTOR_RESULT_READY",
+                        {"type": "EXECUTOR_RESULT_READY"})
+            pending = self.runtime["pending_supervisor_event"]
+            self.assertEqual(pending["decision_attempts"], 0)
+            self.assertEqual(pending["infrastructure_failures"], 1)
+            # A real restart reconciles the interrupted control transaction before
+            # the recovered attempt, exactly as scheduler startup does.
+            o._supervisor_control_helper().reconcile_inflight_turn(
+                o.ROOT, candidate_validator=o.validate_startup_candidate_snapshot)
+            # Attempt 2 (recovery): a real decision commits, but its dispatch is
+            # mechanically invalid; the bounded repair arms WITHOUT HUMAN_REVIEW.
+            with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
+                o.subprocess, "run", side_effect=self.fake_codex([publish_bad_dispatch])
+            ):
+                o.invoke_codex(
+                    self.runtime, "EXECUTOR_RESULT_READY",
+                    {"type": "EXECUTOR_RESULT_READY"})
+            self.assertEqual(o.read_project_state()["status"], "SUPERVISOR_TURN")
+            self.assertEqual(self.runtime["dispatch_validation_repair_used"], 1)
+            self.assertFalse(o.TO_ZCODE.exists())
+            pending = self.runtime["pending_supervisor_event"]
+            self.assertEqual(pending["decision_attempts"], 1)
+            self.assertFalse(pending["retry_exhausted"])
+            # Attempt 3: the armed semantic repair turn still has budget and fixes it.
+            with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
+                o.subprocess, "run", side_effect=self.fake_codex([repair_action])
+            ):
+                o.invoke_codex(self.runtime, "SUPERVISOR_TURN", {"source": "project_state"})
+        finally:
+            o.release_lock()
+
+        self.assertEqual(self.runtime["authorized_dispatch"]["MESSAGE_ID"], 700015)
+        self.assertEqual(self.runtime["dispatch_validation_repair_used"], 0)
+        self.assertIsNone(o.read_project_state().get("dispatch_repair"))
+        self.assertIsNone(self.runtime["pending_supervisor_event"])
+
+    def test_infrastructure_failure_budget_remains_bounded(self):
+        self.publish(self.fv_task())
+        self.runtime["pending_supervisor_event"] = {
+            "reason": "EXECUTOR_RESULT_READY",
+            "event": {"type": "EXECUTOR_RESULT_READY"},
+            "recorded_at": "2026-09-15T00:00:00+00:00",
+            "decision_attempts": 0,
+            "retry_exhausted": False,
+            "infrastructure_failures": o.MAX_SUPERVISOR_INFRASTRUCTURE_FAILURES,
+            "last_infrastructure_error": "Codex exited with code 1",
+        }
+        o.atomic_json(o.RUNTIME_STATE, self.runtime)
+        o.acquire_lock()
+        try:
+            with patch.object(o, "find_codex", return_value="codex-fixture"), patch.object(
+                o.subprocess, "run"
+            ) as mock_run:
+                o.invoke_codex(
+                    self.runtime, "EXECUTOR_RESULT_READY",
+                    {"type": "EXECUTOR_RESULT_READY"})
+                mock_run.assert_not_called()
+        finally:
+            o.release_lock()
+
+        state = o.read_project_state()
+        self.assertEqual(state["status"], "HUMAN_REVIEW")
+        self.assertTrue(self.runtime["pending_supervisor_event"]["retry_exhausted"])
+        self.assertIn("infrastructure failure budget exhausted", state["blocked_reason"])
+        self.assertIn("Codex exited with code 1",
+                      state["supervisor_retry_failure"]["last_error"])
 
     def claims_directories(self):
         parent = self.root / "handoff" / "executor_claims"

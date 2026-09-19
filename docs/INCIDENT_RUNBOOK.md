@@ -1,5 +1,31 @@
 # General Agent Runtime — Incident Runbook
 
+For [Phase 8 context/delegation issues](v1.4-supervisor-v2.md), inspect the full
+referenced Goal, state, current memory and authoritative receipt before changing
+work scope. Check whether an inherited implementation choice was mislabeled a hard
+constraint. Do not rebuild state from the Context V2 view. If current steering was
+misfiled under an opted-in historical memory heading, restore it to a current section
+through the normal Supervisor decision; preserve the historical record. Missing
+special-output instructions require the shipped SUPERVISOR_PROTOCOL_REFERENCE.md,
+not a bypass of the Human Decision or Final Verification gates.
+
+For [Phase 6 native tools](v1.4-host-native-executor.md), distinguish a failed host
+observation from revoked Runtime authority. A missing optional renderer does not
+invalidate the task. A failed checkpoint does: stop the owner and its background
+work, preserve the stale candidate directory, and leave retry to Runtime. Native
+effects outside mediated operations are not automatically cancelled. Never repair
+control/history/ledger or FV deliverables to make a tool result appear successful.
+
+For v1.4 Phase 3 finish incidents, preserve `handoff/executor_finishes/`, candidate
+files and permanent claims. Preparation or partial publication does not establish
+completion. With the same retained owner token and still-live authority, an
+interrupted finish can replay its unchanged semantic result and candidate bytes;
+after commit it only reports the existing ledger state. Missing completion hints
+are recovered by the Orchestrator. Never edit the plan, recover a lost token, or
+replay a retired attempt. Legacy manual staging procedures below remain operator
+compatibility procedures, not normal Executor instructions. See
+[Phase 3](v1.4-runtime-owned-completion.md).
+
 > Safe recovery procedures for common abnormal states.
 >
 > Rule zero: **do not "repair" the Runtime by deleting claims, rewriting ledgers, or editing lifecycle JSON until you have identified the exact state and a documented procedure says to do so.**

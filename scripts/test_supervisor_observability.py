@@ -153,20 +153,20 @@ class SupervisorObservabilityTests(unittest.TestCase):
 
     def test_queue_writes_pending_with_revision_and_keeps_active_empty(self):
         result = sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         self.assertTrue(result["queued"])
         self.assertFalse(result["turn_in_flight"])
         doc = sc.load_supervisor_config(self.root)
         self.assertEqual(doc["PROJECT_ID"], self.PROJECT)
         self.assertIsNone(doc["active"])
-        self.assertEqual(doc["pending"]["model"], "gpt-6")
+        self.assertEqual(doc["pending"]["model"], "gpt-6-astra")
         self.assertEqual(doc["pending"]["reasoning_effort"], "HIGH")
         self.assertEqual(doc["pending"]["config_revision"], 1)
         self.assertTrue(doc["pending"]["queued_at"])
 
     def test_queue_latest_wins_and_increments_revision(self):
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         second = sc.queue_supervisor_config(
             self.root, {"model": "gpt-5.6-sol", "reasoning_effort": "LOW"})
         self.assertEqual(second["pending"]["config_revision"], 2)
@@ -177,27 +177,31 @@ class SupervisorObservabilityTests(unittest.TestCase):
     def test_queue_reports_turn_in_flight_truthfully(self):
         turn = sc.begin_supervisor_turn(self.root, self.PROJECT)
         result = sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         self.assertTrue(result["turn_in_flight"])
         doc = sc.load_supervisor_config(self.root)
         self.assertIsNone(doc["active"],
                           "an active turn must never be replaced mid-flight")
-        self.assertEqual(doc["pending"]["model"], "gpt-6")
+        self.assertEqual(doc["pending"]["model"], "gpt-6-astra")
         sc.finish_supervisor_turn(self.root, turn, processed=False)
 
     def test_queue_rejects_invalid_payload_matrix(self):
         bad_payloads = [
-            {"model": "gpt-6"},
+            {"model": "gpt-6-astra"},
             {"reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "HIGH", "extra": 1},
+            {"model": "gpt-6-astra", "reasoning_effort": "HIGH", "extra": 1},
             {"model": "", "reasoning_effort": "HIGH"},
             {"model": "   ", "reasoning_effort": "HIGH"},
             {"model": "x" * 81, "reasoning_effort": "HIGH"},
             {"model": "gpt-6\nbad", "reasoning_effort": "HIGH"},
             {"model": 6, "reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "ULTRA"},
-            {"model": "gpt-6", "reasoning_effort": "high"},
-            {"model": "gpt-6", "reasoning_effort": None},
+            {"model": "gpt-6-astra", "reasoning_effort": "ULTRA"},
+            {"model": "gpt-6-astra", "reasoning_effort": None},
+            # Non-canonical model ids are refused with an explicit reason;
+            # the queue never hands a free-text model to Codex.
+            {"model": "gpt-6", "reasoning_effort": "HIGH"},
+            {"model": "gpt-5.6-terra", "reasoning_effort": "HIGH"},
+            {"model": "my-model", "reasoning_effort": "HIGH"},
         ]
         for payload in bad_payloads:
             with self.subTest(payload=payload):
@@ -207,37 +211,44 @@ class SupervisorObservabilityTests(unittest.TestCase):
             sc.supervisor_config_path(self.root).exists(),
             "a refused change must never write configuration state")
 
+    def test_queue_normalizes_lowercase_effort_to_stored_vocabulary(self):
+        result = sc.queue_supervisor_config(
+            self.root, {"model": "gpt-5.6-sol", "reasoning_effort": "xhigh"})
+        self.assertEqual(result["pending"]["reasoning_effort"], "XHIGH")
+        doc = sc.load_supervisor_config(self.root)
+        self.assertEqual(doc["pending"]["reasoning_effort"], "XHIGH")
+
     def test_queue_rejects_on_stop(self):
         (self.control / "STOP").write_bytes(b"STOP")
         with self.assertRaises(sc.ControlError):
             sc.queue_supervisor_config(
-                self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+                self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         self.assertFalse(sc.supervisor_config_path(self.root).exists())
 
     def test_queue_without_active_project_is_refused(self):
         (self.control / "ACTIVE_PROJECT.json").unlink()
         with self.assertRaises(sc.ControlError):
             sc.queue_supervisor_config(
-                self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+                self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
 
     def test_queue_with_mismatched_project_is_refused(self):
         with self.assertRaises(sc.ControlError):
             sc.queue_supervisor_config(
-                self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"},
+                self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"},
                 project_id="some-other-project")
 
     def test_begin_consumes_pending_into_turn_snapshot(self):
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "MEDIUM"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "MEDIUM"})
         turn = sc.begin_supervisor_turn(self.root, self.PROJECT)
         snapshot = turn["supervisor_config"]
         self.assertEqual(snapshot["source"], "queued")
-        self.assertEqual(snapshot["model"], "gpt-6")
+        self.assertEqual(snapshot["model"], "gpt-6-astra")
         self.assertEqual(snapshot["reasoning_effort"], "MEDIUM")
         self.assertEqual(snapshot["config_revision"], 1)
         doc = sc.load_supervisor_config(self.root)
         self.assertIsNone(doc["pending"])
-        self.assertEqual(doc["active"]["model"], "gpt-6")
+        self.assertEqual(doc["active"]["model"], "gpt-6-astra")
         self.assertEqual(doc["active"]["source_turn_id"], turn["turn_id"])
         self.assertTrue(doc["active"]["applied_at"])
         sc.finish_supervisor_turn(self.root, turn, processed=False)
@@ -245,7 +256,7 @@ class SupervisorObservabilityTests(unittest.TestCase):
         # reports it as the applied queued configuration.
         later = sc.begin_supervisor_turn(self.root, self.PROJECT)
         self.assertEqual(later["supervisor_config"]["source"], "queued")
-        self.assertEqual(later["supervisor_config"]["model"], "gpt-6")
+        self.assertEqual(later["supervisor_config"]["model"], "gpt-6-astra")
         self.assertEqual(later["supervisor_config"]["reasoning_effort"],
                          "MEDIUM")
         sc.finish_supervisor_turn(self.root, later, processed=False)
@@ -262,7 +273,7 @@ class SupervisorObservabilityTests(unittest.TestCase):
     def test_paused_begin_does_not_consume_pending(self):
         sc.set_pause(self.root, False)
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         with self.assertRaises(sc.ControlError):
             sc.begin_supervisor_turn(self.root, self.PROJECT)
         doc = sc.load_supervisor_config(self.root)
@@ -319,18 +330,18 @@ class SupervisorObservabilityTests(unittest.TestCase):
 
     def test_finish_rejects_model_usage_and_preserves_queued_profile(self):
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         usage = {"reported": True, "input_tokens": 1200, "output_tokens": 340,
                  "total_tokens": 1540, "source": "codex_output_token_usage",
                  "note": None}
         turn = self.commit_turn(
             status="COMPLETE", decision="CONTINUE",
-            observation=self.observation(model="gpt-6",
+            observation=self.observation(model="gpt-6-astra",
                                          reasoning_effort="high",
                                          usage=usage))
         record = self.turn_record(turn["turn_id"])
         self.assertEqual(record["supervisor_config"]["source"], "queued")
-        self.assertEqual(record["supervisor_config"]["model"], "gpt-6")
+        self.assertEqual(record["supervisor_config"]["model"], "gpt-6-astra")
         self.assertEqual(record["supervisor_config"]["reasoning_effort"],
                          "HIGH")
         self.assertEqual(record["supervisor_config"]["config_revision"], 1)
@@ -472,24 +483,36 @@ class SupervisorObservabilityTests(unittest.TestCase):
         completed = subprocess.run(
             [sys.executable, "-X", "utf8", str(SCRIPTS / "supervisor_control.py"),
              "--root", str(self.root), "queue-supervisor-config",
-             "--model", "gpt-6", "--effort", "HIGH", "--json"],
+             "--model", "gpt-6-astra", "--effort", "HIGH", "--json"],
             capture_output=True, text=True, cwd=str(SCRIPTS), timeout=120)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         document = json.loads(completed.stdout)
         self.assertTrue(document["ok"])
         self.assertEqual(document["supervisor_config"]["pending"]["model"],
-                         "gpt-6")
+                         "gpt-6-astra")
         self.assertFalse(document["supervisor_config"]["turn_in_flight"])
 
     def test_cli_queue_rejects_invalid_effort(self):
         completed = subprocess.run(
             [sys.executable, "-X", "utf8", str(SCRIPTS / "supervisor_control.py"),
              "--root", str(self.root), "queue-supervisor-config",
-             "--model", "gpt-6", "--effort", "ULTRA", "--json"],
+             "--model", "gpt-6-astra", "--effort", "ULTRA", "--json"],
             capture_output=True, text=True, cwd=str(SCRIPTS), timeout=120)
         self.assertEqual(completed.returncode, 2)
         document = json.loads(completed.stdout)
         self.assertFalse(document["ok"])
+
+    def test_cli_queue_rejects_non_canonical_model(self):
+        completed = subprocess.run(
+            [sys.executable, "-X", "utf8", str(SCRIPTS / "supervisor_control.py"),
+             "--root", str(self.root), "queue-supervisor-config",
+             "--model", "gpt-6", "--effort", "HIGH", "--json"],
+            capture_output=True, text=True, cwd=str(SCRIPTS), timeout=120)
+        self.assertEqual(completed.returncode, 2)
+        document = json.loads(completed.stdout)
+        self.assertFalse(document["ok"])
+        self.assertIn("gpt-5.6-sol", document["error"])
+        self.assertFalse(sc.supervisor_config_path(self.root).exists())
 
 
 class SupervisorProfileTests(unittest.TestCase):
@@ -525,15 +548,15 @@ class SupervisorProfileTests(unittest.TestCase):
 
     def test_profile_for_turn_prefers_valid_queued_config(self):
         model, effort, source = self.o.supervisor_profile_for_turn(
-            {"source": "queued", "model": "gpt-6",
+            {"source": "queued", "model": "gpt-6-astra",
              "reasoning_effort": "MEDIUM", "config_revision": 3}, {}, "X")
-        self.assertEqual((model, effort, source), ("gpt-6", "medium", "queued"))
+        self.assertEqual((model, effort, source), ("gpt-6-astra", "medium", "queued"))
 
     def test_profile_for_turn_falls_back_to_fixed_policy(self):
         for snapshot in (None, {}, {"source": "fixed_policy"},
                          {"source": "queued", "model": "  ",
                           "reasoning_effort": "HIGH"},
-                         {"source": "queued", "model": "gpt-6",
+                         {"source": "queued", "model": "gpt-6-astra",
                           "reasoning_effort": "ULTRA"}):
             with self.subTest(snapshot=snapshot):
                 model, effort, source = self.o.supervisor_profile_for_turn(
@@ -542,6 +565,90 @@ class SupervisorProfileTests(unittest.TestCase):
                                  (self.o.SUPERVISOR_MODEL,
                                   self.o.SUPERVISOR_REASONING_EFFORT,
                                   "fixed_policy"))
+
+    # -- configurable fixed-policy baseline (control/supervisor_control.json)
+
+    def _write_control_config(self, **extra):
+        sc.save_control(self.root, {
+            "schema_version": 1, "revision": 0,
+            "intervention_generation": 0,
+            "pause": {"status": "RUNNING", "requested_at": None,
+                      "mode": None, "resumed_at": None},
+            **extra})
+
+    def test_configured_baseline_applies_as_fixed_policy(self):
+        self._write_control_config(supervisor_model="gpt-6-astra",
+                                   supervisor_reasoning_effort="high")
+        control_config = self.o.supervisor_fixed_policy_config()
+        self.assertEqual(control_config,
+                         {"model": "gpt-6-astra", "reasoning_effort": "high"})
+        model, effort, source = self.o.supervisor_profile_for_turn(
+            None, {}, "X", control_config=control_config)
+        self.assertEqual((model, effort, source),
+                         ("gpt-6-astra", "high", "fixed_policy"))
+
+    def test_configured_baseline_effort_is_case_insensitive(self):
+        self._write_control_config(supervisor_model=" gpt-6-astra ",
+                                   supervisor_reasoning_effort="HIGH")
+        self.assertEqual(self.o.supervisor_fixed_policy_config(),
+                         {"model": "gpt-6-astra", "reasoning_effort": "high"})
+
+    def test_queued_config_outranks_control_baseline(self):
+        self._write_control_config(supervisor_model="gpt-6-astra",
+                                   supervisor_reasoning_effort="high")
+        baseline = self.o.supervisor_fixed_policy_config()
+        model, effort, source = self.o.supervisor_profile_for_turn(
+            {"source": "queued", "model": "gpt-6-astra",
+             "reasoning_effort": "MEDIUM", "config_revision": 3},
+            {}, "X", control_config=baseline)
+        self.assertEqual((model, effort, source), ("gpt-6-astra", "medium", "queued"))
+
+    def test_partial_or_invalid_baseline_falls_back_to_built_in(self):
+        cases = [
+            ("model only", {"supervisor_model": "gpt-6-astra"}),
+            ("effort only", {"supervisor_reasoning_effort": "high"}),
+            ("empty model", {"supervisor_model": "   ",
+                             "supervisor_reasoning_effort": "high"}),
+            ("non-string model", {"supervisor_model": 7,
+                                  "supervisor_reasoning_effort": "high"}),
+            ("unknown effort", {"supervisor_model": "gpt-6-astra",
+                                "supervisor_reasoning_effort": "ULTRA"}),
+            ("control char in model",
+             {"supervisor_model": "gpt-6\n-astra",
+              "supervisor_reasoning_effort": "high"}),
+            ("oversized model", {"supervisor_model": "m" * 81,
+                                 "supervisor_reasoning_effort": "high"}),
+        ]
+        for label, fields in cases:
+            with self.subTest(case=label):
+                self._write_control_config(**fields)
+                baseline = self.o.supervisor_fixed_policy_config()
+                self.assertIsNone(baseline, label)
+                model, effort, source = self.o.supervisor_profile_for_turn(
+                    None, {}, "X", control_config=baseline)
+                self.assertEqual((model, effort, source),
+                                 (self.o.SUPERVISOR_MODEL,
+                                  self.o.SUPERVISOR_REASONING_EFFORT,
+                                  "fixed_policy"))
+
+    def test_absent_control_document_falls_back_to_built_in(self):
+        self.assertIsNone(self.o.supervisor_fixed_policy_config())
+        model, effort, source = self.o.supervisor_profile_for_turn(
+            None, {}, "X", control_config=None)
+        self.assertEqual((model, effort, source),
+                         (self.o.SUPERVISOR_MODEL,
+                          self.o.SUPERVISOR_REASONING_EFFORT,
+                          "fixed_policy"))
+
+    def test_corrupt_control_document_falls_back_to_built_in(self):
+        (self.root / "control" / "supervisor_control.json").write_text(
+            "{not json", encoding="utf-8")
+        self.assertIsNone(self.o.supervisor_fixed_policy_config())
+        model, effort, source = self.o.supervisor_profile_for_turn(
+            None, {}, "X",
+            control_config=self.o.supervisor_fixed_policy_config())
+        self.assertEqual(source, "fixed_policy")
+        self.assertEqual(model, self.o.SUPERVISOR_MODEL)
 
     def test_usage_extraction_matrix(self):
         o = self.o
@@ -644,14 +751,15 @@ class SupervisorProfileTests(unittest.TestCase):
              "project_root": "projects/p"}), encoding="utf-8")
 
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "MEDIUM"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "MEDIUM"})
 
         usage_document = {"token_usage": {"input_tokens": 1500,
                                           "output_tokens": 450,
                                           "total_tokens": 1950}}
 
         def fake_codex_run(cmd, cwd=None, input=None, timeout=None, stdout=None):
-            self.assertIn("gpt-6", cmd)
+            self.delivered_prompt = input
+            self.assertIn("gpt-6-astra", cmd)
             self.assertIn("model_reasoning_effort=medium", cmd)
             # The model "writes" its decision result exactly like the real
             # Supervisor does: through the project state file.
@@ -683,8 +791,13 @@ class SupervisorProfileTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         record = json.loads(records[0].read_text(encoding="utf-8"))
         self.assertEqual(record["schema"], RECORD_SCHEMA)
+        self.assertEqual(record["context_manifest"]["context_version"], 4)
+        self.assertEqual(record["context_manifest"]["targeted_reads"]["reads"], 0)
+        self.assertEqual(record["context_manifest"]["input_cache"]["uncached_input_tokens"], 500)
+        sc._validate_context_manifest(record["context_manifest"])
+        self.assertEqual(record["context_manifest"]["prompt_utf8_bytes"], len(self.delivered_prompt))
         self.assertEqual(record["supervisor_config"]["source"], "queued")
-        self.assertEqual(record["supervisor_config"]["model"], "gpt-6")
+        self.assertEqual(record["supervisor_config"]["model"], "gpt-6-astra")
         self.assertEqual(record["supervisor_config"]["reasoning_effort"],
                          "MEDIUM")
         self.assertTrue(record["usage"]["reported"])
@@ -698,7 +811,7 @@ class SupervisorProfileTests(unittest.TestCase):
         self.assertIn("project_state", record["context_manifest"])
         doc = sc.load_supervisor_config(self.root)
         self.assertIsNone(doc["pending"])
-        self.assertEqual(doc["active"]["model"], "gpt-6")
+        self.assertEqual(doc["active"]["model"], "gpt-6-astra")
 
 
 if __name__ == "__main__":

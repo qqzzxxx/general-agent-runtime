@@ -691,7 +691,7 @@ def _check_live_lifecycle(root: Path, project_id, identity: dict) -> dict:
     return state
 
 
-def commit(root: Path, staging_dir: Path, *, claim_token=None) -> int:
+def commit(root: Path, staging_dir: Path, *, claim_token=None, emit=True) -> int:
     """Validate a staging directory and durably commit the authoritative completion."""
     scripts = str(Path(__file__).resolve().parent)
     if scripts not in sys.path:
@@ -699,12 +699,12 @@ def commit(root: Path, staging_dir: Path, *, claim_token=None) -> int:
     import executor_fence as fence
     try:
         with fence.runtime_lock(root):
-            return _commit_locked(root, staging_dir, fence, claim_token)
+            return _commit_locked(root, staging_dir, fence, claim_token, emit=emit)
     except fence.FenceError as exc:
         raise CompletionError(EXIT_NOT_AUTHORIZED, str(exc)) from exc
 
 
-def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
+def _commit_locked(root: Path, staging_dir: Path, fence, claim_token, *, emit=True) -> int:
     root = Path(root).resolve()
     scripts_dir = str(Path(__file__).resolve().parent)
     if scripts_dir not in sys.path:
@@ -793,10 +793,11 @@ def _commit_locked(root: Path, staging_dir: Path, fence, claim_token) -> int:
     # Runtime-generated compatibility artifacts, wire order: brief -> pointer -> DONE last.
     publish_compatibility_artifacts(root, entry, include_done=True)
 
-    print(
-        f"COMPLETION_COMMITTED commit_id={entry['COMMIT_ID']} "
-        f"receipt_sha256={entry['RECEIPT_SHA256']} brief_sha256={entry['BRIEF_SHA256']}"
-    )
+    if emit:
+        print(
+            f"COMPLETION_COMMITTED commit_id={entry['COMMIT_ID']} "
+            f"receipt_sha256={entry['RECEIPT_SHA256']} brief_sha256={entry['BRIEF_SHA256']}"
+        )
     return EXIT_COMMITTED
 
 

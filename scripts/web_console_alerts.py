@@ -237,7 +237,11 @@ def project_alerts(*, runtime, status, probe_ok, probe_error_code,
                         identity=f"zcode-pickup:{message_label}"))
 
         # -- Authorization expiry -----------------------------------------
-        if isinstance(auth, dict):
+        # PICKUP-EXECUTION-LIFECYCLE: EXPIRES_AT bounds only the unclaimed
+        # pickup window. A claimed owner legitimately continues past it on its
+        # execution budget (CLAIMED_AT + MAX_TIME), owned by the watchdog; an
+        # expiry alert there would be a false alarm.
+        if isinstance(auth, dict) and not claimed:
             expires_at = parse_timestamp(auth.get("EXPIRES_AT"))
             warning_window = thresholds["expiry_warning_minutes"]
             critical_window = thresholds["expiry_critical_minutes"]

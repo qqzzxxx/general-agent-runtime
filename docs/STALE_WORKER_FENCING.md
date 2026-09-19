@@ -1,5 +1,20 @@
 # Stale worker fencing (EXECUTOR-FENCE-V1)
 
+Current V2 [Phase 6](v1.4-host-native-executor.md) uses session-only entry/resume,
+`executor_work.py` checkpoints before native work batches, optional utilities, and
+semantic finish. Host tools write candidates in the returned attempt workspace;
+they do not publish canonical outputs. Checkpoints cannot intercept or cancel later
+native effects. LIVE_READ_ONLY FV publication adds only new attempt-specific
+verification evidence/reports, never replacing the verified deliverables.
+The identity-based examples below remain the lower-level compatibility contract.
+
+In v1.4 Phase 3, Executors normally call `executor_entry.py`, retain the original
+owner token and use later work checkpoints, then call `executor_finish.py` once
+with semantic results. Runtime performs the publish/commit choreography described
+below. Its frozen preparation is recovery data, never authority; partial files
+remain subject to all existing provenance and fencing rules. Low-level commands
+remain compatible. See [Phase 3](v1.4-runtime-owned-completion.md).
+
 ## Incident and invariant
 
 The incident was `700110 / attempt 1` acquiring its permanent claim, pausing for
@@ -25,9 +40,14 @@ Retry requires fresh MESSAGE_ID and NONCE.
 ## Mechanical boundary
 
 All newly registered dispatches carry Runtime-owned `FENCE_VERSION=1`,
-`PROJECT_ID`, and `EXPIRES_AT` in `authorized_dispatch`. Expiry uses the existing
-MAX_TIME plus scheduler grace calculation. Re-registration of the same live
-attempt preserves expiry and the Runtime's fallback dispatch timestamp.
+`PROJECT_ID`, `EXPIRES_AT`, and `MAX_TIME` in `authorized_dispatch`. Under
+PICKUP-EXECUTION-LIFECYCLE, `EXPIRES_AT` bounds only the unclaimed pickup
+window (registration time plus scheduler grace); a claimed attempt is bounded
+by its execution budget, `CLAIMED_AT` (durable in `claim.json`) plus
+`MAX_TIME`. Claim acquisition after the pickup window is refused for new
+acquisitions; an existing claim keeps its execution authority. Re-registration
+of the same live attempt preserves expiry, `MAX_TIME`, and the Runtime's
+fallback dispatch timestamp.
 
 Claim acquisition takes the fence mutex before inspecting authorization or its
 version, and holds it through claim creation and token binding. For these
@@ -112,6 +132,10 @@ retires the previous dispatch before allowing that model to change lifecycle sta
 Restart replays a pending timeout event instead of reauthorizing the retired wait.
 Missing or invalid `ISSUED_AT` uses the original Runtime dispatch timestamp;
 restart of that identity preserves its registered expiry rather than renewing it.
+An expiry while the dispatch was never claimed is not an Executor failure: it
+converts into a parked `PICKUP_TIMEOUT_STAGE_RESUME` re-plan that does not charge
+the logical retry budget; only a claimed attempt that exhausts its execution
+budget (`CLAIMED_AT + MAX_TIME`) produces a charged `EXECUTOR_TIMEOUT`.
 
 If completion acquires the mutex first and commits, the timeout path sees the
 ledger and does not retire it—even if compatibility artifact publication crashed.

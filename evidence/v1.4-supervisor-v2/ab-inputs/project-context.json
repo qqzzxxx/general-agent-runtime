@@ -1,0 +1,24 @@
+{
+  "a": {
+    "project_id": "console-a-001",
+    "project_type": "SOFTWARE_ENGINEERING",
+    "profile": "SOFTWARE_ENGINEERING",
+    "goal_file": "PROJECT_GOAL.md",
+    "goal_anchor_sha256": "b8a4f07fbe0b7ee02d4f1a4df1f23c9cccbd403ddccbce0b2ebddf967a208b2b",
+    "canonical_goal_source": "C:\\general-agent-runtime-ab-v13\\projects\\console-a-001\\PROJECT_GOAL.md",
+    "canonical_goal_sha256": "b8a4f07fbe0b7ee02d4f1a4df1f23c9cccbd403ddccbce0b2ebddf967a208b2b",
+    "canonical_goal_matches_binding": true,
+    "body_matches_shared_goal": true
+  },
+  "b2": {
+    "project_id": "console-b2-001",
+    "project_type": "SOFTWARE_ENGINEERING",
+    "profile": "SOFTWARE_ENGINEERING",
+    "goal_file": "PROJECT_GOAL.md",
+    "goal_anchor_sha256": "421ae71325daa1840cd39b027fe903364bacc4d46f0639f703856e6548a0e992",
+    "canonical_goal_source": "C:\\general-agent-runtime-ab-v14-b2\\projects\\console-b2-001\\PROJECT_GOAL.md",
+    "canonical_goal_sha256": "421ae71325daa1840cd39b027fe903364bacc4d46f0639f703856e6548a0e992",
+    "canonical_goal_matches_binding": true,
+    "body_matches_shared_goal": true
+  }
+}

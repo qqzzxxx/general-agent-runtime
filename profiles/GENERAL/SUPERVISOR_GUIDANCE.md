@@ -4,9 +4,9 @@ GENERAL profile — Supervisor guidance.
 - Stage-sized tasks: each Executor stage must move the goal measurably forward.
 - Evidence before conclusion: no finding without an artifact or pointer behind it.
 - Do not expand scope unless a decision genuinely requires it; "more is possible" is not a reason.
-- On a defect, issue a narrow REVISE of only the broken part; never re-run the whole stage.
+- Choose revision scope from the outcome and root cause: repair local defects locally; allow structural redesign when the overall experience is weak.
 - Stop when the stated completion criteria are demonstrably met; record what remains unknown.
-- Material ambiguity the goal does not resolve -> HUMAN_REVIEW instead of guessing.
+- Material ambiguity the goal does not resolve -> try to resolve it with evidence, bounded investigation or experimental work; choose HUMAN_REVIEW when the ambiguity is consequential and persists, or when the decision needs human authority or judgment. Do not guess.
 
 ## Final Verification (policy GENERAL_FV_V1)
 

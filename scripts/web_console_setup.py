@@ -64,13 +64,16 @@ _ROUTING_PATTERNS = (
 _UNSAFE_ROOT_PATTERN = re.compile(
     r"\b(artifacts?|control|handoff|projects)/", re.IGNORECASE)
 
-# Supervisor configuration. v1.2 reports no provider capabilities and
-# exposes no model-config interface, so choices are an explicit Console-side
-# setup draft; the capability report below stays honest about that.
+# Supervisor configuration. The draft is Console-owned and
+# non-authoritative: it only prefills the formal queued-configuration form,
+# so its vocabulary mirrors the Runtime queue contract
+# (`supervisor_control.SUPERVISOR_CONFIG_EFFORTS`, XHIGH confirmed from the
+# installed Codex CLI, evidence/v1.4-supervisor-config-ui/). Values outside
+# this set are refused on write; a stored draft with an older suggestion
+# (e.g. ULTRA) still loads verbatim and is surfaced as a legacy value.
 EXPLANATION_MODES = ("MINIMAL", "COMPACT", "DETAILED_ON_DEMAND")
 DEFAULT_EXPLANATION_MODE = "COMPACT"
-REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH", "EXTRA_HIGH", "HIGHEST",
-                     "ULTRA")
+REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH", "XHIGH")
 SUPERVISOR_MODEL_MAX_CHARS = 80
 
 # Input registration bounds (metadata only; contents are never read).
@@ -308,11 +311,14 @@ def validate_supervisor_config(payload) -> dict:
             raise web_console_control.ControlRequestError(
                 "model must not contain control characters", field="model")
     effort = payload["reasoning_effort"]
-    if effort is not None and (not isinstance(effort, str)
-                               or effort not in REASONING_EFFORTS):
-        raise web_console_control.ControlRequestError(
-            "reasoning_effort must be one of " + ", ".join(REASONING_EFFORTS)
-            + " or null", field="reasoning_effort")
+    if effort is not None:
+        if isinstance(effort, str):
+            effort = effort.strip().upper()
+        if effort not in REASONING_EFFORTS:
+            raise web_console_control.ControlRequestError(
+                "reasoning_effort must be one of "
+                + ", ".join(REASONING_EFFORTS)
+                + " or null", field="reasoning_effort")
     mode = payload["explanation_mode"]
     if not isinstance(mode, str) or mode not in EXPLANATION_MODES:
         raise web_console_control.ControlRequestError(

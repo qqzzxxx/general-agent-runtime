@@ -134,6 +134,11 @@ MAX_DISPATCH_VALIDATION_REPAIRS = 1
 # existing no-progress guard, but the counter is attached to the durable event so
 # a process restart cannot reset it.
 MAX_SUPERVISOR_DECISION_ATTEMPTS = 2
+# Provider/CLI/process faults (API errors, non-zero Codex exits, timeouts, missing
+# CLI) form no Supervisor decision, so they are accounted in their own durable
+# budget and never consume the semantic decision/repair entitlement above. The
+# budget stays finite: exhausting it enters the same fail-closed HUMAN_REVIEW.
+MAX_SUPERVISOR_INFRASTRUCTURE_FAILURES = 3
 DESKTOP_NOTIFICATIONS_ENABLED = True
 USER_NOTIFICATION_CONSOLE_ENABLED = True
 
@@ -274,6 +279,15 @@ HUMAN_DECISION_CONSUMED_KEYS = HUMAN_DECISION_RESUME_BASE_KEYS | {
     "decision_sha256",
     "decision_identity",
 }
+# HUMAN-DECISION-FV-BRIDGE-V1 exhaustion recovery: a resume event whose decision
+# budget exhausted voids its still-pending receipt into this terminal shape so a
+# later Human Review cycle stays preparable. The receipt was never consumed, so
+# it never enters the consumption ledger; exactly-once stays enforced by the
+# immutable archive and the receipt's stale-state binding.
+HUMAN_DECISION_EXHAUSTED_KEYS = HUMAN_DECISION_RESUME_BASE_KEYS | {
+    "exhausted_at",
+    "exhaustion_reason",
+}
 HUMAN_DECISION_DECISION_IDENTITY_KEYS = {
     "kind",
     "decision_history_index",
@@ -307,11 +321,18 @@ HUMAN_DECISION_SUPERVISOR_DECISION_KEYS = {
     "stage_id",
     "goal_alignment",
 }
+# HUMAN-DECISION-FV-BRIDGE-V1: a Human Decision that authorizes limited
+# re-verification (or acceptance of an already-fresh PASS) must be expressible
+# on the resume turn. FINAL_VERIFICATION/FINAL_ACCEPTANCE run through the same
+# Runtime preparation and terminal predicate as ordinary turns; the widened
+# vocabulary is additive, so historical consumed records stay valid.
 HUMAN_DECISION_ALLOWED_DECISIONS = {
     "CONTINUE",
     "REDIRECT",
     "CHANGE_METHOD",
     "REVISE",
+    "FINAL_VERIFICATION",
+    "FINAL_ACCEPTANCE",
     "STOP",
     "HUMAN_REVIEW",
 }
@@ -446,6 +467,27 @@ def validate_dispatch_payload(
 
     validate_final_verification_dispatch(state, task)
 
+    # HUMAN-DECISION-FV-BRIDGE-V1 gate provenance: only final_verification_contract
+    # .prepare() may author a FINAL_VERIFICATION_GATE, and it records the prepared
+    # identity in the Runtime record at preparation time. A gate-carrying dispatch
+    # whose (MESSAGE_ID, CLAIMS_HASH) was never Runtime-prepared is rejected on
+    # every path (ordinary and Human-Decision resume), so an internally
+    # self-consistent hand-authored gate can never gain authority.
+    if is_final_verification_task(task) and isinstance(task.get("FINAL_VERIFICATION_GATE"), dict):
+        gate_provenance = task["FINAL_VERIFICATION_GATE"]
+        prepared_identities = runtime.get("final_verification_prepared_identities") or []
+        if not any(
+            isinstance(entry, dict)
+            and entry.get("message_id") == msg_id
+            and str(entry.get("claims_hash") or "") == str(gate_provenance.get("CLAIMS_HASH") or "")
+            for entry in prepared_identities
+        ):
+            raise RuntimeError(
+                "FINAL_VERIFICATION_GATE is not Runtime-prepared: no "
+                f"final_verification_contract.prepare record for MESSAGE_ID={msg_id} "
+                "with this claims_hash; only the Runtime constructs gates"
+            )
+
     # FV-IDENTITY-BINDING-V1 anti-repeat guard: when a mechanically PASS receipt for
     # this exact claims hash is already the Runtime's freshest consumed receipt,
     # re-executing the identical verification cannot add information (same claims,
@@ -572,11 +614,18 @@ def register_dispatched_task(
         ok, reason = executor_claim.verify_authorized_dispatch(
             ROOT, *[task[key] for key in IDENTITY_KEYS], allow_paused_running=True
         )
-        expires = parse_time(previous.get("EXPIRES_AT"))
         if not ok:
             raise RuntimeError(f"Existing Executor owner authorization is invalid: {reason}")
-        if expires is None or utc_now() >= expires:
-            raise RuntimeError("Existing Executor owner authorization has expired")
+        # PICKUP-EXECUTION-LIFECYCLE: an owned attempt is bounded by its
+        # execution budget (CLAIMED_AT + MAX_TIME), never by the pickup window
+        # that expired while this executor was legitimately working.
+        execution = execution_deadline_for(previous, prior_claim, task)
+        if execution is None:
+            expires = parse_time(previous.get("EXPIRES_AT"))
+            if expires is None or utc_now() >= expires:
+                raise RuntimeError("Existing Executor owner authorization has expired")
+        elif utc_now() >= execution:
+            raise RuntimeError("Existing Executor owner execution budget is exhausted")
         runtime["recovered_owned_executor_attempt"] = {
             **{key: task[key] for key in IDENTITY_KEYS},
             "policy": "PRESERVE_ALREADY_CLAIMED_ATTEMPT",
@@ -644,7 +693,19 @@ def register_dispatched_task(
     )
     registered_at = (runtime.get("dispatch_registered_at") if same else None) or stamp()
     timing_runtime = {**runtime, "dispatch_registered_at": registered_at}
-    deadline, _, _, _ = executor_deadline(timing_runtime, state, task)
+    _, _, max_seconds, grace = executor_deadline(timing_runtime, state, task)
+    if max_seconds is None:
+        max_seconds = parse_duration_seconds(
+            task_value(task, "MAX_TIME"), DEFAULT_EXECUTOR_TIMEOUT_SECONDS)
+    if grace is None:
+        grace = max(parse_duration_seconds(
+            task_value(task, "SCHEDULER_GRACE_SECONDS"), MIN_SCHEDULER_GRACE_SECONDS),
+            MIN_SCHEDULER_GRACE_SECONDS)
+    # PICKUP-EXECUTION-LIFECYCLE: EXPIRES_AT bounds only the pickup
+    # authorization (the unclaimed wait). The execution budget starts at the
+    # durable claim instant and is MAX_TIME, recorded here on the
+    # authorization so claim/fence/watchdog share one clock definition.
+    pickup_deadline = parse_time(registered_at) + timedelta(seconds=grace)
     authorized = {
         "schema_version": AUTHORIZED_DISPATCH_SCHEMA_VERSION,
         **{key: task[key] for key in IDENTITY_KEYS},
@@ -658,7 +719,8 @@ def register_dispatched_task(
             "supervisor_turn_id": candidate_origin["supervisor_turn_id"],
             "decision_receipt_sha256": candidate_origin["decision_receipt_sha256"],
         },
-        "EXPIRES_AT": previous["EXPIRES_AT"] if same and previous.get("EXPIRES_AT") else deadline.isoformat(),
+        "MAX_TIME": max_seconds,
+        "EXPIRES_AT": previous["EXPIRES_AT"] if same and previous.get("EXPIRES_AT") else pickup_deadline.isoformat(),
         "SUPERVISOR_DISPATCH_ARCHIVE": {
             "schema_version": archive_binding["schema_version"],
             "metadata_file": archive_binding["metadata_file"],
@@ -2285,12 +2347,20 @@ def load_runtime() -> dict:
     if isinstance(runtime, dict):
         return runtime
     legacy = read_json(ROOT / "ORCHESTRATOR_STATE.json", {}) or {}
+    # A legacy V1.5 root keeps its historical high-water mark (602) so old
+    # message ids are never re-consumed. A Runtime without legacy state has
+    # consumed nothing: seeding 602 there fabricated consumption history
+    # that surfaced in operator-facing status as a consumed message.
+    if legacy:
+        consumed_default = int(legacy.get("last_reviewed_id", 602) or 602)
+    else:
+        consumed_default = 0
     return {
         "schema_version": 2,
         "started_at": stamp(),
         "last_codex_run_at": None,
         "last_codex_reason": None,
-        "last_consumed_message_id": int(legacy.get("last_reviewed_id", 602) or 602),
+        "last_consumed_message_id": consumed_default,
         "last_consumed_nonce": None,
         "last_consumed_brief_sha256": None,
         "last_dispatched_message_id": None,
@@ -2363,6 +2433,80 @@ def save_runtime(runtime: dict) -> None:
                     retirements.append(value)
         if retirements:
             merged["executor_retirements"] = retirements
+
+        # QUOTA-PAUSE-PARK-V1 / LEGACY-PAUSE-RECOVERY-V2: a parked MESSAGE_ID is
+        # a durable budget fact (the dispatch never consumed an attempt), and
+        # the offline recovery tool writes it while no scheduler is live, so it
+        # must survive a stale scheduler snapshot exactly like retirement
+        # history does.
+        parked = []
+        for source in (fresh.get("parked_message_ids") or [],
+                       runtime.get("parked_message_ids") or []):
+            if not isinstance(source, list) or any(type(value) is not int for value in source):
+                raise RuntimeError("parked_message_ids malformed during Runtime merge")
+            for value in source:
+                if value not in parked:
+                    parked.append(value)
+        if parked:
+            merged["parked_message_ids"] = parked
+
+        # HUMAN-DECISION-FV-BRIDGE-V1: gate provenance is written by
+        # final_verification_contract.prepare() from the control plane, so union it
+        # like retirement history to keep a stale Orchestrator snapshot from
+        # erasing Runtime-prepared gate identities.
+        prepared_identities = []
+        seen_prepared = set()
+        for source in (fresh.get("final_verification_prepared_identities") or [],
+                       runtime.get("final_verification_prepared_identities") or []):
+            if not isinstance(source, list):
+                raise RuntimeError(
+                    "final_verification_prepared_identities malformed during Runtime merge")
+            for value in source:
+                if not isinstance(value, dict):
+                    raise RuntimeError(
+                        "final_verification_prepared_identities entry malformed during Runtime merge")
+                key = json.dumps(value, ensure_ascii=False, sort_keys=True,
+                                 separators=(",", ":"))
+                if key not in seen_prepared:
+                    seen_prepared.add(key)
+                    prepared_identities.append(value)
+        if prepared_identities:
+            merged["final_verification_prepared_identities"] = prepared_identities[-50:]
+
+        # ORPHAN-SUPERVISOR-EVENT-RECONCILIATION-V1: retired pending Supervisor
+        # events are durable Runtime history written by the control plane while
+        # no scheduler is live, so union them exactly like retirement history to
+        # keep a stale Orchestrator snapshot from erasing them.
+        retired_events = []
+        seen_retired_events = set()
+        for source in (fresh.get("retired_supervisor_events") or [],
+                       runtime.get("retired_supervisor_events") or []):
+            if not isinstance(source, list):
+                raise RuntimeError(
+                    "retired_supervisor_events malformed during Runtime merge")
+            for value in source:
+                if not isinstance(value, dict):
+                    raise RuntimeError(
+                        "retired_supervisor_events entry malformed during Runtime merge")
+                key = json.dumps(value, ensure_ascii=False, sort_keys=True,
+                                 separators=(",", ":"))
+                if key not in seen_retired_events:
+                    seen_retired_events.add(key)
+                    retired_events.append(value)
+        if retired_events:
+            merged["retired_supervisor_events"] = retired_events
+
+        # Retirement removes current execution ownership, not history: a stale
+        # in-memory snapshot holding the retired event must not resurrect it over
+        # an already-cleared on-disk slot.  Only an exact retired-event match is
+        # dropped; any new event still takes the slot normally.
+        if (isinstance(merged.get("pending_supervisor_event"), dict)
+                and fresh.get("pending_supervisor_event") is None
+                and any(isinstance(item, dict)
+                        and _is_retired_supervisor_event(
+                            item, merged["pending_supervisor_event"])
+                        for item in (merged.get("retired_supervisor_events") or []))):
+            merged["pending_supervisor_event"] = None
 
         fresh_consumed = int(fresh.get("last_consumed_message_id", 0) or 0)
         incoming_consumed = int(runtime.get("last_consumed_message_id", 0) or 0)
@@ -2470,17 +2614,40 @@ def safe_read_text(path: Path, max_chars: int = 24000) -> str:
 
 
 def supervisor_effort(state: dict, reason: str) -> str:
-    """All Codex Supervisor turns are permanently fixed to High reasoning."""
+    """Built-in default effort for Codex Supervisor turns (compat fallback).
+
+    The configurable baseline lives in `control/supervisor_control.json`
+    (`supervisor_model` / `supervisor_reasoning_effort`); these constants
+    only apply when that configuration is absent or invalid."""
     return SUPERVISOR_REASONING_EFFORT
 
 
-def supervisor_profile_for_turn(turn_config, state: dict, reason: str) -> tuple:
+def supervisor_fixed_policy_config() -> dict | None:
+    """Read the optionally configured fixed Supervisor policy, fail-safe.
+
+    Returns the validated {"model", "reasoning_effort"} baseline from the
+    Runtime's own control document, or None when it is absent or doubtful.
+    A doubtful control document never blocks a Supervisor turn: the built-in
+    default policy applies instead.
+    """
+    try:
+        control = _supervisor_control_helper().load_control(ROOT)
+    except Exception:
+        return None
+    return _supervisor_control_helper().supervisor_fixed_policy_from_control(
+        control)
+
+
+def supervisor_profile_for_turn(turn_config, state: dict, reason: str,
+                                control_config=None) -> tuple:
     """Resolve the effective (model, effort, source) for one Supervisor call.
 
-    A validated queued configuration consumed at the turn boundary (source
-    "queued") is the only way the fixed Supervisor policy is overridden, and
-    the override is explicit, bounded, and recorded. Anything doubtful falls
-    back to the fixed policy instead of guessing.
+    Precedence, most specific first: a validated queued configuration
+    consumed at the turn boundary (source "queued"); then the operator's
+    configured fixed-policy baseline from the Runtime control document
+    (source "fixed_policy"); then the built-in default constants. Anything
+    doubtful falls back to the next level instead of guessing, and the
+    resolution is recorded per turn.
     """
     config = turn_config if isinstance(turn_config, dict) else {}
     if (config.get("source") == "queued"
@@ -2489,6 +2656,13 @@ def supervisor_profile_for_turn(turn_config, state: dict, reason: str) -> tuple:
             and config.get("reasoning_effort") in
             _supervisor_control_helper().SUPERVISOR_CONFIG_EFFORTS):
         return config["model"], config["reasoning_effort"].lower(), "queued"
+    if (isinstance(control_config, dict)
+            and isinstance(control_config.get("model"), str)
+            and control_config["model"].strip()
+            and isinstance(control_config.get("reasoning_effort"), str)
+            and control_config["reasoning_effort"].strip()):
+        return (control_config["model"], control_config["reasoning_effort"],
+                "fixed_policy")
     return SUPERVISOR_MODEL, supervisor_effort(state, reason), "fixed_policy"
 
 
@@ -3064,7 +3238,7 @@ def validate_goal_alignment(value) -> dict:
     return value
 
 
-def render_goal_anchor_block(goal_state: dict) -> str:
+def render_goal_anchor_block(goal_state: dict, *, include_alignment: bool = True) -> str:
     """Supervisor prompt block: verified goal identity + alignment contract.
 
     Empty string in legacy mode keeps the historical prompt byte-equality. When
@@ -3113,6 +3287,8 @@ def render_goal_anchor_block(goal_state: dict) -> str:
         "Keep each field concise and auditable; do not duplicate the whole goal file.",
         "=== END GOAL ANCHOR ===",
     ]
+    if not include_alignment:
+        lines = lines[:lines.index("GOAL ALIGNMENT CONTRACT — every decision you record this turn in")] + ["=== END GOAL ANCHOR ==="]
     return "\n".join(lines)
 
 
@@ -3181,10 +3357,16 @@ def _decision_identity(entry: dict, history_index: int) -> dict:
 
 
 def _validate_human_decision_status_pair(decision: str, resulting_status: str) -> None:
+    # HUMAN-DECISION-FV-BRIDGE-V1: FINAL_VERIFICATION is the only decision that
+    # may produce a verification dispatch; COMPLETE is expressible only through
+    # FINAL_ACCEPTANCE (a stop is STOPPED; no recorded flow ever used
+    # STOP→COMPLETE).
     if resulting_status == "WAITING_EXECUTOR":
-        allowed = {"CONTINUE", "REDIRECT", "CHANGE_METHOD", "REVISE"}
+        allowed = {"CONTINUE", "REDIRECT", "CHANGE_METHOD", "REVISE", "FINAL_VERIFICATION"}
     elif resulting_status == "HUMAN_REVIEW":
         allowed = {"HUMAN_REVIEW"}
+    elif resulting_status == "COMPLETE":
+        allowed = {"FINAL_ACCEPTANCE"}
     else:
         allowed = {"STOP"}
     if decision not in allowed:
@@ -3280,8 +3462,25 @@ def load_verified_human_decision_for_supervisor(state: dict) -> dict | None:
         if not ledger or meta != ledger[-1]:
             raise RuntimeError("current consumed Human Decision must equal the latest ledger entry")
         return None
+    if lifecycle == "EXHAUSTED":
+        # HUMAN-DECISION-FV-BRIDGE-V1: an exhausted resume receipt is terminal
+        # history. It is never injectable and never blocks a later cycle; the
+        # base fields still pin the voided receipt for audit.
+        missing = sorted(HUMAN_DECISION_EXHAUSTED_KEYS - set(meta))
+        unknown = sorted(set(meta) - HUMAN_DECISION_EXHAUSTED_KEYS)
+        if missing or unknown:
+            raise RuntimeError(
+                f"exhausted human_review_resume schema mismatch (missing={missing}, unknown={unknown})"
+            )
+        _strict_timezone_timestamp(meta.get("exhausted_at"), "human_review_resume.exhausted_at")
+        reason = meta.get("exhaustion_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise RuntimeError("human_review_resume.exhaustion_reason must be a non-empty string")
+        return None
     if lifecycle != "PENDING_SUPERVISOR_REVIEW":
-        raise RuntimeError("human_review_resume.status must be PENDING_SUPERVISOR_REVIEW or CONSUMED")
+        raise RuntimeError(
+            "human_review_resume.status must be PENDING_SUPERVISOR_REVIEW, CONSUMED, or EXHAUSTED"
+        )
 
     missing = sorted(HUMAN_DECISION_RESUME_BASE_KEYS - set(meta))
     unknown = sorted(set(meta) - HUMAN_DECISION_RESUME_BASE_KEYS)
@@ -3450,6 +3649,14 @@ def commit_human_decision_supervisor_result(
     if not isinstance(state_patch, dict):
         raise RuntimeError("project_state_patch must be a JSON object")
     forbidden = sorted(HUMAN_DECISION_RUNTIME_OWNED_STATE_KEYS & set(state_patch))
+    if "final_verification" in state_patch:
+        # F-007 HUMAN-DECISION-FV-ACCEPTANCE-STAMP-V1: the Final Verification
+        # acceptance record is Runtime-owned. A model patch used to replace
+        # the whole dict, dropping required/policy_version/claims_hash —
+        # which silently disabled the terminal gate (gate_enforced reads
+        # required) and damaged terminal presentation. The Runtime derives
+        # the acceptance stamp itself below.
+        forbidden.append("final_verification (Runtime-owned acceptance stamp)")
     if forbidden:
         raise RuntimeError(f"project_state_patch changes Runtime-owned keys: {forbidden}")
     required_patch = {"status", "current_task", "next_message_id"}
@@ -3497,6 +3704,30 @@ def commit_human_decision_supervisor_result(
         for key, expected in expected_task_identity.items():
             if decision_entry.get(key) != expected:
                 raise RuntimeError(f"Supervisor decision {key} does not bind the Executor task")
+        if decision == "FINAL_VERIFICATION" or is_final_verification_task(executor_task):
+            # HUMAN-DECISION-FV-BRIDGE-V1: a Human Decision may authorize a fresh
+            # Final Verification, but the Runtime alone owns the transition: the
+            # Supervisor requests (FINAL_VERIFICATION_REQUEST); prepare() authors
+            # the immutable gate exactly as on ordinary turns.
+            if decision != "FINAL_VERIFICATION":
+                raise RuntimeError(
+                    "FINAL_VERIFICATION dispatch requires decision=FINAL_VERIFICATION; "
+                    "request the verification instead of hand-authoring it")
+            if "FINAL_VERIFICATION_REQUEST" not in executor_task:
+                raise RuntimeError(
+                    "resume FINAL_VERIFICATION requires FINAL_VERIFICATION_REQUEST; a "
+                    "hand-authored FINAL_VERIFICATION_GATE is rejected (only the "
+                    "Runtime constructs gates)")
+            import final_verification_contract as fv_contract
+            try:
+                candidate, executor_task = fv_contract.prepare(ROOT, candidate, executor_task)
+            except Exception as exc:
+                raise RuntimeError(f"FV dispatch preparation: {exc}") from exc
+            # prepare() durably recorded the gate provenance in the runtime record;
+            # validate against that fresh record.
+            fresh_runtime = load_runtime()
+            runtime.clear()
+            runtime.update(fresh_runtime)
         validate_dispatch_payload(runtime, candidate, executor_task, allow_same_identity=False)
     else:
         if executor_task is not None:
@@ -3508,7 +3739,26 @@ def commit_human_decision_supervisor_result(
         if resulting_status == "COMPLETE":
             # FV-IDENTITY-BINDING-V1: bounded ledger-backed recovery before rejecting,
             # identical to enforce_terminal_verification_gate.
+            # HUMAN-DECISION-FV-BRIDGE-V1: FINAL_ACCEPTANCE runs the ordinary terminal
+            # predicate unchanged — a Human Decision authorizes, but never substitutes
+            # for, a passing and still-freshest Final Verification result. On failure
+            # the turn fails closed: the receipt stays pending for a FINAL_VERIFICATION
+            # decision on the same receipt (never a COMPLETE bounce).
             reconcile_final_verification_binding(runtime, candidate)
+            # F-007: the Runtime stamps the acceptance record itself from its own
+            # verified binding, so the terminal predicate below always runs on a
+            # complete fv shape (a model patch can no longer supply or damage it).
+            if (final_verification_gate_enforced(runtime, candidate)
+                    and runtime.get("last_final_verification_mechanical_pass") is True
+                    and isinstance(candidate.get("final_verification"), dict)):
+                candidate["final_verification"] = {
+                    **candidate["final_verification"],
+                    "status": "PASS",
+                    "verification_message_id": int(runtime["last_final_verification_message_id"]),
+                    "verification_receipt_sha256": str(
+                        runtime["last_final_verification_receipt_sha256"] or ""),
+                    "verified_at": stamp(),
+                }
             allowed, reason = final_verification_terminal_check(runtime, candidate)
             if not allowed:
                 raise RuntimeError(f"COMPLETE rejected by Final Verification Gate: {reason}")
@@ -3614,23 +3864,11 @@ def build_codex_prompt(
     state_sha256: str | None = None,
     control_turn: dict | None = None,
 ) -> str:
-    """Build a compact Supervisor turn with the small authoritative files injected.
-
-    Python is still only transport/scheduling: it does not summarize, rank, or interpret the
-    commercial content. Injecting verbatim compressed state avoids repetitive shell reads and
-    reduces Windows sandbox spawn failures and token overhead.
-    """
-    event_text = json.dumps(event or {}, ensure_ascii=False)
-    now = stamp()
-    dispatch_nonce_seed = uuid.uuid4().hex + uuid.uuid4().hex[:16]
-    state_text = safe_read_text(PROJECT_STATE, 18000)
-    memory_text = safe_read_text(RESEARCH_STATE, 18000)
-    rules_text = safe_read_text(SUPERVISOR_RULES, 14000)
-    # G1-A: goal file resolved from project_state.goal_file (legacy fallback when absent).
+    """Build Context V2; existing Runtime gates still own every commit."""
+    import supervisor_context
     goal_state = state if state is not None else read_project_state()
     goal_path = resolve_goal_path(goal_state)
-    profile_block = render_profile_block(resolve_profile(goal_state))  # G2
-    scope_block = render_project_scope_block(ACTIVE_PROJECT)  # G3
+    profile = resolve_profile(goal_state)
     human_decision = load_verified_human_decision_for_supervisor(goal_state)
     human_decision_block = ""
     if human_decision is not None:
@@ -3658,7 +3896,16 @@ def build_codex_prompt(
             "resulting_lifecycle_state, project_state_patch, executor_task.\n"
             "supervisor_decision must contain exactly: decision, at, reason, scope, "
             "message_id, task_id, stage_id, goal_alignment. Use null for optional identities. "
-            "decision must be CONTINUE, REDIRECT, CHANGE_METHOD, REVISE, STOP, or HUMAN_REVIEW.\n"
+            "decision must be CONTINUE, REDIRECT, CHANGE_METHOD, REVISE, FINAL_VERIFICATION, "
+            "FINAL_ACCEPTANCE, STOP, or HUMAN_REVIEW.\n"
+            "WAITING_EXECUTOR results only from CONTINUE, REDIRECT, CHANGE_METHOD, REVISE, or "
+            "FINAL_VERIFICATION. COMPLETE results only from FINAL_ACCEPTANCE and requires the "
+            "acceptance mirror (final_verification.status=PASS with verification_message_id and "
+            "verification_receipt_sha256) matching the Runtime's freshest passing Final "
+            "Verification receipt; human authorization alone never satisfies that gate. For "
+            "decision FINAL_VERIFICATION, executor_task must carry FINAL_VERIFICATION_REQUEST "
+            "and must never carry a hand-authored FINAL_VERIFICATION_GATE; the Runtime constructs "
+            "the gate exactly as on ordinary turns.\n"
             "goal_alignment is required and must be a concise JSON object with exactly these "
             "six non-empty string fields: original_objective, unmet_criteria, latest_result, "
             "next_action_alignment, scope_drift, method. It records how this decision stays "
@@ -3677,220 +3924,29 @@ def build_codex_prompt(
             "allocated.\n"
             "=== END HUMAN DECISION TRANSACTION OUTPUT CONTRACT ==="
         )
-    intervention_block = ""
-    interventions = ((control_turn or {}).get("interventions") or [])
-    if interventions:
-        rendered = json.dumps(interventions, ensure_ascii=False, indent=2)
-        verbatim_blocks = "\n".join(
-            f"--- BEGIN VERBATIM {item.get('intervention_id')} ---\n"
-            f"{item.get('instruction_text', '')}\n"
-            f"--- END VERBATIM {item.get('intervention_id')} ---"
-            for item in interventions
-        )
-        audit = any(str(item.get("mode") or "").upper() == "AUDIT" for item in interventions)
-        audit_text = (
-            "At least one request is AUDIT mode. Perform an adversarial Supervisor review "
-            "before normal progression. You may broaden READ-ONLY inspection to relevant "
-            "archived dispatches, authoritative completion records, later decisions, current "
-            "project state, artifacts, evidence, and dependency impact. Do not trust PASS or "
-            "COMPLETED merely because the Executor reported it. Remain the Supervisor: do not "
-            "perform bulk Executor production or large rewrites. Reach a normal reliable "
-            "CONTINUE, REVISE, REDIRECT/CHANGE_METHOD, HUMAN_REVIEW, or STOP decision."
-            if audit else
-            "Apply these STEER requests to this Supervisor decision before normal progression."
-        )
-        intervention_block = (
-            "\n\n=== RUNTIME-VERIFIED HUMAN SUPERVISOR INTERVENTIONS ===\n"
-            f"{rendered}\n"
-            "\n=== VERBATIM INTERVENTION TEXT ===\n"
-            f"{verbatim_blocks}\n"
-            "=== END VERBATIM INTERVENTION TEXT ===\n"
-            "=== END HUMAN SUPERVISOR INTERVENTIONS ===\n"
-            "The instruction_text fields above are immutable human input and must be applied "
-            "exactly once by Runtime accounting. They are not Executor completions, never edit "
-            "PROJECT_GOAL, and never authorize TO_ZCODE directly. A target_message_id is a "
-            "historical correction anchor: preserve all history, assess materially dependent "
-            "later work, and use only fresh MESSAGE_IDs for any repair. "
-            f"{audit_text}"
-        )
-    goal_text = safe_read_text(goal_path, 12000) if goal_path.exists() else "[NO PROJECT GOAL FILE]"
-    # GOAL-ANCHOR-V1: verified goal identity + alignment contract (empty in legacy mode).
-    goal_anchor_block = render_goal_anchor_block(goal_state)
-    brief_text = "[NO EXECUTOR BRIEF FOR THIS TURN]"
+    receipt = None
+    receipt_path = None
+    fallback = None
     if reason in {"EXECUTOR_RESULT_READY", "MALFORMED_EXECUTOR_RECEIPT", "MALFORMED_EXECUTOR_SIGNAL"}:
-        # COMPLETION-SEAL-V1: the Supervisor must review the committed receipt, not
-        # whatever the mutable root compatibility file happens to contain.
-        committed_path = (event or {}).get("committed_receipt_path") if isinstance(event, dict) else None
-        entry = None
+        committed_path = (event or {}).get("committed_receipt_path")
         if committed_path:
-            entry = _completion_helper().load_entry_file(Path(committed_path))
-        if entry is not None:
-            brief_text = _completion_helper().render_brief_text(entry["RECEIPT"])
-        elif SUPERVISOR_BRIEF.exists():
-            brief_text = safe_read_text(SUPERVISOR_BRIEF, 22000)
-    # G5A.5.2: scope-aware stage-dispatch and Final Verification instructions.
-    # Legacy mode keeps the historical wording byte-for-byte; isolated mode uses the
-    # injected PROJECT RUNTIME SCOPE and the active Profile's bound FV policy.
-    if human_decision is not None:
-        stage_instructions = (
-            "Do not write project_state.json, RESEARCH_STATE.md, TO_ZCODE.md, reports, or any "
-            "other file during this transaction turn. Express the complete bounded Supervisor "
-            "decision and any selected Executor task only through the required JSON result."
-        )
-        fv_instructions = (
-            "The Orchestrator will apply the active Profile's Final Verification gate to the "
-            "returned candidate before any durable lifecycle commit."
-        )
-    elif ACTIVE_PROJECT is not None:
-        stage_instructions = (
-            "If another Executor stage is warranted: update the injected PROJECT STATE "
-            "(project_state.json) and PROJECT MEMORY (RESEARCH_STATE.md) at the PROJECT ROOT "
-            "named in the PROJECT RUNTIME SCOPE, then atomically publish the root "
-            "TO_ZCODE.md using the v2 wire contract. You may use the provided "
-            "TURN_TIME_UTC / DISPATCH_NONCE_SEED as mechanical timestamp/nonce material. "
-            "EXECUTOR_PROTOCOL must be a flat JSON array of instruction strings."
-        )
-        fv_instructions = (
-            "If final_verification.required=true, COMPLETE is forbidden until the active "
-            "Profile's bound Final Verification policy has passed and FINAL_ACCEPTANCE is "
-            "complete. Use the active Profile policy and its bound policy_id/policy_version: "
-            "select 3-8 decision-critical claims within the Profile taxonomy, dispatch ONE "
-            "bounded TASK_KIND=FINAL_VERIFICATION stage. Record decision=FINAL_VERIFICATION "
-            "in last_supervisor_decision and decision_history. Supply FINAL_VERIFICATION_REQUEST "
-            "with CRITICAL_CLAIMS; Runtime binds EXECUTION_MODE from the FV policy. "
-            "Omit EXECUTION_MODE and FINAL_VERIFICATION_GATE. "
-            "Runtime establishes PENDING, POLICY_ID, POLICY_VERSION, CLAIMS_HASH, CLAIM_COUNT, "
-            "and the immutable FINAL_VERIFICATION_GATE policy snapshot before committing the decision. "
-            "CRITICAL_CLAIMS element schema is mechanically enforced: EVERY element must be "
-            "a JSON object containing EXACTLY these six lowercase keys — no uppercase "
-            "variants, no aliases, no missing keys: "
-            '{"claim_id": "C1", "claim": "Decision-critical factual claim.", '
-            '"claim_type": "IP", "decision_impact": "HIGH", '
-            '"evidence_pointers": ["evidence/example.txt"], '
-            '"verification_standard": "Adversarially verify against the cited evidence."}. '
-            "decision_impact must be HIGH or MEDIUM; evidence_pointers must be a JSON list "
-            "of strings. CLAIMS_HASH is the canonical SHA-256 of the exact claim list: "
-            "hash the JSON produced by json.dumps(claims, ensure_ascii=False, sort_keys=True, "
-            "separators=(',', ':')). Runtime stores the same list and hash in "
-            "project_state.final_verification; omit unauthored metadata, and never submit conflicting "
-            "state metadata. Initial state may be NOT_STARTED; after a real revision use REVERIFY. "
-            "The Executor authors FINAL_VERIFICATION_RESULTS with OVERALL_STATUS and CLAIM_RESULTS; "
-            "Runtime constructs the receipt envelope without changing any judgment. "
-            "A dispatch whose claims fail this schema is "
-            "rejected, quarantined, and costs a bounded repair turn. On FAIL/INCONCLUSIVE "
-            "apply only a narrow REVISE of the smallest affected claim/evidence segment "
-            "before reverifying."
-        )
-    else:
-        stage_instructions = (
-            "If another Executor stage is warranted: update control/project_state.json and "
-            "RESEARCH_STATE.md, then atomically publish root TO_ZCODE.md using the v2 wire "
-            "contract. You may use the provided TURN_TIME_UTC / DISPATCH_NONCE_SEED as "
-            "mechanical timestamp/nonce material."
-        )
-        fv_instructions = (
-            "For a commercial run protected by Production V1.5 Final Verification Gate, "
-            "COMPLETE is forbidden until the exact last accepted final-verification receipt "
-            "has mechanically passed. When research is otherwise ready to stop, identify "
-            "3-8 decision-critical claims, set final_verification=PENDING, and dispatch one "
-            "bounded TASK_KIND=FINAL_VERIFICATION stage instead of completing. "
-            "CRITICAL_CLAIMS element schema is mechanically enforced: EVERY element must be "
-            "a JSON object containing EXACTLY these six lowercase keys — no uppercase "
-            "variants, no aliases, no missing keys: "
-            '{"claim_id": "C1", "claim": "Decision-critical factual claim.", '
-            '"claim_type": "IP", "decision_impact": "HIGH", '
-            '"evidence_pointers": ["evidence/example.txt"], '
-            '"verification_standard": "Adversarially verify against the cited evidence."}. '
-            "decision_impact must be HIGH or MEDIUM; evidence_pointers must be a JSON list "
-            "of strings. CLAIMS_HASH is the canonical SHA-256 of the exact claim list "
-            "(json.dumps(claims, ensure_ascii=False, sort_keys=True, separators=(',', ':'))), "
-            "and the same claim list and hash must be stored in "
-            "project_state.final_verification. After a PASS receipt, perform "
-            "FINAL_ACCEPTANCE; only then may you set final_verification.status=PASS and "
-            "COMPLETE. If the gate fails/inconclusive, REVISE only the smallest affected "
-            "claim/evidence segment and reverify."
-        )
-
-    terminal_instructions = (
-        "For this Human Decision transaction, do not write or update a report; identify any "
-        "needed later work in the structured decision."
-        if human_decision is not None
-        else "If terminal and the gate is satisfied (or this is a grandfathered legacy run), "
-        "write/update the appropriate high-level report and issue no task. Then exit."
+            receipt_path = Path(committed_path)
+            entry = _completion_helper().load_entry_file(receipt_path)
+            if entry is not None:
+                receipt = entry["RECEIPT"]
+        if receipt is None and SUPERVISOR_BRIEF.exists():
+            fallback = SUPERVISOR_BRIEF
+    return supervisor_context.build(
+        root=ROOT, reason=reason, event=event, state=goal_state,
+        state_path=PROJECT_STATE, memory_path=RESEARCH_STATE, goal_path=goal_path,
+        rules_path=SUPERVISOR_RULES, profile=profile,
+        goal_anchor=render_goal_anchor_block(goal_state, include_alignment=False),
+        scope=render_project_scope_block(ACTIVE_PROJECT), human_block=human_decision_block,
+        interventions=(control_turn or {}).get("interventions") or [],
+        receipt=receipt, receipt_path=receipt_path, fallback_brief=fallback,
+        now=stamp(), nonce=uuid.uuid4().hex + uuid.uuid4().hex[:16],
     )
 
-    # FIX-700102: when a published dispatch was mechanically rejected, the Supervisor
-    # repair turn is told the precise validation error and the bounded-repair contract.
-    repair_block = ""
-    repair = goal_state.get("dispatch_repair")
-    if isinstance(repair, dict):
-        repair_identity = repair.get("rejected_identity") or {}
-        repair_block = (
-            "\n\n=== MECHANICAL DISPATCH REJECTION (bounded repair turn) ===\n"
-            "Your previous Executor dispatch was published but REJECTED by mechanical "
-            "Orchestrator validation. It was quarantined out of the inbox; no Executor "
-            "executed it, no MESSAGE_ID was consumed, and nothing was authorized.\n"
-            f"Validation error: {repair.get('error')}\n"
-            f"Rejected dispatch identity: {json.dumps(repair_identity, ensure_ascii=False)}\n"
-            f"Repair attempt: {repair.get('repair_attempt')} of "
-            f"{repair.get('max_repair_attempts')} — a further rejected dispatch on this "
-            "chain is terminal and stops the Runtime.\n"
-            "Fix ONLY the validation defect named above: correct the exact schema/structure "
-            "it lists (for FINAL_VERIFICATION critical claims see the required six lowercase "
-            "keys in these instructions), keep project_state.json and TO_ZCODE.md mutually "
-            "consistent, and republish root TO_ZCODE.md atomically with status "
-            "WAITING_EXECUTOR. You may keep the rejected MESSAGE_ID/NONCE or allocate a "
-            "fresh MESSAGE_ID; bind current_task and next_message_id accordingly. Do not "
-            "change PROJECT_GOAL, prior evidence, the meaning of the claim set beyond the "
-            "required schema, or the verification standard. Do not delete or rewrite "
-            "history or audit artifacts.\n"
-            "=== END MECHANICAL DISPATCH REJECTION ==="
-        )
-
-    return f"""
-You are the Codex / GPT-5.6 Sol SUPERVISOR for this unattended dual-Agent project.
-Complete exactly one Supervisor decision/dispatch turn, then exit. Do not chat with the user.
-
-TURN_REASON: {reason}
-MECHANICAL_EVENT: {event_text}
-TURN_TIME_UTC: {now}
-DISPATCH_NONCE_SEED: {dispatch_nonce_seed}
-
-The orchestrator has mechanically injected the authoritative small files below verbatim.
-Do NOT reread them with shell commands unless you have a concrete reason. Use tools primarily
-to update state/publish a task or to inspect one precise evidence artifact when truly needed.
-
-=== SUPERVISOR RUNTIME CONTRACT ===
-{rules_text}
-=== END RUNTIME CONTRACT ===
-
-=== PROJECT STATE ===
-{state_text}
-=== END PROJECT STATE ===
-
-=== COMPRESSED RESEARCH STATE ===
-{memory_text}
-=== END RESEARCH STATE ===
-
-=== PROJECT GOAL ===
-{goal_text}
-=== END PROJECT GOAL ==={goal_anchor_block}{profile_block}{scope_block}{human_decision_block}{intervention_block}
-
-=== CURRENT EXECUTOR BRIEF ===
-{brief_text}
-=== END EXECUTOR BRIEF ===
-
-Operate only inside {ROOT} (the active Runtime Root). You are the Supervisor, not the Executor.
-Do not use browser/GUI/Computer Use, mouse/keyboard automation, ZCode CLI, or polling.
-Do not execute GLM's stage yourself. Do not perform bulk web/data work.
-
-{stage_instructions}
-
-{fv_instructions}
-{repair_block}
-
-{terminal_instructions}
-""".strip() + "\n"
 
 def find_codex() -> str:
     codex = shutil.which("codex")
@@ -3902,6 +3958,15 @@ def find_codex() -> str:
 def _same_supervisor_invocation(pending: dict, reason: str,
                                 event: dict | None) -> bool:
     return (pending.get("reason") == reason and pending.get("event") == event)
+
+
+def _is_retired_supervisor_event(record: dict, pending: dict) -> bool:
+    """True when `pending` is the exact event a retirement record retired."""
+    retired = record.get("retired_event")
+    return (isinstance(retired, dict)
+            and retired.get("reason") == pending.get("reason")
+            and retired.get("event") == pending.get("event")
+            and retired.get("recorded_at") == pending.get("recorded_at"))
 
 
 def persist_supervisor_event(runtime: dict, reason: str,
@@ -4004,8 +4069,314 @@ def _supervisor_invocation_blocked(runtime: dict, state: dict,
     return False
 
 
+def reconcile_exhausted_event_for_human_resume(runtime: dict, state: dict) -> bool:
+    """Re-arm an exhausted durable Supervisor event after an official resume.
+
+    A terminal HUMAN_REVIEW keeps its durable event owned forever for audit, and
+    `retry_exhausted` holds the lifecycle guard. The Human Decision resume is the
+    human-authorized successor of that event, but the resume transaction commits
+    the project lifecycle without rewriting Runtime-owned bookkeeping, so an
+    already-applied resume would otherwise livelock: persist_supervisor_event
+    services the stale event first and the guard blocks every wake. When - and
+    only when - a verified Human Decision receipt is pending for Supervisor
+    review, replace the exhausted event with the exact HUMAN_DECISION_RESUME
+    event under fresh budgets. Every other shape keeps the stale event blocked.
+    """
+    pending = runtime.get("pending_supervisor_event")
+    if not isinstance(pending, dict) or not pending.get("retry_exhausted"):
+        return False
+    resume_event = human_decision_resume_event(state)
+    if resume_event is None:
+        return False
+    fresh = load_runtime()
+    current = fresh.get("pending_supervisor_event")
+    if not isinstance(current, dict) or not current.get("retry_exhausted"):
+        return False
+    fresh["pending_supervisor_event"] = {
+        "reason": "HUMAN_DECISION_RESUME",
+        "event": resume_event,
+        "recorded_at": stamp(),
+        "decision_attempts": 0,
+        "retry_exhausted": False,
+        "rearmed_from": {
+            "reason": current.get("reason"),
+            "exhausted_at": current.get("exhausted_at"),
+            "last_error": str(current.get("last_error") or "")[:800],
+            "receipt_id": resume_event.get("receipt_id"),
+        },
+    }
+    save_runtime(fresh)
+    runtime.clear()
+    runtime.update(fresh)
+    log(
+        "Replaced exhausted Supervisor event with the pending Human Decision resume event",
+        previous_reason=current.get("reason"),
+        exhausted_at=current.get("exhausted_at"),
+        receipt_id=resume_event.get("receipt_id"),
+    )
+    return True
+
+
+# ORPHAN-SUPERVISOR-EVENT-RECONCILIATION-V1: a Runtime-global pending
+# Supervisor event that provably binds no live Runtime work is retired by
+# Runtime-owned logic so startup falls through to the project's real current
+# state instead of servicing a factually wrong trigger.  Classification is
+# mechanical and fail-closed: an event that already entered the decision
+# machinery or holds terminal audit ownership (retry_exhausted) is never
+# retired; only reasons whose live producer always binds full work identity
+# are reconcilable; an event whose payload binds identity is preserved
+# (live referent) or stays fail-visible (uncertain); and a bare event is
+# retired only when every authoritative work source is empty.
+ORPHAN_SUPERVISOR_EVENT_RECONCILIATION = "ORPHAN-SUPERVISOR-EVENT-RECONCILIATION-V1"
+
+# Event payload keys that bind a live work item.  A live completion-derived
+# event carries these (see consume_executor_receipt); a bare event none.
+SUPERVISOR_EVENT_REFERENT_KEYS = (
+    "message_id", "task_id", "stage_id", "attempt", "nonce",
+    "brief_sha256", "receipt_sha256", "commit_id", "archive",
+    "committed_receipt_path", "receipt_id", "project_id",
+)
+
+# Reasons whose live producer always binds full work identity in the current
+# protocol, so an identity-free record of that reason is provably not a live
+# producer's output.  Reasons without a proven contract stay uncertain.
+ORPHAN_RECONCILABLE_EVENT_REASONS = {"EXECUTOR_RESULT_READY"}
+
+
+def _event_referent_bindings(event) -> dict:
+    """The identity keys a pending event payload actually binds (non-null)."""
+    if not isinstance(event, dict):
+        return {}
+    return {key: event.get(key) for key in SUPERVISOR_EVENT_REFERENT_KEYS
+            if event.get(key) is not None}
+
+
+def _live_referents_for_event(runtime: dict, state: dict, event: dict) -> list:
+    """Authoritative work items an identity-bearing event can still represent."""
+    completion = _completion_helper()
+    referents = []
+
+    def _matches(task_like) -> bool:
+        if not isinstance(task_like, dict):
+            return False
+        provided = 0
+        for payload_key, identity_key in (
+                ("message_id", "MESSAGE_ID"), ("task_id", "TASK_ID"),
+                ("stage_id", "STAGE_ID"), ("attempt", "ATTEMPT"),
+                ("nonce", "NONCE")):
+            expected = event.get(payload_key)
+            if expected is None:
+                continue
+            provided += 1
+            if task_value(task_like, identity_key) != expected:
+                return False
+        return provided > 0
+
+    current = state.get("current_task") or {}
+    if _matches(current):
+        referents.append("current_task")
+    if _matches(runtime.get("authorized_dispatch")):
+        referents.append("authorized_dispatch")
+    message_id = event.get("message_id")
+    if isinstance(message_id, int) and not isinstance(message_id, bool):
+        if completion.lookup_entries(ROOT, message_id):
+            referents.append("completion_ledger")
+        identity = {key: task_value(current, key) for key in IDENTITY_KEYS}
+        if all(value is not None for value in identity.values()):
+            claim, _ = completion.load_claim(ROOT, identity)
+            if isinstance(claim, dict):
+                referents.append("executor_claim")
+    archive = event.get("archive")
+    if isinstance(archive, str) and (ROOT / archive).is_file():
+        referents.append("archived_brief")
+    return referents
+
+
+def classify_pending_supervisor_event(runtime: dict, state: dict) -> dict:
+    """Mechanically classify the Runtime-global pending Supervisor event.
+
+    Returns a report with classification NONE / LIVE / ORPHAN / UNCERTAIN.
+    ORPHAN requires positive mechanical evidence: the recorded reason has an
+    identity-binding live-producer contract, the payload binds no identity,
+    the event never entered the decision machinery, and every authoritative
+    work source (current stage, authorization, claims, completion ledger,
+    deferred/timeout events, FV, Human Decision, raw executor signal) is
+    empty.  Anything not provable stays LIVE or UNCERTAIN and is preserved.
+    """
+    pending = runtime.get("pending_supervisor_event")
+    if not isinstance(pending, dict):
+        return {"classification": "NONE", "reason": None, "checks": [],
+                "referents": [], "retireable": False}
+    reason = str(pending.get("reason") or "")
+    event = pending.get("event") if isinstance(pending.get("event"), dict) else None
+    checks = []
+
+    def add(check: str, passed: bool, detail: str) -> bool:
+        checks.append({"check": check, "passed": bool(passed), "detail": detail})
+        return bool(passed)
+
+    def result(classification: str, referents=None):
+        return {"classification": classification, "reason": reason,
+                "checks": checks, "referents": referents or [],
+                "retireable": classification == "ORPHAN"}
+
+    if not add("not_retry_exhausted", not pending.get("retry_exhausted"),
+               "an exhausted event stays owned forever for audit"):
+        return result("UNCERTAIN")
+    if not add("never_entered_decision_machinery",
+               int(pending.get("decision_attempts", 0) or 0) <= 0
+               and int(pending.get("infrastructure_failures", 0) or 0) <= 0,
+               "decision_attempts and infrastructure_failures are zero"):
+        return result("UNCERTAIN")
+    if not add("reason_contract", reason in ORPHAN_RECONCILABLE_EVENT_REASONS,
+               f"reason {reason!r} has an identity-binding live-producer contract"
+               if reason in ORPHAN_RECONCILABLE_EVENT_REASONS else
+               f"reason {reason!r} has no proven identity contract"):
+        return result("UNCERTAIN")
+
+    bindings = _event_referent_bindings(event)
+    if bindings:
+        referents = _live_referents_for_event(runtime, state, event)
+        add("event_binds_no_identity", False,
+            f"payload binds {sorted(bindings)}")
+        if referents:
+            return result("LIVE", referents)
+        return result("UNCERTAIN")
+    add("event_binds_no_identity", True, "payload binds no work identity")
+
+    current = state.get("current_task") or {}
+    if not add("no_current_executor_stage",
+               state.get("status") != "WAITING_EXECUTOR" and not current,
+               f"project status {state.get('status')!r}, current_task "
+               + ("present" if current else "null")):
+        return result("UNCERTAIN")
+    if not add("no_authorized_dispatch",
+               runtime.get("authorized_dispatch") is None,
+               "runtime authorized_dispatch is null"):
+        return result("UNCERTAIN")
+    completion = _completion_helper()
+    ledger_empty = not any(
+        completion.ledger_dir(ROOT).glob("completion-*.json"))
+    if not add("completion_ledger_empty", ledger_empty,
+               "handoff/completion_ledger holds no entries"):
+        return result("UNCERTAIN")
+    claims_empty = not any(
+        (ROOT / "handoff" / "executor_claims").glob("*.claim"))
+    if not add("executor_claims_empty", claims_empty,
+               "handoff/executor_claims holds no claims"):
+        return result("UNCERTAIN")
+    if not add("no_deferred_completion_event",
+               runtime.get("paused_deferred_event") is None,
+               "paused_deferred_event is null"):
+        return result("UNCERTAIN")
+    if not add("no_pending_executor_timeout",
+               runtime.get("pending_executor_timeout") is None,
+               "pending_executor_timeout is null"):
+        return result("UNCERTAIN")
+    fv = state.get("final_verification") or {}
+    fv_live = (fv.get("status") not in (None, "NOT_STARTED")
+               or fv.get("verification_message_id") is not None
+               or fv.get("verification_receipt_sha256") is not None
+               or bool(runtime.get("final_verification_receipt_ledger"))
+               or runtime.get("last_final_verification_message_id") is not None)
+    if not add("no_live_final_verification", not fv_live,
+               "project FV is NOT_STARTED and Runtime FV bookkeeping is empty"):
+        return result("UNCERTAIN")
+    if not add("no_human_decision_pending",
+               state.get("human_review_resume") is None
+               and human_decision_resume_event(state) is None,
+               "no Human Decision resume receipt is pending"):
+        return result("UNCERTAIN")
+    raw_signal = ZCODE_DONE.exists() or SUPERVISOR_BRIEF.exists()
+    if not add("no_raw_executor_signal", not raw_signal,
+               "no DONE flag and no root SUPERVISOR_BRIEF.md"):
+        return result("UNCERTAIN")
+    if not add("no_terminal_guard_flags",
+               not STOP_FLAG.exists() and not HUMAN_REVIEW_FLAG.exists(),
+               "control/STOP and control/HUMAN_REVIEW are absent"):
+        return result("UNCERTAIN")
+    return result("ORPHAN")
+
+
+def _scheduler_owner_is_alive(runtime: dict):
+    owner = runtime.get("scheduler_owner")
+    if not isinstance(owner, dict) or not owner.get("pid"):
+        return None
+    import runtime_lifecycle
+    return runtime_lifecycle.process_alive(int(owner["pid"]))
+
+
+def reconcile_pending_supervisor_event(retire: bool = False) -> dict:
+    """Classify, and optionally retire, the Runtime-global pending event.
+
+    The classification half is read-only.  With retire=True an ORPHAN
+    classification is committed as one fenced transaction: the event moves
+    out of `pending_supervisor_event` into an append-only
+    `retired_supervisor_events` record (full event snapshot, original and
+    retirement timestamps, and the classification evidence), and the pending
+    slot is cleared so startup resumes from the project's real state.  LIVE
+    and UNCERTAIN events are preserved unchanged and reported.  The
+    transaction refuses to run while a scheduler owner is alive.
+    """
+    with _fence_helper().runtime_lock(ROOT):
+        runtime = load_runtime()
+        state = read_project_state()
+        report = classify_pending_supervisor_event(runtime, state)
+        report["changed"] = False
+        if not retire or report["classification"] == "NONE":
+            return report
+        if report["classification"] != "ORPHAN":
+            report["preserved"] = True
+            return report
+        if _scheduler_owner_is_alive(runtime) is True:
+            report["preserved"] = True
+            report["refusal"] = ("scheduler owner is alive; stop the Agent "
+                                 "system before retiring a pending event")
+            return report
+        pending = runtime["pending_supervisor_event"]
+        record = {
+            "schema_version": 1,
+            "mechanism": ORPHAN_SUPERVISOR_EVENT_RECONCILIATION,
+            "reason": report["reason"],
+            "originally_recorded_at": pending.get("recorded_at"),
+            "retired_at": stamp(),
+            "classification": "ORPHAN",
+            "classification_evidence": report["checks"],
+            "retired_event": pending,
+        }
+        untouched = {key: value for key, value in runtime.items()
+                     if key not in ("pending_supervisor_event",
+                                    "retired_supervisor_events", "updated_at")}
+        retirements = [item for item in
+                       (runtime.get("retired_supervisor_events") or [])
+                       if isinstance(item, dict)]
+        retirements.append(record)
+        runtime["retired_supervisor_events"] = retirements
+        runtime["pending_supervisor_event"] = None
+        save_runtime(runtime)
+        verified = load_runtime()
+        verified_untouched = {key: value for key, value in verified.items()
+                              if key not in ("pending_supervisor_event",
+                                             "retired_supervisor_events",
+                                             "updated_at")}
+        if (verified.get("pending_supervisor_event") is not None
+                or not isinstance(verified.get("retired_supervisor_events"), list)
+                or record not in verified["retired_supervisor_events"]
+                or verified_untouched != untouched):
+            raise RuntimeError("orphan Supervisor event retirement did not commit")
+        report["changed"] = True
+        report["retirement_record"] = record
+        log("Retired orphan pending Supervisor event with durable provenance",
+            mechanism=ORPHAN_SUPERVISOR_EVENT_RECONCILIATION,
+            reason=record["reason"],
+            originally_recorded_at=record["originally_recorded_at"],
+            retired_at=record["retired_at"])
+        return report
+
+
 def exhaust_supervisor_retry_budget(runtime: dict, reason: str, event: dict | None,
-                                    error: str | None) -> None:
+                                    error: str | None,
+                                    blocked_reason: str | None = None) -> None:
     """Enter a bounded, auditable HUMAN_REVIEW without discarding input."""
     with _fence_helper().runtime_lock(ROOT):
         state = read_project_state()
@@ -4025,8 +4396,9 @@ def exhaust_supervisor_retry_budget(runtime: dict, reason: str, event: dict | No
         state["status"] = "HUMAN_REVIEW"
         state["current_task"] = None
         state["blocked_reason"] = (
-            "Supervisor decision retry budget exhausted; pending human input was "
-            "preserved for audit and explicit recovery"
+            blocked_reason
+            or "Supervisor decision retry budget exhausted; pending human input was "
+               "preserved for audit and explicit recovery"
         )
         state["supervisor_retry_failure"] = {
             "reason": reason,
@@ -4034,13 +4406,34 @@ def exhaust_supervisor_retry_budget(runtime: dict, reason: str, event: dict | No
             "last_error": pending["last_error"],
             "at": pending["exhausted_at"],
         }
-        state["updated_at"] = stamp()
+        # HUMAN-DECISION-FV-BRIDGE-V1 exhaustion recovery: an exhausted resume
+        # event voids its still-pending receipt into the terminal EXHAUSTED shape
+        # inside this same atomic state write. Without this, the stranded pending
+        # receipt blocks every future Human Review cycle (duplicate-resume refusal)
+        # and only manual state repair remains. The voided receipt never enters the
+        # consumption ledger (no decision was committed) and stays exactly-once
+        # excluded by its archive and stale-state binding.
+        resume_meta = state.get("human_review_resume")
+        if (reason == "HUMAN_DECISION_RESUME"
+                and isinstance(resume_meta, dict)
+                and resume_meta.get("status") == "PENDING_SUPERVISOR_REVIEW"):
+            finalized_at = stamp()
+            state["human_review_resume"] = {
+                **json.loads(json.dumps(resume_meta, ensure_ascii=False)),
+                "status": "EXHAUSTED",
+                "exhausted_at": finalized_at,
+                "exhaustion_reason": str(pending["last_error"])[:800],
+            }
+            state["updated_at"] = finalized_at
+        else:
+            state["updated_at"] = stamp()
         atomic_json(PROJECT_STATE, state)
         save_runtime(fresh)
         runtime.clear()
         runtime.update(fresh)
     log(
-        "Supervisor decision retry budget exhausted; entering HUMAN_REVIEW",
+        (blocked_reason or "Supervisor decision retry budget exhausted")
+        + "; entering HUMAN_REVIEW",
         reason=reason,
         attempts=pending.get("decision_attempts"),
         error=pending.get("last_error"),
@@ -4117,7 +4510,12 @@ def finalize_supervisor_retry_result(runtime: dict, reason: str,
 
 def record_supervisor_decision_attempt(runtime: dict, reason: str,
                                        event: dict | None) -> dict:
-    """Increment the durable budget immediately before the external model call."""
+    """Account one semantic Supervisor attempt: the model returned a candidate.
+
+    Called only after the external model call completed and the candidate exists,
+    so provider/CLI/process faults can never spend the bounded decision budget a
+    later semantic dispatch failure still needs for its repair turn.
+    """
     fresh = load_runtime()
     pending = fresh.get("pending_supervisor_event")
     if not isinstance(pending, dict) or not _same_supervisor_invocation(
@@ -4130,6 +4528,39 @@ def record_supervisor_decision_attempt(runtime: dict, reason: str,
     runtime.clear()
     runtime.update(fresh)
     return pending
+
+
+def record_supervisor_infrastructure_failure(runtime: dict, reason: str,
+                                             event: dict | None,
+                                             error: str) -> None:
+    """Account a provider/CLI/process fault in its own durable budget.
+
+    The bounded semantic repair entitlement must survive infrastructure faults:
+    a Codex API/CLI/process failure forms no decision, so it is counted here
+    (bounded by MAX_SUPERVISOR_INFRASTRUCTURE_FAILURES) and never in
+    decision_attempts. Accounting is best-effort and must never mask the
+    terminal error, which always propagates to the caller.
+    """
+    try:
+        fresh = load_runtime()
+        pending = fresh.get("pending_supervisor_event")
+        if not isinstance(pending, dict) or not _same_supervisor_invocation(
+                pending, reason, event):
+            log("Supervisor infrastructure failure not accounted; durable event changed",
+                reason=reason, error=str(error)[:400])
+            return
+        pending["infrastructure_failures"] = int(
+            pending.get("infrastructure_failures", 0) or 0) + 1
+        pending["last_infrastructure_error"] = str(
+            error or "unknown infrastructure failure")[:800]
+        pending["last_infrastructure_at"] = stamp()
+        fresh["pending_supervisor_event"] = pending
+        save_runtime(fresh)
+        runtime.clear()
+        runtime.update(fresh)
+    except Exception as exc:
+        log("Supervisor infrastructure failure accounting failed",
+            reason=reason, error=repr(exc)[:200])
 
 
 def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
@@ -4148,6 +4579,16 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
             runtime, reason, event, pending_invocation.get("last_error")
         )
         return
+    if (int(pending_invocation.get("infrastructure_failures", 0) or 0)
+            >= MAX_SUPERVISOR_INFRASTRUCTURE_FAILURES):
+        exhaust_supervisor_retry_budget(
+            runtime, reason, event,
+            pending_invocation.get("last_infrastructure_error"),
+            blocked_reason=(
+                "Supervisor infrastructure failure budget exhausted; pending human "
+                "input was preserved for audit and explicit recovery"),
+        )
+        return
     if control.pause_status(ROOT) != "RUNNING":
         runtime["status"] = "PAUSED"
         save_runtime(runtime)
@@ -4155,7 +4596,8 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         return
     try:
         control_turn = control.begin_supervisor_turn(
-            ROOT, _active_project_id(), {"reason": reason, "event": event})
+            ROOT, _active_project_id(), {"reason": reason, "event": event},
+            ordinary_dispatch_required=reason != "HUMAN_DECISION_RESUME")
     except control.ControlError as exc:
         if "paused" in str(exc).lower():
             runtime["status"] = "PAUSED"
@@ -4191,7 +4633,13 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     if not goal_anchor_gate(runtime, state_before):
         control.finish_supervisor_turn(ROOT, control_turn, processed=False)
         return
-    codex = find_codex()
+    try:
+        codex = find_codex()
+    except RuntimeError as exc:
+        # A missing Codex CLI is a provider/CLI infrastructure fault: account it
+        # in the infrastructure budget and let the original error stay terminal.
+        record_supervisor_infrastructure_failure(runtime, reason, event, str(exc))
+        raise
     human_decision_turn = reason == "HUMAN_DECISION_RESUME"
     try:
         state_sha_before = sha256(PROJECT_STATE)
@@ -4206,32 +4654,19 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         state_sha256=state_sha_before,
         control_turn=control_turn,
     )  # G1-A: goal_file aware
-    # SUPERVISOR-TURN-OBSERVABILITY-V1: boundedly record the context classes
-    # this turn is provided, for the durable turn record. Observation is
-    # never allowed to break the turn: the goal path is resolved the same
-    # way the prompt resolves it, and an unresolvable path is recorded as
-    # an absent goal rather than raised.
-    try:
-        goal_path_for_manifest = resolve_goal_path(state_before)
-    except Exception:
-        goal_path_for_manifest = None
-    turn_manifest = supervisor_turn_context_manifest(
-        reason=reason,
-        event=event,
-        goal_state=state_before,
-        goal_path=goal_path_for_manifest,
-        interventions=(control_turn or {}).get("interventions") or [],
-        human_decision=load_verified_human_decision_for_supervisor(state_before),
-        supervisor_rules_path=SUPERVISOR_RULES,
-        project_state_path=PROJECT_STATE,
-        research_state_path=RESEARCH_STATE,
-        executor_brief_available=_supervisor_brief_available(reason, event),
-    )
-    pending_invocation = record_supervisor_decision_attempt(runtime, reason, event)
+    # Measure the actual decision-context prompt, without rereading references.
+    # Test/legacy builders may return a plain string without presentation metadata.
+    turn_manifest = getattr(prompt, "context_manifest", {
+        "context_version": None, "prompt_characters": len(prompt),
+        "prompt_utf8_bytes": len(prompt.encode("utf-8")),
+        "supervisor_rules": {"delivery": "unknown"},
+        "project_state": {"delivery": "unknown"},
+    })
     started = time.monotonic()
     log("Starting Codex supervisor turn", reason=reason)
     model, effort, profile_source = supervisor_profile_for_turn(
-        control_turn.get("supervisor_config"), state_before, reason)
+        control_turn.get("supervisor_config"), state_before, reason,
+        control_config=supervisor_fixed_policy_config())
     if profile_source == "queued":
         log("Codex supervisor profile applied from queued configuration",
             model=model, effort=effort, phase=state_before.get("phase"),
@@ -4272,7 +4707,7 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     ])
     import provider_usage
     try:
-        with provider_usage.stdout_capture(ROOT, control_turn) as usage_stdout:
+        with provider_usage.stdout_capture(ROOT, control_turn, context_manifest=turn_manifest) as usage_stdout:
             result = subprocess.run(
                 cmd,
                 cwd=str(ROOT),
@@ -4281,7 +4716,14 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
                 stdout=usage_stdout,
             )
     except subprocess.TimeoutExpired as exc:
+        record_supervisor_infrastructure_failure(
+            runtime, reason, event,
+            f"Codex supervisor turn timed out after {CODEX_TIMEOUT_SECONDS}s")
         raise RuntimeError(f"Codex supervisor turn timed out after {CODEX_TIMEOUT_SECONDS}s") from exc
+    except (OSError, RuntimeError) as exc:
+        # provider_usage capture or process-spawn faults are infrastructure too.
+        record_supervisor_infrastructure_failure(runtime, reason, event, repr(exc))
+        raise
 
     elapsed = round(time.monotonic() - started, 2)
     runtime["codex_invocations"] = int(runtime.get("codex_invocations", 0)) + 1
@@ -4290,7 +4732,14 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
     save_runtime(runtime)
 
     if result.returncode != 0:
-        raise RuntimeError(f"Codex exited with code {result.returncode}")
+        error = f"Codex exited with code {result.returncode}"
+        record_supervisor_infrastructure_failure(runtime, reason, event, error)
+        raise RuntimeError(error)
+    # The model returned a candidate: only now is one bounded semantic decision
+    # attempt consumed. Infrastructure faults above never reach this line, so a
+    # provider/CLI failure cannot spend the repair entitlement a later semantic
+    # dispatch failure still needs.
+    record_supervisor_decision_attempt(runtime, reason, event)
 
     if human_decision_turn:
         # GOAL-ANCHOR-V1: re-verify the goal after the read-only turn and before the
@@ -4303,12 +4752,32 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
             )
             return
         structured_result = read_human_decision_supervisor_result(output_path)
-        state = commit_human_decision_supervisor_result(
-            runtime,
-            state_before,
-            state_sha_before,
-            structured_result,
-        )
+        try:
+            state = commit_human_decision_supervisor_result(
+                runtime,
+                state_before,
+                state_sha_before,
+                structured_result,
+            )
+        except (RuntimeError, ValueError, TypeError, KeyError) as exc:
+            # F-006 HUMAN-DECISION-RESULT-BOUNDED-RETRY-V1: a model-produced
+            # invalid Human Decision result is a bounded Supervisor failure,
+            # never a fatal orchestrator error. The attempt was already
+            # accounted above; close the control turn uncommitted, keep the
+            # pending receipt and the retained retry event, and let the
+            # durable budget decide between retry and HUMAN_REVIEW exhaustion
+            # (which voids the pending receipt for explicit recovery).
+            log("Human Decision Supervisor result rejected under the decision budget",
+                reason=reason,
+                error=str(exc)[:400],
+                attempts=int((runtime.get("pending_supervisor_event") or {}).get(
+                    "decision_attempts", 0) or 0))
+            control.finish_supervisor_turn(ROOT, control_turn, processed=False)
+            pending_after = runtime.get("pending_supervisor_event") or {}
+            if (int(pending_after.get("decision_attempts", 0) or 0)
+                    >= MAX_SUPERVISOR_DECISION_ATTEMPTS):
+                exhaust_supervisor_retry_budget(runtime, reason, event, str(exc))
+            return
     else:
         state = read_project_state()
     # The model completed one decision with the snapshotted interventions. Mark
@@ -4327,6 +4796,8 @@ def invoke_codex(runtime: dict, reason: str, event: dict | None = None) -> None:
         candidate_validator=validate_supervisor_candidate_snapshot,
         observation=observation,
     )
+    # Ordinary preparation can have replaced projections after the model returned.
+    state = read_project_state()
     fresh_runtime = load_runtime()
     runtime.clear()
     runtime.update(fresh_runtime)
@@ -4866,8 +5337,34 @@ def consume_executor_receipt(runtime: dict) -> tuple[bool, dict | None]:
     return True, event
 
 
+def execution_deadline_for(authorization: dict, claim: dict | None = None,
+                           task: dict | None = None) -> datetime | None:
+    """PICKUP-EXECUTION-LIFECYCLE: one clock definition for a claimed attempt.
+
+    The execution budget is CLAIMED_AT (durable in claim.json) plus MAX_TIME
+    (recorded on the authorization at registration; the task mirror is the
+    legacy fallback). Returns None only when no execution-clock fact exists,
+    which is possible only for pre-lifecycle authorizations; callers then fall
+    back to the legacy combined EXPIRES_AT window.
+    """
+    claimed_at = parse_time((claim or {}).get("CLAIMED_AT"))
+    max_seconds = (authorization or {}).get("MAX_TIME")
+    if type(max_seconds) is not int or max_seconds <= 0:
+        max_seconds = parse_duration_seconds(
+            task_value(task or {}, "MAX_TIME"), -1)
+    if claimed_at is None or max_seconds is None or max_seconds < 0:
+        return None
+    return claimed_at + timedelta(seconds=max_seconds)
+
+
 def executor_deadline(runtime: dict, state: dict, payload: dict | None = None):
-    """One timing calculation for watchdog and Runtime-bound fencing expiry."""
+    """Stage clock parts (issued, MAX_TIME, grace) and the legacy fallback window.
+
+    PICKUP-EXECUTION-LIFECYCLE: the returned deadline (issued + MAX_TIME +
+    grace) is only the conservative fallback for states without a usable
+    authorization clock; live pickups are bounded by authorized EXPIRES_AT and
+    claimed executions by execution_deadline_for.
+    """
     task = state.get("current_task") or {}
     # Recover timing metadata from the validated root task when Supervisor state is compact.
     issued_raw = task_value(task, "ISSUED_AT") or task_value(task, "DISPATCHED_AT")
@@ -4917,6 +5414,103 @@ def pending_timeout_event(runtime: dict, state: dict) -> dict | None:
     return None
 
 
+def park_paused_timeout_stage(runtime: dict, timeout_event: dict) -> None:
+    """QUOTA-PAUSE-PARK-V1: recoverable conversion of a pause-caused expiry.
+
+    The claimed attempt's authorization expired while the Runtime was paused,
+    so fencing requires its retirement and no extension is possible. This
+    keeps that fail-closed retirement, quarantines the inbox, resets the wait
+    into a Supervisor stage, arms one durable EXECUTOR_TIMEOUT_DURING_PAUSE
+    event, and records the identity as pause-parked so the retry budget is
+    not charged for a quota pause. Resume then validates and the Supervisor
+    re-plans through the ordinary authorization path.
+    """
+    _supervisor_control_helper().invalidate_candidate(
+        ROOT, "EXECUTOR_TIMEOUT_DURING_PAUSE", label="pause-timeout")
+    fresh = load_runtime()
+    runtime.clear()
+    runtime.update(fresh)
+    parked_ids = runtime.get("parked_message_ids")
+    if not isinstance(parked_ids, list):
+        parked_ids = []
+        runtime["parked_message_ids"] = parked_ids
+    timeout_message_id = timeout_event.get("message_id")
+    if type(timeout_message_id) is int and timeout_message_id not in parked_ids:
+        parked_ids.append(timeout_message_id)
+    runtime["pending_executor_timeout"] = None
+    save_runtime(runtime)
+    annotated = {**timeout_event, "authorization_expired": True,
+                 "note": ("authorization expired while the Runtime was paused "
+                          "for scheduling/quota reasons; not charged to the "
+                          "logical retry budget")}
+    persist_supervisor_event(
+        runtime, "EXECUTOR_TIMEOUT_DURING_PAUSE", annotated)
+
+
+def _active_task_claim(task: dict) -> dict | None:
+    """The durable claim record for the current task identity, if any."""
+    identity = {key: task_value(task, key) for key in IDENTITY_KEYS}
+    if any(value is None for value in identity.values()):
+        return None
+    claim, _ = _completion_helper().load_claim(ROOT, identity)
+    return claim if isinstance(claim, dict) else None
+
+
+def park_pickup_timeout_stage(runtime: dict, state: dict, task: dict,
+                              deadline: datetime, clock: tuple) -> dict:
+    """PICKUP-EXECUTION-LIFECYCLE: recoverable conversion of an unclaimed expiry.
+
+    The bounded pickup authorization expired with no Executor claim, so no
+    execution ever began. This retires the dead pickup identity per fencing,
+    quarantines the live inbox, parks the MESSAGE_ID so the scientific retry
+    budget is not charged for worker availability, resets the wait into a
+    Supervisor stage, and arms one durable PICKUP_TIMEOUT_STAGE_RESUME event
+    for the bounded re-plan through the ordinary authorization path. Caller
+    holds the fence.
+    """
+    _supervisor_control_helper().invalidate_candidate(
+        ROOT, "PICKUP_TIMEOUT", label="pickup-timeout")
+    fresh = load_runtime()
+    runtime.clear()
+    runtime.update(fresh)
+    identity = {key: task_value(task, key) for key in IDENTITY_KEYS}
+    retire_executor(runtime, task, "PICKUP_TIMEOUT")
+    parked_ids = runtime.get("parked_message_ids")
+    if not isinstance(parked_ids, list):
+        parked_ids = []
+        runtime["parked_message_ids"] = parked_ids
+    if any(type(value) is not int for value in parked_ids):
+        raise RuntimeError("parked_message_ids is malformed")
+    if identity["MESSAGE_ID"] not in parked_ids:
+        parked_ids.append(identity["MESSAGE_ID"])
+    runtime["pending_executor_timeout"] = None
+    save_runtime(runtime)
+    issued, max_seconds, grace = clock
+    event = {
+        "type": "PICKUP_TIMEOUT_STAGE_RESUME",
+        "task_id": identity["TASK_ID"],
+        "stage_id": identity["STAGE_ID"],
+        "message_id": identity["MESSAGE_ID"],
+        "attempt": identity["ATTEMPT"],
+        "nonce": identity["NONCE"],
+        "issued_at": issued.isoformat() if issued else None,
+        "max_time_seconds": max_seconds,
+        "scheduler_grace_seconds": grace,
+        "deadline": deadline.isoformat(),
+        "authorization_expired": True,
+        "note": ("the dispatch pickup authorization expired before any "
+                 "Executor claim; this is scheduling/worker-availability "
+                 "recovery, not a method failure, executor retry, or "
+                 "scientific failure"),
+    }
+    persist_supervisor_event(runtime, "PICKUP_TIMEOUT_STAGE_RESUME", event)
+    state["status"] = "SUPERVISOR_TURN"
+    state["current_task"] = None
+    state["updated_at"] = stamp()
+    atomic_json(PROJECT_STATE, state)
+    return event
+
+
 @executor_serialized
 def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
     if state.get("status") != "WAITING_EXECUTOR":
@@ -4933,10 +5527,23 @@ def executor_timeout_event(runtime: dict, state: dict) -> dict | None:
     if deadline is None:
         return None
     auth = runtime.get("authorized_dispatch") or {}
-    if task_identity_matches(auth, task) and auth.get("EXPIRES_AT"):
-        deadline = parse_time(auth["EXPIRES_AT"])
+    auth_matches = task_identity_matches(auth, task)
+    claim = _active_task_claim(task)
+    if claim is not None:
+        # Claimed execution: the budget runs from the durable claim instant,
+        # never from the dispatch wall-clock that waiting already consumed.
+        execution = execution_deadline_for(auth, claim, task)
+        if execution is None and auth_matches and auth.get("EXPIRES_AT"):
+            execution = parse_time(auth["EXPIRES_AT"])
+        deadline = execution or deadline
+    elif auth_matches and auth.get("EXPIRES_AT"):
+        # Unclaimed wait: only the bounded pickup authorization applies.
+        deadline = parse_time(auth["EXPIRES_AT"]) or deadline
     if utc_now() < deadline:
         return None
+    if claim is None and auth_matches:
+        return park_pickup_timeout_stage(
+            runtime, state, task, deadline, (issued, max_seconds, grace))
     runtime["timeout_notified_for_nonce"] = nonce
     retire_executor(runtime, task, "EXECUTOR_TIMEOUT")
     event = {
@@ -5089,6 +5696,10 @@ def main() -> int:
             log("Human review present before startup; Codex was not invoked")
             emit_user_notification(runtime, "HUMAN_REVIEW", state)
             return 3
+        # An official Human Decision resume commits the project lifecycle without
+        # rewriting the durable event; re-arm an exhausted event here so the
+        # verified pending receipt is actually serviced instead of livelocking.
+        reconcile_exhausted_event_for_human_resume(runtime, state)
         control = _supervisor_control_helper()
         startup_paused = control.pause_status(ROOT) != "RUNNING"
         # Repair completion-derived state before deciding whether a historical
@@ -5307,14 +5918,19 @@ def main() -> int:
                     if paused_view.get("active_task_claimed"):
                         paused_timeout = executor_timeout_event(runtime, state)
                         if paused_timeout:
-                            control.invalidate_candidate(
-                                ROOT, "EXECUTOR_TIMEOUT_DURING_PAUSE"
-                            )
+                            # QUOTA-PAUSE-PARK-V1: an expiry caused by the pause
+                            # is not an executor failure. park_paused_timeout_
+                            # stage retires the dead identity per fencing and
+                            # mechanically converts the wait into one bounded
+                            # Supervisor re-plan, so Resume is never blocked by
+                            # a retired current task.
+                            park_paused_timeout_stage(runtime, paused_timeout)
                             control.settle_pause(ROOT, "CURRENT_STAGE_TIMED_OUT")
                             runtime["status"] = "PAUSED"
                             save_runtime(runtime)
                             log(
-                                "Claimed Executor stage timed out while pause was pending",
+                                "Claimed Executor stage expired while paused; "
+                                "parked for one Supervisor re-plan after resume",
                                 message_id=paused_timeout.get("message_id"),
                             )
                             return 6
@@ -5376,13 +5992,14 @@ def main() -> int:
             if timeout_event:
                 log("Executor timeout detected", **timeout_event)
                 _view().lifecycle_event(
-                    "EXECUTOR_TIMEOUT",
+                    str(timeout_event.get("type") or "EXECUTOR_TIMEOUT"),
                     message_id=timeout_event.get("message_id"),
                     task_id=timeout_event.get("task_id"),
                     stage_id=timeout_event.get("stage_id"),
                     deadline=timeout_event.get("deadline"),
                 )
-                invoke_codex(runtime, "EXECUTOR_TIMEOUT", timeout_event)
+                invoke_codex(runtime, str(timeout_event.get("type") or "EXECUTOR_TIMEOUT"),
+                             timeout_event)
                 continue
 
             # If Codex intentionally left the lifecycle at SUPERVISOR_TURN, run it once; it must not busy-loop.

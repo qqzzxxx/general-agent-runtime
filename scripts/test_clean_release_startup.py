@@ -43,7 +43,8 @@ def copy_release_layout(destination: Path) -> None:
         shutil.copytree(
             SOURCE / directory,
             destination / directory,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+            ignore=shutil.ignore_patterns(
+                "__pycache__", "*.pyc", "*.pyo", "ACTIVE_PROJECT.json"),
         )
     for directory in (
         "handoff/archive",
@@ -70,6 +71,10 @@ class CleanReleaseStartupTests(unittest.TestCase):
         self.runtime = self.base / "Extracted Runtime With Spaces"
         copy_release_layout(self.runtime)
         self.env = clean_environment()
+        # The fresh-release eligibility interpreter is release product: a
+        # clean copy without it can never re-prove first-project bootstrap.
+        self.assertTrue(
+            (self.runtime / "scripts" / "web_console_fresh_install.py").is_file())
 
     def run_process(self, args: list[str], *, timeout: int = 180) -> subprocess.CompletedProcess[str]:
         return subprocess.run(

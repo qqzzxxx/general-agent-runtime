@@ -189,6 +189,21 @@ class OrchestratorMechanicalTests(unittest.TestCase):
             completion_helper.commit(o.ROOT, staging_dir), completion_helper.EXIT_COMMITTED)
         return brief
 
+    def test_fresh_runtime_has_no_fabricated_consumption_history(self):
+        # F-002: a Runtime without legacy V1.5 state has consumed nothing.
+        # Seeding the legacy high-water mark 602 here fabricated a consumed
+        # message that operator-facing status reported as real history.
+        self.assertFalse(o.RUNTIME_STATE.exists())
+        self.assertFalse((o.ROOT / "ORCHESTRATOR_STATE.json").exists())
+        self.assertEqual(o.load_runtime()["last_consumed_message_id"], 0)
+
+    def test_legacy_root_keeps_historical_consumption_high_water_mark(self):
+        legacy_state = o.ROOT / "ORCHESTRATOR_STATE.json"
+        legacy_state.write_text('{"schema_version": 1}', encoding="utf-8")
+        self.assertEqual(o.load_runtime()["last_consumed_message_id"], 602)
+        legacy_state.write_text('{"last_reviewed_id": 731}', encoding="utf-8")
+        self.assertEqual(o.load_runtime()["last_consumed_message_id"], 731)
+
     def test_fresh_receipt_consumed_once(self):
         self.commit_receipt()
         seen, event = o.consume_executor_receipt(self.runtime)

@@ -1,5 +1,27 @@
 # General Agent Runtime — System Handbook
 
+Current Supervisor behavior is [Phase 8 Outcome Ownership / Context V2](v1.4-supervisor-v2.md).
+Preserving functionality/information does not freeze architecture, labels or implementation.
+The Supervisor distinguishes outcomes/quality, sourced hard constraints, current facts
+and revisable assumptions. It receives current decision records and evidence with full
+references. Legacy memory remains complete; explicit V2 memory organization can defer
+historical sections. The view must never be serialized as replacement authoritative state.
+Goal integrity, authorization, Human Decision and Final Verification gates are unchanged.
+
+Current V2 execution is [Phase 6 host-native execution](v1.4-host-native-executor.md).
+The Executor chooses methods using available session tools within task restrictions.
+Runtime owns identity, authority, lifecycle, checkpoints, publication, completion,
+history, provenance and FV state. Tools do not confer those powers. Native effects
+remain cooperative; stop owned background work before finish. Final Verification
+may inspect with host tools but must preserve verified deliverables/live state.
+
+The v1.4 development entry/finish adapters own deterministic Executor protocol:
+entry returns the authorized task/workspace/token; finish accepts semantic results,
+publishes through the existing fence and commits through the existing ledger.
+The low-level acquisition/publication/staging descriptions below remain the
+underlying compatibility contract. Current Executors do not construct those
+packages. See [Phase 3](v1.4-runtime-owned-completion.md) for schema and evidence.
+
 > Maintainer-facing system model for General Agent Runtime.
 >
 > This handbook explains the design and intended invariants. If it conflicts with current code or canonical Runtime contracts, the current implementation wins.
@@ -137,8 +159,8 @@ COMPLETION_SEALED
 
 The Supervisor owns high-value reasoning:
 
-- project decomposition;
-- choosing the next stage;
+- preserving the user's intended outcome and genuine constraints;
+- choosing the most valuable remaining work and appropriate Executor autonomy;
 - accepting/rejecting Executor results;
 - `REVISE`;
 - `REDIRECT` / `CHANGE_METHOD`;

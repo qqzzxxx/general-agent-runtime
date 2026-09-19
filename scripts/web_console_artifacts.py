@@ -30,6 +30,7 @@ import re
 import unicodedata
 import urllib.parse
 import csv as csv_module
+from datetime import datetime
 
 from web_console_control import ControlRequestError
 
@@ -116,6 +117,15 @@ MAGIC_PDF = b"%PDF-"
 TEXT_FORMATS = (FORMAT_MARKDOWN, FORMAT_TEXT, FORMAT_LOG, FORMAT_CODE)
 
 QUERY_STATUS_VALUES = ("ledger", "unbound", "missing")
+
+# Runtime publication records (executor_fence.publish →
+# handoff/executor_publications/<commit_id>/<sha256(path)>.json). The exact
+# key set is the Runtime's own RECORD_KEYS contract; the Console never
+# accepts a looser shape.
+PUBLICATION_RECORD_KEYS = frozenset((
+    "MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE", "PROJECT_ID",
+    "path", "sha256", "PUBLISHED_AT"))
+MAX_PUBLICATION_RECORDS = 128
 
 
 class ArtifactPathError(ValueError):
@@ -329,6 +339,85 @@ def verified_publications(entry):
             return [], "ambiguous publication path, hash or identity"
         seen.add(path.casefold())
     return raw, None
+
+
+def verified_runtime_publication_records(entries, identity) -> tuple:
+    """Validate raw Runtime publication records against one dispatch identity.
+
+    The Runtime fence writes one record per published artifact under
+    `handoff/executor_publications/<commit_id>/` at publish time — the same
+    single authoritative source a verified completion later seals into its
+    publication manifest, read here before that seal exists. `entries` is a
+    list of {"name": filename, "record": parsed JSON} pairs as read by the
+    HTTP layer; `identity` is the archived dispatch's identity plus
+    PROJECT_ID. Every check mirrors the Runtime's own fence validation
+    (exact schema, identity/project binding, authorized path, hash shape,
+    timezone-aware timestamp, filename binding); any failure refuses the
+    whole set instead of binding a subset. Returns (publications, reason)
+    where each publication is {path, sha256, published_at, task_id,
+    stage_id, attempt}.
+    """
+    if (not isinstance(identity, dict)
+            or not _is_int(identity.get("MESSAGE_ID"))
+            or not _is_int(identity.get("ATTEMPT"))
+            or not isinstance(identity.get("PROJECT_ID"), str)
+            or not all(isinstance(identity.get(key), str) and identity[key]
+                       for key in ("TASK_ID", "STAGE_ID", "NONCE"))):
+        return [], "incomplete dispatch identity"
+    if not isinstance(entries, list) or len(entries) > MAX_PUBLICATION_RECORDS:
+        return [], "invalid publication record list"
+    seen = set()
+    publications = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return [], "invalid publication record"
+        record = entry.get("record")
+        if (not isinstance(record, dict)
+                or set(record) != PUBLICATION_RECORD_KEYS):
+            return [], "publication record schema mismatch"
+        if (type(record.get("MESSAGE_ID")) is not int
+                or record["MESSAGE_ID"] != identity["MESSAGE_ID"]
+                or type(record.get("ATTEMPT")) is not int
+                or record["ATTEMPT"] != identity["ATTEMPT"]
+                or any(not isinstance(record.get(key), str)
+                       or record[key] != identity[key]
+                       for key in ("TASK_ID", "STAGE_ID", "NONCE"))
+                or record["PROJECT_ID"] != identity["PROJECT_ID"]):
+            return [], "publication record identity mismatch"
+        try:
+            path = normalize_artifact_path(record.get("path"))
+        except ArtifactPathError:
+            return [], "invalid publication record path"
+        if (not isinstance(record.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"])):
+            return [], "invalid publication record hash"
+        if not _is_tz_aware_timestamp(record.get("PUBLISHED_AT")):
+            return [], "invalid publication record timestamp"
+        expected_name = hashlib.sha256(
+            path.encode("utf-8")).hexdigest() + ".json"
+        if entry.get("name") != expected_name:
+            return [], "publication record filename binding mismatch"
+        if path.casefold() in seen:
+            return [], "ambiguous duplicate publication path"
+        seen.add(path.casefold())
+        publications.append({
+            "path": path, "sha256": record["sha256"],
+            "published_at": record["PUBLISHED_AT"],
+            "task_id": record["TASK_ID"], "stage_id": record["STAGE_ID"],
+            "attempt": record["ATTEMPT"],
+        })
+    return publications, None
+
+
+def _is_tz_aware_timestamp(value) -> bool:
+    """Mirror the Runtime's timestamp check: non-empty ISO-8601 with a timezone."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def build_artifact_index(ledger_entries, files) -> dict:

@@ -7,6 +7,7 @@ control request or a failed resume. Only the scheduler can acknowledge startup.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -19,6 +20,104 @@ import executor_fence as fence
 import supervisor_control as control
 
 STARTUP_TIMEOUT = 5.0
+
+
+def _convert_parked_dispatch(root: Path) -> str | None:
+    """QUOTA-PAUSE-PARK-V1: convert quota-parked work before resume validation.
+
+    A SAFE pause parks a dispatched-but-unclaimed task: the inbox is quarantined,
+    the identity stays valid, and no retry budget is spent. Such a state can never
+    be re-registered as-is (the inbox is gone and every new claim must bind the
+    current control revision), so Resume mechanically converts it into one
+    bounded Supervisor re-plan: state becomes SUPERVISOR_TURN and a durable
+    PARKED_STAGE_RESUME event tells the Supervisor to continue the same logical
+    stage through the ordinary authorization path. No identity is revived: the
+    parked MESSAGE_ID stays in parked_message_ids, is retired as SUPERSEDED when
+    the successor registers, and every claim-side hash/identity check still
+    refuses any stale wake. Caller holds the runtime fence.
+    """
+    _, _, state_path, state, runtime = control._load_live(root)
+    if state.get("status") != "WAITING_EXECUTOR":
+        return None
+    pause = control.load_control(root).get("pause") or {}
+    if pause.get("status") != "PAUSED" or pause.get("mode") != "SAFE":
+        return None
+    task = state.get("current_task")
+    authorization = runtime.get("authorized_dispatch")
+    if not isinstance(task, dict) or not isinstance(authorization, dict):
+        return None
+    if not control._same_identity(task, authorization):
+        return None
+    identity = control.normalize_identity(task, "parked dispatch")
+    if control._claim_exists(root, identity):
+        return None
+    if control._completion_for_identity(root, identity) is not None:
+        return None
+    inbox = root / "TO_ZCODE.md"
+    if inbox.exists():
+        try:
+            intact = (hashlib.sha256(inbox.read_bytes()).hexdigest()
+                      == str(authorization.get("TO_ZCODE_SHA256") or ""))
+        except OSError:
+            intact = False
+        if intact:
+            # The dispatch is still exactly published; the ordinary restart
+            # path owns it. Only a parked (quarantined) wait converts here.
+            return None
+
+    message_id = identity["MESSAGE_ID"]
+    retired = runtime.get("retired_message_ids") or []
+    if not isinstance(retired, list) or any(type(value) is not int for value in retired):
+        raise control.ControlError("retirement facts are malformed")
+    pending_timeout = runtime.get("pending_executor_timeout")
+    timeout_matches = (isinstance(pending_timeout, dict)
+                       and all(pending_timeout.get(key.lower()) == identity[key]
+                               for key in control.IDENTITY_KEYS))
+    if message_id in retired and not timeout_matches:
+        # No mechanical evidence that the Runtime itself retired this wait:
+        # leave it to the fail-closed resume validation instead of converting.
+        return None
+
+    expired = True
+    try:
+        moment = datetime.fromisoformat(
+            str(authorization.get("EXPIRES_AT")).replace("Z", "+00:00"))
+        expired = moment.tzinfo is not None and datetime.now(timezone.utc) >= moment
+    except (TypeError, ValueError, AttributeError):
+        expired = True
+    reason = ("EXECUTOR_TIMEOUT_DURING_PAUSE" if message_id in retired
+              else "PARKED_STAGE_RESUME")
+    event = {
+        "type": reason,
+        **{key: identity[key] for key in control.IDENTITY_KEYS},
+        "authorization_expired": bool(expired or message_id in retired),
+        "note": ("dispatch parked by a user scheduling/quota pause; not a method "
+                 "failure, executor retry, or scientific failure"),
+    }
+    if not isinstance(runtime.get("pending_supervisor_event"), dict):
+        runtime["pending_supervisor_event"] = {
+            "reason": reason, "event": event,
+            "recorded_at": control.now_iso(),
+            "decision_attempts": 0, "retry_exhausted": False,
+        }
+    parked_ids = runtime.get("parked_message_ids")
+    if not isinstance(parked_ids, list) or any(type(value) is not int for value in parked_ids):
+        raise control.ControlError("parked_message_ids is malformed")
+    if message_id not in parked_ids:
+        parked_ids.append(message_id)
+    state["status"] = "SUPERVISOR_TURN"
+    state["current_task"] = None
+    state["updated_at"] = control.now_iso()
+    control._atomic_json(state_path, state)
+    control._atomic_json(root / "control" / "orchestrator_runtime.json", runtime)
+    fresh = control.load_control(root)
+    parked_record = (fresh.get("pause") or {}).get("parked_dispatch")
+    if isinstance(parked_record, dict) and parked_record.get("MESSAGE_ID") == message_id:
+        parked_record["CONVERTED_AT"] = control.now_iso()
+        parked_record["CONVERTED_REASON"] = reason
+        fresh["pause"]["parked_dispatch"] = parked_record
+        control.save_control(root, fresh)
+    return reason
 
 
 def process_alive(pid: int) -> bool | None:
@@ -180,6 +279,7 @@ def resume(root: Path, *, start: bool = True) -> dict:
         while True:
             with fence.runtime_lock(root):
                 control.reconcile_control_transactions_locked(root)
+                _convert_parked_dispatch(root)
                 project_id, state, runtime = validate_resumable(root)
                 fresh = control.load_control(root)
                 previous = fresh.get("pause")

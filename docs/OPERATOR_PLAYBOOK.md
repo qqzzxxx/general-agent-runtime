@@ -1,5 +1,25 @@
 # General Agent Runtime — Operator Playbook
 
+[Phase 8 Supervisor V2](v1.4-supervisor-v2.md) needs no project-state migration.
+When separately deploying, ship `supervisor_context.py`, the canonical Supervisor
+contract and `SUPERVISOR_PROTOCOL_REFERENCE.md` together; the Runtime creation copier
+includes the new static reference. Existing Executor V2 configuration is unchanged.
+Steer the desired experience and true constraints explicitly; an existing layout is
+not a requirement unless the user says it is. Full decision history remains available.
+
+For [Phase 6](v1.4-host-native-executor.md), deploy code and the regenerated permanent
+prompt together when deployment is authorized. Native tools are allowed for the
+bound outcome when available in the scheduled session. Existing explicit sealed
+restrictions remain in force; do not edit a live dispatch to enable tools. A
+checkpoint/publication rejection ends authority, but cannot kill independent host
+processes. Confirm old Executor activity has stopped during interruption/rollout.
+
+For v1.4 development deployments, install the updated Executor prompt alongside
+Runtime code. Normal Executor work uses entry, later fence checkpoints, and one
+semantic finish operation. Do not ask Executors to hash outputs or author staging.
+Existing claims, publication records and completion ledger remain authoritative.
+See [Phase 3](v1.4-runtime-owned-completion.md) for recovery and compatibility limits.
+
 > Normal human operating procedures for General Agent Runtime.
 >
 > This document covers ordinary use and controlled steering. For failures and repair, use `INCIDENT_RUNBOOK.md`.
@@ -174,7 +194,46 @@ The user does not relay messages.
 
 ---
 
-## 8. What to watch in the console
+## 8. Configure the Supervisor model (optional baseline)
+
+By default the Orchestrator runs Codex Supervisor turns with its built-in
+default policy. To pin a different baseline, set the two optional fields in
+the Runtime's control document `control/supervisor_control.json`:
+
+```json
+{
+  "schema_version": 1,
+  "revision": 0,
+  "intervention_generation": 0,
+  "pause": {"status": "RUNNING", "requested_at": null, "mode": null, "resumed_at": null},
+  "supervisor_model": "gpt-6-astra",
+  "supervisor_reasoning_effort": "high"
+}
+```
+
+Rules:
+
+- `supervisor_model` and `supervisor_reasoning_effort` must be present and
+  valid together; `supervisor_reasoning_effort` accepts
+  `LOW` / `MEDIUM` / `HIGH` / `XHIGH` case-insensitively. Queued changes
+  through the Console or `queue-supervisor-config` accept only the
+  canonical models `gpt-5.6-sol` and `gpt-6-astra` (confirmed against the
+  installed Codex CLI; see `evidence/v1.4-supervisor-config-ui/`).
+- A missing pair keeps the built-in default policy (backward compatible
+  with older control documents). A partial or invalid pair is never
+  half-applied: the built-in default policy applies and the Orchestrator
+  logs the values it actually used each turn.
+- An explicit queued configuration (Web Console "Queue a model / reasoning
+  change", or `supervisor_control.py queue-supervisor-config`) still takes
+  precedence at the next eligible Supervisor turn boundary.
+- The Web Console Supervisor panel reads this same configuration and shows
+  it as the fixed policy baseline; no second configuration exists.
+- ZCode (Executor) and the Scheduled Automation are not affected by this
+  setting.
+
+---
+
+## 9. What to watch in the console
 
 Useful lifecycle events:
 
@@ -197,7 +256,7 @@ A Scheduled Automation wake that exits because of `CLAIM_EXISTS` can also be nor
 
 ---
 
-## 9. Safe inspection during a long project
+## 10. Safe inspection during a long project
 
 You may inspect:
 
@@ -215,7 +274,7 @@ If you find a quality problem, use steering feedback rather than rewriting Goal 
 
 ---
 
-## 10. Adding user steering feedback
+## 11. Adding user steering feedback
 
 Use the active project's:
 
@@ -253,7 +312,7 @@ Unfinished deliverables should use this rule immediately.
 
 ---
 
-## 11. Timing of feedback
+## 12. Timing of feedback
 
 ### Case A — Executor has not claimed the task yet
 
@@ -287,7 +346,7 @@ Do not:
 
 ---
 
-## 12. Pausing vs stopping
+## 13. Pausing vs stopping
 
 ### `PAUSE_AGENT_SYSTEM.ps1`
 
@@ -298,9 +357,18 @@ inspecting or steering:
 .\PAUSE_AGENT_SYSTEM.ps1
 ```
 
-Idle work pauses immediately. An authorized-but-unclaimed dispatch is permanently
-retired before pausing. An already-claimed attempt normally finishes; Runtime consumes
-its authoritative completion but does not start the next Supervisor turn. For explicit
+Idle work pauses immediately. An authorized-but-unclaimed dispatch is parked
+(QUOTA-PAUSE-PARK-V1): the inbox is quarantined so nothing can be claimed or
+executed while paused, the identity stays valid, no retry budget is consumed,
+and Resume re-plans the same logical stage automatically with a fresh
+authorized task — no Human Decision is required after a plain quota pause.
+A long pause may outlive the parked dispatch's authorization expiry; Resume
+still recovers through a new Supervisor-authorized identity, never by
+extending the expired nonce. An already-claimed attempt normally finishes;
+Runtime consumes its authoritative completion but does not start the next
+Supervisor turn. If the claimed attempt's authorization expires while paused,
+it is retired per fencing and converted into one bounded Supervisor re-plan,
+so Resume stays available. For explicit
 cooperative revocation at the next fence checkpoint:
 
 ```powershell
@@ -366,7 +434,7 @@ fresh Supervisor decision) so the v1.2 archive and seal exist before execution.
 
 ---
 
-## 13. HUMAN_REVIEW
+## 14. HUMAN_REVIEW
 
 When the Runtime enters `HUMAN_REVIEW`, automation stops by design.
 
@@ -392,7 +460,7 @@ Do not hand-edit the Human Review flag or lifecycle state.
 
 ---
 
-## 14. Completion
+## 15. Completion
 
 When project status becomes `COMPLETE`:
 
@@ -405,7 +473,7 @@ Do not expect the Runtime to silently start another project.
 
 ---
 
-## 15. New project in the same Runtime
+## 16. New project in the same Runtime
 
 The same Runtime can store multiple projects.
 
@@ -430,7 +498,7 @@ choose the pattern; Automation setup is reused only within the same Runtime Root
 
 ---
 
-## 16. Starting a new AI support conversation
+## 17. Starting a new AI support conversation
 
 Use the Runtime itself as the context package.
 
@@ -444,7 +512,7 @@ This removes dependency on a historical ChatGPT conversation.
 
 ---
 
-## 17. Routine read-only diagnostic commands
+## 18. Routine read-only diagnostic commands
 
 ### Current project
 
@@ -482,7 +550,7 @@ These are diagnostics, not permission to mutate state.
 
 ---
 
-## 18. Operator decision table
+## 19. Operator decision table
 
 | Situation | Preferred action |
 |---|---|

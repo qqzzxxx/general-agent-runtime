@@ -1,0 +1,170 @@
+{
+  "schema": "RUNTIME-OWNED-COMPLETION-OFFLINE-V1",
+  "baseline": "evidence/v1.4-executor-entry-adapter/context-comparison.json",
+  "baseline_prompt_snapshot": "evidence/v1.4-runtime-owned-completion/phase2-executor-prompt.md",
+  "measurement": "BOM-stripped LF-normalized Unicode characters, same Phase 0 ROOT substitution; no token conversion",
+  "permanent_template_characters": {
+    "before": 14609,
+    "after": 13806,
+    "reduction": 803,
+    "reduction_percent": 5.5
+  },
+  "bound_permanent_prompt_characters": {
+    "before": 14657,
+    "after": 13860,
+    "reduction": 797,
+    "reduction_percent": 5.44
+  },
+  "task_equivalent_result_characters": {
+    "before": 928,
+    "after": 454,
+    "reduction": 474,
+    "reduction_percent": 51.08
+  },
+  "task_equivalent_result_and_commands_characters": {
+    "before": 1554,
+    "after": 534,
+    "reduction": 1020,
+    "reduction_percent": 65.64
+  },
+  "sources_after": {
+    "permanent_prompt": {
+      "characters": 13806,
+      "utf8_bytes": 13814,
+      "sha256": "f216bc9d039e5d356619209d97df96088225a1ee1de3918076a9dc687115315d"
+    }
+  },
+  "fixtures": {
+    "before_staging": {
+      "COMPLETION_STAGING_SCHEMA_VERSION": 1,
+      "MESSAGE_ID": 700110,
+      "TASK_ID": "summary",
+      "STAGE_ID": "check-evidence",
+      "ATTEMPT": 1,
+      "NONCE": "<NONCE>",
+      "PROJECT_ID": "synthetic",
+      "STATUS": "STAGING_READY",
+      "CREATED_AT": "<ISO_TIMESTAMP>",
+      "RECEIPT": {
+        "PROTOCOL_VERSION": 2,
+        "MESSAGE_ID": 700110,
+        "TASK_ID": "summary",
+        "STAGE_ID": "check-evidence",
+        "ATTEMPT": 1,
+        "NONCE": "<NONCE>",
+        "STATUS": "PARTIAL",
+        "Key findings": [
+          "Two supplied sources agree."
+        ],
+        "Evidence pointers": [
+          "evidence/check.txt: comparison; input source A and source B"
+        ],
+        "Limitations": [
+          "A third source was unavailable."
+        ],
+        "Acceptance self-check": [
+          "Cross-check complete for two of three sources"
+        ],
+        "Suggested memory updates": [
+          "Third source remains unverified"
+        ]
+      },
+      "EVIDENCE": [
+        {
+          "path": "evidence/check.txt",
+          "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ],
+      "DELIVERABLES": [
+        {
+          "path": "reports/summary.md",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
+    },
+    "before_commands": [
+      "python scripts/executor_fence.py publish --message-id 700110 --task-id \"summary\" --stage-id \"check-evidence\" --attempt 1 --nonce \"<NONCE>\" --claim-token \"<TOKEN>\" --path \"reports/summary.md\" --sha256 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "python scripts/executor_fence.py publish --message-id 700110 --task-id \"summary\" --stage-id \"check-evidence\" --attempt 1 --nonce \"<NONCE>\" --claim-token \"<TOKEN>\" --path \"evidence/check.txt\" --sha256 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "python scripts/executor_completion.py commit --staging-dir \"<STAGING_DIR>\" --claim-token \"<TOKEN>\""
+    ],
+    "after_result": {
+      "artifacts": [
+        {
+          "path": "reports/summary.md",
+          "role": "deliverable"
+        },
+        {
+          "path": "evidence/check.txt",
+          "role": "evidence"
+        }
+      ],
+      "outcome": "PARTIAL",
+      "findings": [
+        "Two supplied sources agree."
+      ],
+      "evidence": [
+        "evidence/check.txt: comparison; input source A and source B"
+      ],
+      "limitations": [
+        "A third source was unavailable."
+      ],
+      "completion": {
+        "Acceptance self-check": [
+          "Cross-check complete for two of three sources"
+        ],
+        "Suggested memory updates": [
+          "Third source remains unverified"
+        ]
+      }
+    },
+    "after_command": "python scripts/executor_finish.py --claim-token \"<TOKEN>\" --result \"finish.json\""
+  },
+  "executor_required_operations": {
+    "whole_stage_phase0": "N + C + 3",
+    "whole_stage_phase2": "N + C + 1",
+    "whole_stage_phase3": "C + 1",
+    "variables": "N published files; C baseline explicit checks including the entry-owned initial check; C >= 1. Later checkpoints retained.",
+    "finish_helper_executions": {
+      "before": "N + 1",
+      "after": 1
+    },
+    "finish_identity_argument_values": {
+      "before": "5N",
+      "after": 0
+    },
+    "executor_artifact_hashes": {
+      "before": "N (plus optional rechecks)",
+      "after": 0
+    },
+    "executor_staging_packages": {
+      "before": 1,
+      "after": 0,
+      "reduction": 1,
+      "reduction_percent": 100.0
+    },
+    "executor_identity_copies_in_result": {
+      "before": 2,
+      "after": 0,
+      "reduction": 2,
+      "reduction_percent": 100.0
+    },
+    "executor_machine_hash_manifests": {
+      "before": 2,
+      "after": 0,
+      "reduction": 2,
+      "reduction_percent": 100.0
+    },
+    "runtime_publications": "N on first success; existing matching records verified on recovery",
+    "unchanged": "Claim ownership, work checkpoints, canonical path limits, per-file publication, commit/consume/seal, FV judgments."
+  },
+  "limitations": [
+    "Static source and synthetic authoring surface; not captured Executor input/output or model turns.",
+    "Commands use identical root-relative helper spelling for comparison; installed prompt uses absolute Runtime helper paths.",
+    "No total tool-output saving claimed; entry still returns attempt/path/capability metadata.",
+    "Runtime still performs hashes, publication checks, staging and commit, plus frozen preparation IO.",
+    "Task wire and Supervisor context assembly are unchanged; only the exact Runtime FV packaging instruction is translated in the entry view.",
+    "No providers, live project state or Executor automation are invoked."
+  ],
+  "provider_token_savings": null,
+  "latency_savings_seconds": null
+}

@@ -9,7 +9,9 @@ from unittest import mock
 
 import executor_claim as claim
 import executor_completion as completion
+import executor_contract
 import final_verification_contract as contract
+import ordinary_dispatch as od
 import supervisor_control as sc
 import test_supervisor_control as fixtures
 import test_fv_identity_binding_fix as fv_fixtures
@@ -51,6 +53,75 @@ class FVOnePassTests(unittest.TestCase):
         self.prepared = sc._parse_dispatch_bytes(self.o.TO_ZCODE.read_bytes())
         self.assertNotIn("FINAL_VERIFICATION_REQUEST", self.prepared)
         return state
+
+    def test_drifted_protocol_is_restamped_to_runtime_canonical_wire(self):
+        # F-003: a full-wire FV dispatch whose EXECUTOR_PROTOCOL drifted while
+        # being copied used to dead-end at the Executor V2 projection guard
+        # (NOT_AUTHORIZED, zero retries on this stage). The wire protocol is
+        # Runtime-owned: the decision transaction re-stamps the canonical
+        # array and binds the candidate hash to the stamped bytes.
+        self.task["EXECUTOR_PROTOCOL"] = [
+            "python scripts/executor_claim.py acquire before work",
+            "Run python scripts/executor_fence.py prepare with the original five "
+            "identity arguments and --claim-token <token>. All stage writes and "
+            "subprocess output belong in its returned attempt_workspace; canonical "
+            "inputs are read-only.",
+        ]
+        self.decide()
+        raw = self.o.TO_ZCODE.read_bytes()
+        published = sc._parse_dispatch_bytes(raw)
+        self.assertEqual(published["EXECUTOR_PROTOCOL"],
+                         [*od.EXECUTOR_PROTOCOL, contract.RESULT_PROTOCOL])
+        origin = sc._read_json(sc.candidate_origin_path(self.root))
+        self.assertEqual(origin.get("dispatch_sha256"), sc.sha256_bytes(raw))
+        # The V2 protocol guard stays byte-exact: its own membership test
+        # accepts every stamped entry, and the exact F-003 drift (entry 7
+        # paraphrased by the Supervisor) is still rejected by projection.
+        for entry in published["EXECUTOR_PROTOCOL"]:
+            self.assertTrue(entry in od.EXECUTOR_PROTOCOL
+                            or entry in contract.RESULT_PROTOCOL, entry[:60])
+        import test_executor_contract as ec_fixtures
+        drifted = ec_fixtures.task_fields()
+        drifted["EXECUTOR_PROTOCOL"][7] = drifted["EXECUTOR_PROTOCOL"][7].replace(
+            "canonical files are read-only inputs.", "canonical inputs are read-only.")
+        with self.assertRaises(ValueError) as caught:
+            executor_contract.project(drifted)
+        self.assertIn("custom protocol instructions", str(caught.exception))
+
+    def test_full_wire_protocol_drift_is_restamped_without_header_loss(self):
+        # A non-FV full-wire candidate gets the same Runtime-owned stamp, and
+        # the Supervisor inbox header outside the JSON fence is preserved.
+        wire_task = self.h.make_task(700130, "nonce-700130")
+        wire_task["EXECUTOR_PROTOCOL"] = [
+            "python scripts/executor_claim.py acquire before work "]
+        turn = sc.begin_supervisor_turn(self.root, self.h.PROJECT)
+        state = self.h.read_state()
+        decision = {"decision": "DISPATCH", "reason": "full-wire drift stamp"}
+        state["decision_history"].append(decision)
+        state.update(last_supervisor_decision=decision, status="WAITING_EXECUTOR",
+                     current_task={k: wire_task[k] for k in sc.IDENTITY_KEYS})
+        self.h._json(self.o.PROJECT_STATE, state)
+        self.o.TO_ZCODE.write_bytes(fixtures.wire(wire_task))
+        retry = sc.finish_supervisor_turn(self.root, turn, processed=True)
+        self.assertFalse(retry, sc.load_control(self.root).get("last_supervisor_turn_result"))
+        raw = self.o.TO_ZCODE.read_text(encoding="utf-8")
+        self.assertTrue(raw.startswith(f"MESSAGE_ID: {wire_task['MESSAGE_ID']}\n"))
+        published = sc._parse_dispatch_bytes(raw.encode("utf-8"))
+        self.assertEqual(published["EXECUTOR_PROTOCOL"], list(od.EXECUTOR_PROTOCOL))
+
+    def test_fv_receipt_missing_policy_required_checks_fails_at_commit(self):
+        # F-004: a receipt whose per-claim checks omit the bound policy's
+        # required fields used to pass this boundary and only failed the
+        # orchestrator's mechanical evaluation later, dead-ending Final
+        # Acceptance behind repeated Supervisor rounds. Presence is enforced
+        # here; values remain the verifier's honest judgment.
+        self.decide()
+        receipt = self.receipt()
+        receipt["FINAL_VERIFICATION_RESULTS"]["CLAIM_RESULTS"][0]["checks"] = {"verdict": "ok"}
+        self.stage(receipt, name="verification-missing-checks")
+        with self.assertRaises(RuntimeError) as caught:
+            completion.commit(self.root, self.staging, claim_token=self.token)
+        self.assertIn("policy-required", str(caught.exception))
 
     def receipt(self, overall="PASS"):
         legacy = fv_fixtures.FVIdentityBindingTests.receipt(self, self.task, overall)

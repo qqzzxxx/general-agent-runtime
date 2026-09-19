@@ -533,9 +533,13 @@ def _completion_block(completion_result: dict, honesty_notes: list,
                    "ledger_file": None, "receipt": None,
                    "receipt_status": None, "receipt_outcome": None}
     if note or not isinstance(document, dict) or document.get("ok") is False:
-        if not note and document is not None and document.get("ok") is False:
-            honesty_notes.append("the completion ledger has no usable entry "
-                                 "for this MESSAGE_ID")
+        if not note and document is not None:
+            if not isinstance(document, dict):
+                honesty_notes.append("the completion query returned unusable "
+                                     "output")
+            elif document.get("ok") is False:
+                honesty_notes.append("the completion ledger has no usable "
+                                     "entry for this MESSAGE_ID")
         return unavailable
     receipt = document.get("RECEIPT") \
         if isinstance(document.get("RECEIPT"), dict) else None
@@ -594,27 +598,137 @@ def _interventions_block(interventions_result: dict, message_id: int,
     return matched
 
 
-def _artifacts_block(document: dict) -> dict:
+def _artifacts_block(dispatch_result: dict, completion_result: dict,
+                     publications) -> dict:
+    """Compose the Task Detail artifacts block from authoritative sources.
+
+    Two sources, one provenance: (a) the completion query's verified
+    publication projection — final metadata, only when completion and
+    publication integrity are both OK; (b) the server's bounded read of the
+    Runtime's own pre-completion publication records
+    (`handoff/executor_publications/<commit_id>/`), which the Runtime fence
+    writes at publish time and a completion later seals. (b) is always
+    `provisional`: it is never presented as final publication metadata, and
+    a broken completion integrity is surfaced, never smoothed over.
+
+    States: `final` (verified completion publications), `provisional`
+    (Runtime publication records awaiting or lacking a verified completion),
+    `none` (dispatch verified, nothing published yet), `unavailable` (no
+    honest way to locate or trust publications; `reason` says why).
+    """
     from web_console_artifacts import verified_publications
-    publications, reason = verified_publications(document if isinstance(document, dict) else {})
+    completion_document = completion_result.get("document")
+    completion_dict = completion_document \
+        if isinstance(completion_document, dict) else None
+    usable_completion = (completion_dict is not None
+                         and completion_dict.get("ok") is not False)
+    final, final_reason = verified_publications(
+        completion_dict if usable_completion else {})
+    dispatch_document = dispatch_result.get("document") \
+        if isinstance(dispatch_result, dict) else None
+    dispatch_verified = (isinstance(dispatch_document, dict)
+                         and dispatch_document.get("ok") is not False
+                         and dispatch_document.get("integrity")
+                         == "AUTHORIZED_VALID")
+    records = publications.get("records") \
+        if isinstance(publications, dict) else None
+    publications_reason = publications.get("reason") \
+        if isinstance(publications, dict) else None
+    if publications is not None and not isinstance(publications, dict):
+        records, publications_reason = None, "invalid publication projection"
+    if not isinstance(records, list):
+        records = []
+    truncated = len(records) > MAX_ARTIFACTS_LISTED
+    # "none" (nothing published) is an observed fact only after a clean read
+    # of the Runtime's publication records; a failed or absent projection
+    # must stay "unavailable" instead of claiming absence.
+    clean_read = (isinstance(publications, dict)
+                  and publications.get("state") == "ok"
+                  and not publications_reason)
+
+    if final_reason is None:
+        paths = [_final_path_view(item, completion_dict)
+                 for item in final[:MAX_ARTIFACTS_LISTED]]
+        return {
+            "available": True, "state": "final", "reason": None,
+            "complete": True, "paths": paths,
+            "count": len(final),
+            "truncated": len(final) > MAX_ARTIFACTS_LISTED,
+            "note": ("Verified Runtime publication metadata; historical "
+                     "bytes are not retained. Current-content preview is "
+                     "available in Artifact Center only when its hash "
+                     "matches this publication."),
+        }
+
+    if usable_completion \
+            and completion_dict.get("integrity") == "OK":
+        reason = final_reason
+    elif usable_completion:
+        integrity = completion_dict.get("integrity")
+        reason = ("completion integrity is "
+                  + (integrity if _is_str(integrity) else "unreported")
+                  + "; publication metadata is not presented as final")
+    else:
+        reason = "no verified completion for this round"
+    if publications_reason:
+        reason += f"; Runtime publication records: {publications_reason}"
+
+    if records:
+        paths = [dict(record, status="provisional")
+                 for record in records[:MAX_ARTIFACTS_LISTED]]
+        return {
+            "available": False, "state": "provisional", "reason": reason,
+            "complete": False, "paths": paths,
+            "count": len(records), "truncated": truncated,
+            "note": ("Runtime publication records are shown as "
+                     "provisional; they are not final publication "
+                     "metadata. Historical bytes are not retained."),
+        }
+    if clean_read and not usable_completion and dispatch_verified:
+        return {
+            "available": False, "state": "none", "reason": None,
+            "complete": False, "paths": [], "count": 0,
+            "truncated": False,
+            "note": ("The Runtime has not published any artifact for this "
+                     "round yet; the archived dispatch is verified, so "
+                     "this is an observed fact, not a guess."),
+        }
     return {
-        "available": reason is None,
-        "reason": reason,
-        "paths": [{"path": item["path"], "sha256": item["sha256"]}
-                  for item in publications[:MAX_ARTIFACTS_LISTED]],
-        "note": reason or ("Verified Runtime publication metadata; historical bytes are not retained. "
-                           "Current-content preview is available in Artifact Center only when its hash matches this publication."),
+        "available": False, "state": "unavailable", "reason": reason,
+        "complete": usable_completion, "paths": [], "count": 0,
+        "truncated": False,
+        "note": ("No authoritative publication metadata is shown rather "
+                 "than a guess."),
+    }
+
+
+def _final_path_view(item: dict, completion_dict: dict | None) -> dict:
+    return {
+        "path": item["path"], "sha256": item["sha256"],
+        "status": "final", "message_id": item.get("MESSAGE_ID"),
+        "task_id": item.get("TASK_ID") if _is_str(item.get("TASK_ID")) else None,
+        "stage_id": item.get("STAGE_ID") if _is_str(item.get("STAGE_ID")) else None,
+        "attempt": item.get("ATTEMPT") if _is_int(item.get("ATTEMPT")) else None,
+        "published_at": item.get("PUBLISHED_AT")
+        if _is_str(item.get("PUBLISHED_AT")) else None,
+        "commit_id": completion_dict.get("COMMIT_ID")
+        if isinstance(completion_dict, dict)
+        and _is_str(completion_dict.get("COMMIT_ID")) else None,
     }
 
 
 def interpret_round_detail(message_id: int, *, dispatch_result: dict,
                            completion_result: dict,
                            interventions_result: dict,
-                           decision: dict) -> dict:
+                           decision: dict,
+                           publications: dict | None = None) -> dict:
     """Compose one Task Detail document from the bounded history sources.
 
     `decision` is composed separately by the server (it performs the single
     bounded, hash-verified decision-receipt read) and is relayed verbatim.
+    `publications` is the server's bounded pre-completion publication-record
+    projection ({state, records, reason}); None means the server could not
+    or did not run it, which degrades the artifacts block honestly.
     """
     honesty_notes: list = []
     control_notes: list = []
@@ -665,7 +779,8 @@ def interpret_round_detail(message_id: int, *, dispatch_result: dict,
         "dispatch": dispatch,
         "completion": completion,
         "interventions": interventions,
-        "artifacts": _artifacts_block(completion_result.get("document") if not _control_note(completion_result, "completion") else {}),
+        "artifacts": _artifacts_block(dispatch_result, completion_result,
+                                      publications),
         "decision": decision if isinstance(decision, dict) else
         {"available": False, "verified": False, "reason": "DECISION_UNAVAILABLE"},
         "honesty": {

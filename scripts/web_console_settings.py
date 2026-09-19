@@ -33,8 +33,11 @@ TIMELINE_PAGE_SIZE_MIN = 5
 TIMELINE_PAGE_SIZE_MAX = 100
 DECISION_SUMMARY_MODES = ("compact", "full")
 # Mirrors the Runtime's queue contract (`SUPERVISOR_CONFIG_EFFORTS`); the
-# empty string means "inherit the Runtime's fixed policy".
-SUPERVISOR_REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH")
+# empty string means "inherit the Runtime's fixed policy". XHIGH was added
+# with the installed Codex CLI's confirmed capabilities
+# (evidence/v1.4-supervisor-config-ui/); the set only ever grows so stored
+# legacy values keep loading.
+SUPERVISOR_REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH", "XHIGH")
 
 ALERT_THRESHOLD_BOUNDS = {
     "zcode_pickup_minutes": (1, 10080),
@@ -113,6 +116,14 @@ def _reject_control_characters(text: str, *, allowed="\n\t") -> None:
 
 
 def validate_model(value) -> str:
+    """Bounded free text, deliberately not vocabulary-checked here.
+
+    Settings are Console-owned defaults, never authoritative Runtime state.
+    A stored value outside the canonical Supervisor model set must keep
+    loading and re-saving verbatim (the UI surfaces it as a legacy value);
+    the canonical-model enforcement happens at the Runtime queue, the only
+    path that applies a model to Codex.
+    """
     if not isinstance(value, str):
         raise SettingsError("SETTINGS_VALUE_INVALID",
                             "the Supervisor model must be a string",
@@ -129,8 +140,15 @@ def validate_model(value) -> str:
 
 
 def validate_reasoning_effort(value) -> str:
+    """Empty string means "inherit"; otherwise the Runtime queue vocabulary.
+
+    Accepted case-insensitively (the UI sends the CLI-canonical lowercase
+    form) and normalized to the stored uppercase form.
+    """
     if value in (None, ""):
         return ""
+    if isinstance(value, str):
+        value = value.strip().upper()
     if value not in SUPERVISOR_REASONING_EFFORTS:
         raise SettingsError(
             "SETTINGS_VALUE_INVALID",

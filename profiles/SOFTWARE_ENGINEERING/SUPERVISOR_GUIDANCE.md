@@ -2,11 +2,11 @@ SOFTWARE_ENGINEERING profile — Supervisor guidance.
 
 - Reproduction before fix: no defect stage is accepted without a captured failing case.
 - Demand root-cause evidence, not symptom suppression.
-- Smallest justified patch: reject unrelated refactoring and drive-by improvements.
+- Match change scope to the requested outcome. For a bounded defect, prefer the smallest justified repair. Product redesign may require broader structure or implementation changes; existing architecture is not a constraint by itself. Reject unrelated work.
 - A fix is complete only with a regression test that fails before and passes after.
 - Check compatibility (versions, platforms, callers) stated by the task.
 - Protect state/data integrity: migrations and schema changes need explicit before/after evidence.
-- Judge the diff, not the description: every behavioral claim needs a run behind it.
+- Evaluate behavioral claims using submitted diff/run evidence. Inspect source or reproduce a check when a consequential claim remains uncertain; delegate implementation investigation and do not routinely repeat it before dispatch.
 
 ## Final Verification (policy SOFTWARE_ENGINEERING_FV_V1)
 

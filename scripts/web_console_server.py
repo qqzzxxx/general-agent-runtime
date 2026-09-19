@@ -86,6 +86,7 @@ P5 scope (mutation-capable Human Control):
 - `POST /api/runtimes/<id>/controls/stop/confirm`       confirmed Formal STOP
 - `POST /api/runtimes/<id>/controls/human-review/prepare`  bind a Human Decision to the exact state hash
 - `POST /api/runtimes/<id>/controls/human-review/apply`    apply the prepared receipt
+- `POST /api/runtimes/<id>/controls/human-review/resume`   gated one-click start after an applied decision
 
 Every mutation resolves the opaque Runtime ID exactly once through the
 Registry and stays bound to that canonical root for the whole operation. Each
@@ -103,8 +104,20 @@ mismatched confirmations fail closed. Prepared Human Decision receipts are
 stored only in the Console's non-authoritative data directory, are scoped to
 one Runtime ID, and are deleted after a successful apply so a replayed
 confirmation cannot reapply. HUMAN_REVIEW is presented with the bounded
-reason from the Runtime's own control/HUMAN_REVIEW flag and never claims an
-automatic resume.
+reason from the Runtime's own control/HUMAN_REVIEW flag. A successful
+Human Decision Apply additionally attempts one gated automatic resume:
+before anything is started, the Console re-proves from authoritative
+Runtime state that the apply is committed (project SUPERVISOR_TURN, no
+HUMAN_REVIEW), the durable HUMAN_DECISION_RESUME event is persisted and
+bound to that receipt and the active project, control/STOP is absent, no
+live Orchestrator owner exists, and no other start is in progress; the
+Runtime is then started only through its own documented
+START_AGENT_SYSTEM.ps1 entry point (the same path as the Setup Wizard's
+start), whose exclusive-create `.orchestrator.lock` remains the final
+two-instance arbiter. A blocked or failed resume never rolls the apply
+back: the decision stays applied and the surface reports "Decision
+applied, Runtime not resumed" with the blocking reasons and a gated
+one-click resume endpoint that re-evaluates the same proof.
 
 P6 scope (read-only Artifact Center + artifact-triggered feedback):
 
@@ -135,6 +148,14 @@ MESSAGE_ID, normalized artifact paths, a bounded Unicode comment, and an
 explicit STEER or AUDIT mode, then delegates to `supervisor_control.py
 intervene` with references only — artifact contents and project history are
 never auto-injected.
+
+Task Detail additionally performs one bounded server-side read of the
+Runtime's own pre-completion publication records
+(`handoff/executor_publications/<commit_id>/*.json`, located via the pinned
+Runtime commit-id formula and the archived dispatch's verified identity).
+These are the same records a verified completion seals into its publication
+manifest — one provenance source, read before the seal exists — and they are
+surfaced only as provisional metadata that is never presented as final.
 
 The runtime ID in a route is an opaque, server-generated 16-hex-character
 value. A request's Runtime Root is resolved exclusively by looking up that
@@ -196,6 +217,7 @@ import web_console_settings
 import web_console_alerts
 import web_console_runtime_create
 import resume_human_review
+import runtime_lifecycle
 
 SCHEMA_VERSION = 1
 SERVER_VERSION = "GARWebConsole/1.3.0"
@@ -239,6 +261,22 @@ HR_DATA_SUBDIR = "human_review"
 HR_MAX_PREPARED_RECEIPTS = 32
 STOP_SCRIPT_RELATIVE = "STOP_AGENT_SYSTEM.ps1"
 HR_SCRIPT_RELATIVE = Path("scripts") / "resume_human_review.py"
+# Bounded read of the Runtime's own orchestrator_runtime.json, used only to
+# prove the durable HUMAN_DECISION_RESUME event for the auto-resume gate.
+MAX_RUNTIME_DOCUMENT_BYTES = 1024 * 1024
+# Bounded read of the active project's project_state.json, used only to
+# project the authoritative Supervisor decision record into the
+# HUMAN_REVIEW decision brief. Any absence, oversize, or unparsable
+# document degrades to "unavailable"; the Console never writes it back.
+MAX_PROJECT_STATE_BYTES = 1024 * 1024
+ACTIVE_PROJECT_POINTER_MAX_BYTES = 4096
+# Same identity rule as the Runtime's own
+# supervisor_control.PROJECT_ID_PATTERN (the Console resolves the active
+# project exactly like the Runtime does, without importing it).
+ACTIVE_PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# How long one auto-resume waits for another in-process start (Setup Wizard's
+# setup/start or a prior auto-resume) to finish before refusing fail-closed.
+AUTO_RESUME_START_LOCK_WAIT_SECONDS = 90.0
 
 # P7 Setup Wizard bounds. Setup drafts are Console-owned, non-authoritative
 # data (one per registered Runtime); Goal upload needs more room than the
@@ -266,6 +304,9 @@ REPARSE_POINT_FLAG = 0x400
 ARTIFACTS_WALK_MAX_FILES = 5000
 ARTIFACTS_WALK_MAX_DEPTH = 24
 ARTIFACTS_MAX_HASH_BYTES = 64 * 1024 * 1024
+# Per-record read bound for pre-completion Runtime publication records; the
+# Runtime's own reader refuses above the same cap (STAGING_MAX_BYTES).
+PUBLICATION_RECORD_MAX_BYTES = 256 * 1024
 
 # Route shapes for the Runtime Registry. Anything that is not exactly a
 # generated ID (traversal, absolute paths, encoded or mixed separators) is
@@ -291,6 +332,8 @@ ROUTE_REGISTRY_HR_PREPARE = re.compile(
     r"^/api/runtimes/([0-9a-f]{16})/controls/human-review/prepare$")
 ROUTE_REGISTRY_HR_APPLY = re.compile(
     r"^/api/runtimes/([0-9a-f]{16})/controls/human-review/apply$")
+ROUTE_REGISTRY_HR_RESUME = re.compile(
+    r"^/api/runtimes/([0-9a-f]{16})/controls/human-review/resume$")
 ROUTE_REGISTRY_TIMELINE = re.compile(
     r"^/api/runtimes/([0-9a-f]{16})/timeline$")
 ROUTE_REGISTRY_ROUND = re.compile(
@@ -1132,7 +1175,7 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             ROUTE_REGISTRY_PAUSE, ROUTE_REGISTRY_RESUME,
             ROUTE_REGISTRY_INTERVENTION, ROUTE_REGISTRY_STOP_PREPARE,
             ROUTE_REGISTRY_STOP_CONFIRM, ROUTE_REGISTRY_HR_PREPARE,
-            ROUTE_REGISTRY_HR_APPLY))
+            ROUTE_REGISTRY_HR_APPLY, ROUTE_REGISTRY_HR_RESUME))
 
     @staticmethod
     def _is_setup_mutation_path(path: str) -> bool:
@@ -1266,6 +1309,10 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
         match = ROUTE_REGISTRY_HR_APPLY.match(path)
         if match:
             self._control_hr_apply(match.group(1))
+            return
+        match = ROUTE_REGISTRY_HR_RESUME.match(path)
+        if match:
+            self._control_hr_resume(match.group(1))
             return
         match = ROUTE_REGISTRY_ARTIFACT_FEEDBACK.match(path)
         if match:
@@ -1652,6 +1699,85 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
                 and not isinstance(revision, bool)) else None,
         }
 
+    def _precompletion_publications(self, root: Path,
+                                    dispatch_document) -> dict:
+        """Bounded read-only projection of Runtime publication records.
+
+        The Runtime fence writes one record per published artifact under
+        `handoff/executor_publications/<commit_id>/` at publish time — the
+        same single authoritative source a verified completion later seals
+        into its manifest; this reads it before that seal exists, so a
+        dispatched-but-not-completed round can honestly answer "published
+        artifacts, task not complete". The commit directory name is the
+        Runtime's pinned commit-id formula
+        (`completion-<MESSAGE_ID>-<sha256(NONCE)[:24]>`); every record is
+        re-validated fail-closed (schema, identity/project binding,
+        authorized path, hash, timestamp, filename binding) before it is
+        surfaced. Returns {"state": "ok"|"invalid", "records": […],
+        "reason": str|None}; "ok" with zero records means the Runtime has
+        published nothing for this identity yet.
+        """
+        unavailable = {"state": "invalid", "records": [], "reason": None}
+        if (not isinstance(dispatch_document, dict)
+                or dispatch_document.get("ok") is False
+                or dispatch_document.get("integrity") != "AUTHORIZED_VALID"):
+            unavailable["reason"] = "DISPATCH_IDENTITY_UNAVAILABLE"
+            return unavailable
+        message_id = dispatch_document.get("MESSAGE_ID")
+        nonce = dispatch_document.get("NONCE")
+        if (type(message_id) is not int
+                or not isinstance(nonce, str) or not nonce
+                or not isinstance(dispatch_document.get("PROJECT_ID"), str)
+                or not isinstance(dispatch_document.get("TASK_ID"), str)
+                or not isinstance(dispatch_document.get("STAGE_ID"), str)
+                or type(dispatch_document.get("ATTEMPT")) is not int):
+            unavailable["reason"] = "DISPATCH_IDENTITY_INCOMPLETE"
+            return unavailable
+        # Pinned Runtime commit-id formula (executor_completion.commit_id_for).
+        commit_id = "completion-{}-{}".format(
+            message_id,
+            hashlib.sha256(nonce.encode("utf-8")).hexdigest()[:24])
+        directory = root / "handoff" / "executor_publications" / commit_id
+        try:
+            if not directory.is_dir():
+                return {"state": "ok", "records": [], "reason": None}
+            names = sorted(entry.name for entry in directory.iterdir())
+        except OSError:
+            unavailable["reason"] = "PUBLICATION_RECORDS_UNAVAILABLE"
+            return unavailable
+        if len(names) > web_console_artifacts.MAX_PUBLICATION_RECORDS:
+            unavailable["reason"] = "TOO_MANY_PUBLICATION_RECORDS"
+            return unavailable
+        entries = []
+        for name in names:
+            try:
+                raw = (directory / name).read_bytes()
+            except OSError:
+                unavailable["reason"] = "PUBLICATION_RECORD_UNREADABLE"
+                return unavailable
+            if len(raw) > PUBLICATION_RECORD_MAX_BYTES:
+                unavailable["reason"] = "PUBLICATION_RECORD_TOO_LARGE"
+                return unavailable
+            try:
+                record = json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, ValueError):
+                unavailable["reason"] = "PUBLICATION_RECORD_UNPARSEABLE"
+                return unavailable
+            entries.append({"name": name, "record": record})
+        identity = {key: dispatch_document.get(key)
+                    for key in ("MESSAGE_ID", "TASK_ID", "STAGE_ID",
+                                "ATTEMPT", "NONCE")}
+        identity["PROJECT_ID"] = dispatch_document["PROJECT_ID"]
+        records, reason = \
+            web_console_artifacts.verified_runtime_publication_records(
+                entries, identity)
+        if reason is not None:
+            return {"state": "invalid", "records": [], "reason": reason}
+        for record in records:
+            record["commit_id"] = commit_id
+            record["message_id"] = message_id
+        return {"state": "ok", "records": records, "reason": None}
+
     def _registry_round(self, runtime_id: str, message_id_text: str, *,
                         with_body: bool):
         """Read-only Task Detail document for one round (P4).
@@ -1681,6 +1807,8 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             self._send_json(status, envelope, with_body=with_body)
             return
         dispatch_document = dispatch_result.get("document")
+        publications = self._precompletion_publications(
+            root, dispatch_document)
         decision = {"available": False, "verified": False, "reason": None,
                     "turn_id": None, "committed_at": None,
                     "resulting_status": None, "decision_decision": None,
@@ -1695,7 +1823,8 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             dispatch_result=dispatch_result,
             completion_result=completion_result,
             interventions_result=interventions_result,
-            decision=decision)
+            decision=decision,
+            publications=publications)
         meta = {"id": entry["id"], "label": entry["label"],
                 "root": entry["root"]}
         if not detail["found"]:
@@ -2127,6 +2256,37 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
     def _hr_directory(self, runtime_id: str) -> Path:
         return self.config.data_dir / HR_DATA_SUBDIR / runtime_id
 
+    def _prepared_hr_summaries(self, runtime_id: str) -> list:
+        """Bounded read-only listing of this Runtime's prepared receipts.
+
+        The Console stores exactly what its own prepare step returned, so the
+        UI can re-bind to a prepared decision (for example after a page
+        reload) and Apply can send the real receipt_sha256 back instead of
+        re-deriving it. Malformed or unreadable files are skipped rather than
+        breaking the whole controls document; the authoritative validation
+        remains in the Runtime helper at apply time.
+        """
+        hr_dir = self._hr_directory(runtime_id)
+        try:
+            candidates = sorted(hr_dir.glob("human-decision-*.json"))
+        except OSError:
+            return []
+        summaries = []
+        for path in candidates[:HR_MAX_PREPARED_RECEIPTS]:
+            try:
+                if not path.is_file() \
+                        or path.stat().st_size > MAX_HR_RECEIPT_BYTES:
+                    continue
+                stored = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, ValueError):
+                continue
+            summary = web_console_control.prepared_decision_summary(stored)
+            if summary is not None:
+                summaries.append(summary)
+        summaries.sort(key=lambda item: (item["submitted_at"] or "",
+                                         item["receipt_id"]), reverse=True)
+        return summaries
+
     @staticmethod
     def _helper_exit_response(label: str, exit_code: int,
                               stderr_head: str):
@@ -2373,9 +2533,28 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             relayed["next_message_id_unchanged"] = next_message_id
         if isinstance(event.get("executor_dispatched"), bool):
             relayed["executor_dispatched"] = event["executor_dispatched"]
+        # The apply is committed; attempt one gated automatic resume so
+        # Prepare → Apply actually resumes the project in one user action.
+        # The gate re-proves the apply from authoritative Runtime state and
+        # never rolls it back: a refusal or a failed start still answers 200
+        # with the human_decision_result above plus an honest auto_resume
+        # document the UI turns into "Decision applied, Runtime not
+        # resumed" and a gated one-click resume.
+        receipt_id = relayed.get("receipt_id")
+        project_id = relayed.get("project_id")
+        if isinstance(receipt_id, str) and isinstance(project_id, str):
+            auto_resume = self._attempt_auto_resume(
+                entry["id"], meta, root, expected_receipt_id=receipt_id)
+        else:
+            auto_resume = self._auto_resume_result(
+                web_console_control.auto_resume_gate_blocked(
+                    "APPLIED_FACT_UNAVAILABLE",
+                    "the apply answer lacked its receipt/project binding; "
+                    "refusing to start the Runtime without proving exactly "
+                    "what was applied"))
         self._send_json(200, {
             "schema_version": SCHEMA_VERSION, "ok": True, "runtime": meta,
-            "human_decision_result": relayed})
+            "human_decision_result": relayed, "auto_resume": auto_resume})
 
     def _registry_controls(self, runtime_id: str, *, with_body: bool):
         """Pending Controls document for one registered Runtime (P5).
@@ -2405,6 +2584,21 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
         controls_doc["human_review"] = \
             web_console_control.human_review_presentation(
                 status_doc, reason_text, truncated=truncated)
+        controls_doc["human_review"]["prepared"] = \
+            self._prepared_hr_summaries(entry["id"])
+        # Decision Brief: verbatim projection of the authoritative Supervisor
+        # decision record (project_state decision_history /
+        # last_supervisor_decision) for the current review. Read-only; the
+        # Console never writes project_state.json and never adds judgment.
+        controls_doc["human_review"]["decision_brief"] = \
+            web_console_control.human_review_decision_brief(
+                self._read_project_state_document(root))
+        # Same pure gate the automatic resume runs before starting; here its
+        # verdict is only a projection so the UI can honestly show "Decision
+        # applied, Runtime not resumed" (with reasons) after a page reload.
+        controls_doc["human_review"]["applied_resume"] = \
+            web_console_control.applied_resume_facts(
+                self._auto_resume_gate(root, meta, status_doc=status_doc))
         controls_doc["source"] = {
             "kind": "supervisor_control_status_plus_interventions",
             "status_exit_code": 0,
@@ -2433,6 +2627,218 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
             return None, False
         truncated = len(raw) > limit
         return raw[:limit].decode("utf-8", errors="replace"), truncated
+
+    @staticmethod
+    def _read_bounded_json_object(path: Path, *, max_bytes: int):
+        """One bounded JSON object with duplicate keys rejected; None on any
+        absence, oversize, or malformation (fail-closed observation)."""
+        try:
+            if not path.is_file() or path.stat().st_size > max_bytes:
+                return None
+
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError(f"duplicate key: {key}")
+                    result[key] = value
+                return result
+
+            value = json.loads(path.read_text(encoding="utf-8-sig"),
+                               object_pairs_hook=unique)
+        except (OSError, UnicodeDecodeError, ValueError):
+            return None
+        return value if isinstance(value, dict) else None
+
+    def _read_project_state_document(self, root: Path) -> dict | None:
+        """Bounded fail-closed read of the active project's project_state.json.
+
+        Resolution mirrors the Runtime's own
+        `supervisor_control.resolve_active_project` (pointer schema, project
+        id pattern, projects/ containment, legacy fallback) without importing
+        it; the document feeds only the read-only decision brief projection.
+        """
+        pointer_path = root / "control" / "ACTIVE_PROJECT.json"
+        if not pointer_path.is_file():
+            return self._read_bounded_json_object(
+                root / "control" / "project_state.json",
+                max_bytes=MAX_PROJECT_STATE_BYTES)
+        pointer = self._read_bounded_json_object(
+            pointer_path, max_bytes=ACTIVE_PROJECT_POINTER_MAX_BYTES)
+        project_id = pointer.get("project_id") if pointer else None
+        if pointer is None \
+                or set(pointer) != {"schema_version", "project_id",
+                                    "project_root"} \
+                or pointer.get("schema_version") != 1 \
+                or not isinstance(project_id, str) \
+                or not ACTIVE_PROJECT_ID_PATTERN.fullmatch(project_id) \
+                or not isinstance(pointer.get("project_root"), str) \
+                or Path(pointer["project_root"]).as_posix() \
+                != f"projects/{project_id}":
+            return None
+        projects = (root / "projects").resolve()
+        project = (root / "projects" / project_id).resolve()
+        try:
+            if not project.is_relative_to(projects):
+                return None
+        except ValueError:
+            return None
+        return self._read_bounded_json_object(
+            project / "project_state.json",
+            max_bytes=MAX_PROJECT_STATE_BYTES)
+
+    # -- Gated automatic resume after a Human Decision Apply ------------------
+
+    def _runtime_document(self, root: Path) -> dict | None:
+        """Bounded read of the Runtime's own orchestrator_runtime.json.
+
+        Used only to prove the durable HUMAN_DECISION_RESUME pending event;
+        any unreadable, oversized, or non-object document degrades to None
+        and the gate refuses fail-closed.
+        """
+        path = root / "control" / "orchestrator_runtime.json"
+        try:
+            if not path.is_file() \
+                    or path.stat().st_size > MAX_RUNTIME_DOCUMENT_BYTES:
+                return None
+            value = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            return None
+        return value if isinstance(value, dict) else None
+
+    @staticmethod
+    def _live_owner_facts(root: Path) -> tuple[dict | None, str | None]:
+        """Reuse the Runtime's own scheduler-ownership liveness semantics
+        (`runtime_lifecycle.live_owner`) for control/.orchestrator.lock. A
+        live owner blocks the automatic resume; a dead owner's lock is left
+        exactly where it is — orchestrator.py's acquire_lock reclaims it,
+        and the Console never edits authoritative state itself."""
+        try:
+            return runtime_lifecycle.live_owner(root), None
+        except Exception as exc:  # ControlError or anything unexpected
+            return None, str(exc)
+
+    def _auto_resume_gate(self, root: Path, meta: dict,
+                          status_doc: dict | None = None, *,
+                          expected_receipt_id: str | None = None) -> dict:
+        """Gather the authoritative facts and evaluate the pure gate once."""
+        if status_doc is None:
+            status, payload = self.server.status_result(
+                runtime_root=root, runtime_meta=meta)
+            status_doc = payload["control_plane"]["status"] \
+                if status == 200 else None
+        owner, owner_error = self._live_owner_facts(root)
+        return web_console_control.evaluate_auto_resume_gate(
+            status_doc, self._runtime_document(root), live_owner=owner,
+            owner_error=owner_error,
+            expected_receipt_id=expected_receipt_id)
+
+    @staticmethod
+    def _auto_resume_result(gate: dict, **overrides) -> dict:
+        result = {
+            "schema_version": web_console_control.AUTO_RESUME_SCHEMA_VERSION,
+            "attempted": False, "start_invoked": False, "verification": None,
+            "runtime_status": None,
+            "start_entry_point": START_SCRIPT_RELATIVE,
+            "gate": gate, "error": None}
+        result.update(overrides)
+        return result
+
+    def _attempt_auto_resume(self, runtime_id: str, meta: dict, root: Path,
+                             *, expected_receipt_id: str | None = None
+                             ) -> dict:
+        """Start the Runtime through its own documented entry point after a
+        successful Human Decision Apply, but only when the mechanical safety
+        gate proves it from authoritative Runtime state.
+
+        Concurrency: the in-process per-Runtime start lock (the same lock the
+        Setup Wizard's setup/start holds) serializes auto-resume against the
+        other start path and against double-Apply racing two request threads;
+        the gate is re-evaluated freshly inside that lock. Cross-process
+        races (a manual PowerShell start, another Console instance) are
+        narrowed by the gate's live-owner proof and finally arbitrated by
+        orchestrator.py's exclusive-create .orchestrator.lock, so two
+        orchestrators can never both become owners. A start failure never
+        affects the already-committed Human Decision.
+        """
+        gate = self._auto_resume_gate(root, meta,
+                                      expected_receipt_id=expected_receipt_id)
+        if not gate["allowed"]:
+            return self._auto_resume_result(gate)
+        lock = self._setup_start_lock(runtime_id)
+        if not lock.acquire(
+                timeout=AUTO_RESUME_START_LOCK_WAIT_SECONDS):
+            return self._auto_resume_result(
+                web_console_control.auto_resume_gate_blocked(
+                    "START_IN_PROGRESS",
+                    "another start is still in progress; the automatic "
+                    "resume refused to race it (retry the one-click resume "
+                    "once it settles)"))
+        try:
+            gate = self._auto_resume_gate(
+                root, meta, expected_receipt_id=expected_receipt_id)
+            if not gate["allowed"]:
+                return self._auto_resume_result(gate)
+            start = self._run_start_entry(root, meta)
+            if start.get("failed"):
+                return self._auto_resume_result(gate, attempted=True,
+                                                error={
+                                                    "code": start.get("code")
+                                                    or "RESUME_START_FAILED",
+                                                    "message":
+                                                    start.get("message") or
+                                                    "the Runtime start entry "
+                                                    "point failed"})
+            return self._auto_resume_result(
+                gate, attempted=True, start_invoked=True,
+                verification=start.get("verification"),
+                runtime_status=start.get("runtime_status"))
+        finally:
+            lock.release()
+
+    def _control_hr_resume(self, runtime_id: str):
+        """Gated one-click resume: re-run the same proof and start the
+        Runtime through its documented entry point. The Human Decision (if
+        applied) is never touched; refusals name the blocking reason."""
+        resolved = self._resolved_entry(runtime_id)
+        if resolved is None:
+            return
+        entry, meta = resolved
+        root = Path(entry["root"])
+        try:
+            payload = self._read_json_body(allow_empty=True)
+        except BodyError as exc:
+            self._send_body_error(exc)
+            return
+        if payload:
+            self._send_json(400, error_envelope(
+                "CONTROL_INVALID_PAYLOAD",
+                "human-review/resume takes no parameters; send {} or no "
+                "body"))
+            return
+        result = self._attempt_auto_resume(entry["id"], meta, root)
+        if not result["attempted"]:
+            self._send_json(409, error_envelope(
+                "HUMAN_REVIEW_RESUME_BLOCKED",
+                "the mechanical safety gate refused the automatic resume; "
+                "nothing was started and any applied decision stays applied",
+                {"blocked": result["gate"]["blocked"]}))
+            return
+        if result.get("error"):
+            self._send_json(502, error_envelope(
+                "RESUME_START_FAILED",
+                "the decision stays applied, but the Runtime start entry "
+                "point did not succeed", {"error": result["error"]}))
+            return
+        self._send_json(200, {
+            "schema_version": SCHEMA_VERSION, "ok": True, "runtime": meta,
+            "resume_runtime": {
+                "schema_version":
+                    web_console_control.AUTO_RESUME_SCHEMA_VERSION,
+                "start_invoked": result["start_invoked"],
+                "verification": result["verification"],
+                "runtime_status": result["runtime_status"],
+                "start_entry_point": result["start_entry_point"]}})
 
     # -- P6 Artifact Center ----------------------------------------------------
 
@@ -2938,7 +3344,9 @@ class ConsoleRequestHandler(BaseHTTPRequestHandler):
         draft, draft_note = self._load_draft(runtime_id)
         view = web_console_supervisor.config_view(
             config_result, capability=capability,
-            draft_supervisor=draft.get("supervisor"))
+            draft_supervisor=draft.get("supervisor"),
+            control_policy=web_console_supervisor.read_control_fixed_policy(
+                root))
         if draft_note:
             view["honesty"]["notes"].append(draft_note)
         self._send_json(200, {

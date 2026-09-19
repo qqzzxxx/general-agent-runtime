@@ -433,6 +433,8 @@ class AlignmentRecordTests(GoalAnchorFixture):
                 self.m._normalized_human_supervisor_decision({**base, "goal_alignment": bad})
 
     def test_prompt_contract_contains_goal_anchor_and_alignment_fields(self):
+        # V2 alignment instructions are canonical policy, not repeated in the anchor facts.
+        shutil.copyfile(RUNTIME_ROOT / "control/CODEX_SUPERVISOR_RUNTIME.md", self.m.SUPERVISOR_RULES)
         prompt = self.m.build_codex_prompt(
             "SUPERVISOR_TURN", {"source": "fixture"}, self.read_state())
         self.assertIn("=== GOAL ANCHOR (GOAL-ANCHOR-V1) ===", prompt)

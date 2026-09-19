@@ -888,6 +888,15 @@ class HumanDecisionTests(ControlEndpointTestsBase):
         helpers = [call for call in self.fixture.calls(self.fixture.runtime_a)
                    if "helper" in call]
         self.assertEqual(helpers, [{"helper": "prepare"}])
+        # The controls document mirrors the stored prepared receipt so the
+        # Apply step can echo the exact prepare binding back (also after a
+        # page reload).
+        status, controls, _ = self.get_controls(self.runtime_a["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual(controls["controls"]["human_review"]["prepared"],
+                         [{"receipt_id": decision["receipt_id"],
+                           "receipt_sha256": decision["receipt_sha256"],
+                           "submitted_at": "2026-09-12T04:00:00+00:00"}])
         status, payload, _ = self.apply(decision["receipt_id"],
                                         decision["receipt_sha256"])
         self.assertEqual(status, 200)
@@ -899,12 +908,52 @@ class HumanDecisionTests(ControlEndpointTestsBase):
                    if "helper" in call]
         self.assertEqual(helpers, [{"helper": "prepare"},
                                    {"helper": "apply"}])
+        status, controls, _ = self.get_controls(self.runtime_a["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual(controls["controls"]["human_review"]["prepared"], [])
         # The consumed receipt is gone: a replayed confirmation cannot reapply.
         status, payload, _ = self.apply(decision["receipt_id"],
                                         decision["receipt_sha256"])
         self.assertEqual(status, 404)
         self.assertEqual(payload["error"]["code"],
                          "HUMAN_DECISION_RECEIPT_UNKNOWN")
+
+    def test_apply_without_receipt_sha256_fails_closed(self):
+        # Regression pin (2026-09-15 Web Console wiring bug): the UI posted
+        # {receipt_id} alone and the Runtime refused with a schema mismatch
+        # after the prepare step had already succeeded.
+        self.activate_review(self.fixture.runtime_a)
+        _, payload, _ = self.prepare()
+        decision = payload["human_decision"]
+        status, payload, _ = self.fixture.request(
+            "POST",
+            f"/api/runtimes/{self.runtime_a['id']}"
+            f"/controls/human-review/apply",
+            body={"receipt_id": decision["receipt_id"]})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["code"], "CONTROL_INVALID_PAYLOAD")
+        self.assertIn("receipt_sha256", payload["error"]["detail"]["reason"])
+        helpers = [call for call in self.fixture.calls(self.fixture.runtime_a)
+                   if "helper" in call]
+        self.assertEqual(helpers, [{"helper": "prepare"}])
+
+    def test_prepared_listing_skips_unusable_stored_files(self):
+        self.activate_review(self.fixture.runtime_a)
+        _, payload, _ = self.prepare()
+        decision = payload["human_decision"]
+        hr_dir = (self.fixture.data_dir / "human_review"
+                  / self.runtime_a["id"])
+        (hr_dir / f"human-decision-{'0' * 32}.json").write_text(
+            "definitely not json", encoding="utf-8")
+        (hr_dir / f"human-decision-{'1' * 32}.json").write_text(
+            json.dumps({"receipt_id": "human-decision-" + "1" * 32},
+                       ensure_ascii=False), encoding="utf-8")
+        status, controls, _ = self.get_controls(self.runtime_a["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual(controls["controls"]["human_review"]["prepared"],
+                         [{"receipt_id": decision["receipt_id"],
+                           "receipt_sha256": decision["receipt_sha256"],
+                           "submitted_at": "2026-09-12T04:00:00+00:00"}])
 
     def test_apply_rejects_a_mismatched_receipt_hash(self):
         self.activate_review(self.fixture.runtime_a)

@@ -305,20 +305,30 @@ class SupervisorRouteTests(unittest.TestCase):
         config = payload["supervisor_config"]
         self.assertFalse(config["active"]["configured"])
         self.assertIsNone(config["pending"])
+        # The canonical model menu is part of the configuration surface.
+        self.assertEqual(config["supported_models"],
+                         list(wsup.SUPPORTED_SUPERVISOR_MODELS))
+        self.assertEqual(config["supported_model_display_names"],
+                         {"gpt-5.6-sol": "GPT-5.6 Sol",
+                          "gpt-6-astra": "GPT-6 Astra"})
 
         status, payload, _ = self.fixture.request(
             "POST", f"/api/runtimes/{self.runtime_id}/supervisor/config",
-            body={"model": "gpt-6", "reasoning_effort": "HIGH"})
+            body={"model": "gpt-6-astra", "reasoning_effort": "xhigh"})
         self.assertEqual(status, 200, payload)
         result = payload["supervisor_config"]
         self.assertTrue(result["queued"])
         self.assertFalse(result["turn_in_flight"])
+        # The CLI-canonical lowercase effort arrives as the stored uppercase
+        # vocabulary, one mapping with the queued value.
+        self.assertEqual(result["pending"]["reasoning_effort"], "XHIGH")
 
         status, payload, _ = self.fixture.request(
             "GET", f"/api/runtimes/{self.runtime_id}/supervisor/config")
         config = payload["supervisor_config"]
         self.assertFalse(config["active"]["configured"])
-        self.assertEqual(config["pending"]["model"], "gpt-6")
+        self.assertEqual(config["pending"]["model"], "gpt-6-astra")
+        self.assertTrue(config["pending"]["supported"])
         self.assertEqual(config["pending"]["applies"],
                          "next eligible Supervisor turn")
 
@@ -338,17 +348,34 @@ class SupervisorRouteTests(unittest.TestCase):
             "GET", f"/api/runtimes/{self.runtime_id}/supervisor/config")
         config = payload["supervisor_config"]
         self.assertTrue(config["active"]["configured"])
-        self.assertEqual(config["active"]["model"], "gpt-6")
+        self.assertEqual(config["active"]["model"], "gpt-6-astra")
+        self.assertEqual(config["active"]["reasoning_effort"], "XHIGH")
+        self.assertTrue(config["active"]["supported"])
         self.assertIsNone(config["pending"])
+
+    def test_config_post_rejects_non_canonical_model(self):
+        status, payload, _ = self.fixture.request(
+            "POST", f"/api/runtimes/{self.runtime_id}/supervisor/config",
+            body={"model": "gpt-6", "reasoning_effort": "HIGH"})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["code"], "CONTROL_INVALID_PAYLOAD")
+        self.assertIn("gpt-5.6-sol", payload["error"]["detail"]["reason"])
+        self.assertIn("gpt-6-astra", payload["error"]["detail"]["reason"])
+        status, payload, _ = self.fixture.request(
+            "GET", f"/api/runtimes/{self.runtime_id}/supervisor/config")
+        self.assertIsNone(payload["supervisor_config"]["pending"],
+                          "a refused change must leave no queued state")
 
     def test_config_post_validation_matrix(self):
         bad_bodies = [
-            {"model": "gpt-6"},
+            {"model": "gpt-6-astra"},
             {"reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "ULTRA"},
+            {"model": "gpt-6-astra", "reasoning_effort": "ULTRA"},
             {"model": "", "reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "HIGH", "extra": None},
+            {"model": "gpt-6-astra", "reasoning_effort": "HIGH",
+             "extra": None},
             {"model": 6, "reasoning_effort": "HIGH"},
+            {"model": "gpt-5.6-terra", "reasoning_effort": "HIGH"},
         ]
         for body in bad_bodies:
             status, payload, _ = self.fixture.request(
@@ -362,7 +389,7 @@ class SupervisorRouteTests(unittest.TestCase):
         (self.fixture.runtime / "control" / "STOP").write_bytes(b"STOP")
         status, payload, _ = self.fixture.request(
             "POST", f"/api/runtimes/{self.runtime_id}/supervisor/config",
-            body={"model": "gpt-6", "reasoning_effort": "HIGH"})
+            body={"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         self.assertEqual(status, 409)
         self.assertEqual(payload["error"]["code"], "CONTROL_ACTION_REFUSED")
 
@@ -416,7 +443,7 @@ class SupervisorRouteTests(unittest.TestCase):
                            usage=REPORTED_USAGE)
         self.fixture.request(
             "POST", f"/api/runtimes/{self.runtime_id}/supervisor/config",
-            body={"model": "gpt-6", "reasoning_effort": "LOW"})
+            body={"model": "gpt-6-astra", "reasoning_effort": "LOW"})
         self.fixture.restart()
         status, payload, _ = self.fixture.request(
             "GET", f"/api/runtimes/{self.runtime_id}/supervisor/turns")

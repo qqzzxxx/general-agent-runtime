@@ -522,6 +522,32 @@ class TimelineEndpointTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"],
                          "CONTROL_PLANE_MALFORMED_OUTPUT")
 
+    def test_non_dict_completion_document_fails_closed_over_the_wire(self):
+        # A foreign or older control plane that answers `feedback` with a
+        # bare JSON list must not kill the route: the round still composes
+        # from its dispatch history, and the completion block is honestly
+        # unavailable instead of fabricating data or dropping the
+        # connection.
+        feedback_file = (self.fixture.runtime_a / "stub_history"
+                         / "feedback-700501.json")
+        original = feedback_file.read_text(encoding="utf-8")
+        feedback_file.write_text(json.dumps([{"unexpected": "shape"}]),
+                                 encoding="utf-8")
+        try:
+            status, payload, _ = self.fixture.request(
+                "GET", f"/api/runtimes/{self.runtime_a['id']}/rounds/700501")
+        finally:
+            feedback_file.write_text(original, encoding="utf-8")
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ok"])
+        detail = payload["round"]
+        self.assertFalse(detail["completion"]["available"])
+        self.assertIsNone(detail["completion"]["receipt"])
+        self.assertIn("the completion query returned unusable output",
+                      detail["honesty"]["notes"])
+        self.assertTrue(detail["dispatch"]["available"])
+        self.assertIn("TO_ZCODE", detail["dispatch"]["exact_dispatch"])
+
     def test_control_plane_error_fails_closed(self):
         self.set_mode("exit2_json")
         status, payload, _ = self.timeline_of(self.runtime_a["id"])

@@ -203,7 +203,10 @@ class AuthorizationExpiryTests(unittest.TestCase):
         self.assertTrue({"zcode-pickup", "authorization-expiry"} <= rules(project(**current)))
         claimed = current | {"active_task_claimed": True, "active_task_claim_recorded": True}
         self.assertNotIn("zcode-pickup", rules(project(**claimed)))
-        self.assertIn("authorization-expiry", rules(project(**claimed)))
+        # PICKUP-EXECUTION-LIFECYCLE: a claimed owner legitimately continues
+        # past the pickup window on its execution budget, so the pickup-window
+        # expiry alert would be a false alarm there.
+        self.assertNotIn("authorization-expiry", rules(project(**claimed)))
         variants = [
             {"active_task": None},
             {"active_task_completion_status": "COMPLETION_COMMITTED"},

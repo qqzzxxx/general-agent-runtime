@@ -1,4 +1,4 @@
-# General Agent Runtime v1.3
+# General Agent Runtime v1.4
 
 An unattended dual-Agent runtime in which a **high-reasoning Supervisor**, a
 **high-throughput Executor**, and a **deterministic Python Orchestrator** cooperate on
@@ -7,13 +7,16 @@ acting as the message bus.
 
 The architecture separates Supervisor, Executor, and Orchestrator roles at the
 protocol level, but this release is **not plug-and-play model-agnostic**. The current
-Supervisor integration is implemented specifically for Codex CLI and pins GPT-5.6 Sol.
-The validated V1 Supervisor configuration is **Codex CLI + GPT-5.6 Sol + high reasoning**.
-Other Supervisor models/backends are not part of the validated V1 release.
+Supervisor integration is implemented specifically for Codex CLI and defaults to
+GPT-5.6 Sol with high reasoning. The Supervisor model and reasoning effort are
+operator-configurable through `control/supervisor_control.json`
+(`supervisor_model` / `supervisor_reasoning_effort`); the built-in constants apply
+only when that configuration is absent or invalid. Other Supervisor backends are not
+part of the validated release.
 
 | Role | Current implementation | Portability |
 |---|---|---|
-| Supervisor (planning, acceptance, redirection, stop) | Codex CLI / GPT-5.6 Sol (`codex exec`) | replacing it requires code-level backend/invocation adaptation |
+| Supervisor (planning, acceptance, redirection, stop) | Codex CLI (`codex exec`); model/effort configurable via `control/supervisor_control.json` | replacing it requires code-level backend/invocation adaptation |
 | Executor (bulk implementation, evidence production) | ZCode Desktop Scheduled Automation / GLM | an equivalent scheduled automation can be adapted if it fully obeys the Runtime wire, claim, scope, and completion protocols |
 | Orchestrator (mechanical scheduling, authorization, gating) | Python; mechanically invokes the Supervisor backend | fixed by design |
 
@@ -297,11 +300,11 @@ fence, completion wins and is delivered normally; if interrupt obtains the fence
 the identity is retired and its later commit is rejected. STOP remains terminal, and HUMAN_REVIEW still
 requires `RESUME_HUMAN_REVIEW.ps1`. Query and mutation commands support `-Json`.
 `scripts/supervisor_control.py` is the structured interface used by the included
-v1.3 Web Console. JSON mode emits exactly one
+v1.4 Web Console. JSON mode emits exactly one
 ASCII-safe JSON document on stdout, including for Unicode input; lifecycle/start text
 is kept off that stream.
 
-## Web Console (v1.3)
+## Web Console (v1.4)
 
 Run `.\START_WEB_CONSOLE.ps1` to start the local server and open the browser.
 Use **Create Runtime** to create an isolated release skeleton, then **Setup** to
@@ -414,25 +417,37 @@ chat conversation.
 
 ## Status
 
-General Agent Runtime **v1.2.0** is the current public and recommended release. It adds
-the permanent Supervisor dispatch archive, exact historical `MESSAGE_ID` lookup,
-authoritative Executor feedback history, a combined agent timeline, STEER and AUDIT
-interventions, reversible pause/resume, cooperative current-task interruption, and
-JSON-capable status/history/control interfaces for future UI clients.
+General Agent Runtime **v1.4** is the current release. On top of the v1.3 foundation
+(permanent Supervisor dispatch archive, authoritative Executor feedback, combined
+timeline, STEER/AUDIT interventions, reversible pause/resume, cooperative interruption,
+and JSON control interfaces), v1.4 adds:
+
+- a configurable Supervisor baseline (`supervisor_model` / `supervisor_reasoning_effort`
+  in `control/supervisor_control.json`, with queued per-change configurations);
+- the Agent Intelligence baseline: Memory Routing V2 for Supervisor context, plus
+  refined exploration-judgment, ambiguity/Human-Review, and task-restriction wording;
+- Runtime-owned dispatch and completion: the Orchestrator prepares, authorizes, and
+  seals task handoffs and completion records, and the Executor contract moves to
+  `executor_entry.py --contract-version 2` with host-native tools;
+- a pickup/execution lifecycle with pickup timeouts and claimed-time budgets, and a
+  reconciliation path for claimed Executor timeouts;
+- the Human Decision lifecycle (HUMAN_DECISION + verbatim Decision Briefs in the Web
+  Console) and the Human Decision → Final Verification bridge, so a human decision can
+  carry a project through Runtime-owned Final Verification and Final Acceptance without
+  manual lifecycle surgery;
+- orphan Supervisor-event reconciliation and legacy pause recovery through a single
+  canonical park/resume mechanism;
+- the redesigned light-theme v1.4 Web Console with Runtime creation, Setup wizard,
+  Cockpit, Artifacts with provenance, and Final Verification state.
 
 Historical dispatch and completion records remain append-only. New Executor acquisition
 fails closed without the required archive and authorization integrity, pending human
 input is enforced at Supervisor authorization boundaries, STOP remains terminal, and
 HUMAN_REVIEW and Final Verification guards remain intact.
 
-Release validation included a clean release-like black-box run and a real autonomous
-Codex <-> ZCode Desktop Automation smoke test through Final Verification and normal
-COMPLETE, in addition to the complete automated regression suite.
-
-Current-task interruption is cooperative Runtime/fence revocation, not an instantaneous
-operating-system process kill. A legacy attempt that already owns its permanent claim
-uses the documented completion-only recovery path. The planned v1.3 browser Web Console
-is not included in v1.2.0, and this release does not claim absolute bug-freedom.
+Release validation includes the complete automated regression suite plus clean
+release-layout startup tests that run the public launchers from a fresh, non-Git copy
+with no developer environment. This release does not claim absolute bug-freedom.
 
 Run the full regression suite from the Runtime Root with:
 

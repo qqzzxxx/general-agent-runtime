@@ -215,6 +215,7 @@ class P9Fixture:
         (console / "docs" / "a.md").write_text("docs\n", encoding="utf-8")
         scripts = console / "scripts"
         for name in ("supervisor_control.py", "provider_usage.py", "executor_claim.py",
+                     "supervisor_context.py", "supervisor_inspect.py", "supervisor_intelligence.py",
                      "executor_fence.py", "executor_completion.py",
                      "preflight.py", "start_project.py", "other.py"):
             if name == "supervisor_control.py" and complete:

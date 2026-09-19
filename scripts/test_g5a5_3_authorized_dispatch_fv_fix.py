@@ -171,6 +171,17 @@ class AuthorizedDispatchAndFVTests(unittest.TestCase):
 
     def authorize(self, task, state=None):
         state = self.publish(task, state)
+        # HUMAN-DECISION-FV-BRIDGE-V1: registration enforces Runtime gate
+        # provenance; this fixture hand-authors the gate to exercise the
+        # authorization/claim layers, so record the prepared identity exactly
+        # as final_verification_contract.prepare() would.
+        gate = task.get("FINAL_VERIFICATION_GATE")
+        if isinstance(gate, dict) and gate.get("CLAIMS_HASH"):
+            import final_verification_contract as contract
+            contract.record_prepared_identity(
+                o.ROOT, o.load_runtime(),
+                {key: task[key] for key in o.IDENTITY_KEYS},
+                gate["CLAIMS_HASH"], o.stamp())
         o.register_dispatched_task(self.runtime, state)
         return state
 
@@ -308,7 +319,9 @@ class AuthorizedDispatchAndFVTests(unittest.TestCase):
         self.assertEqual(self.claims(), [])
 
     def test_supervisor_contract_shows_exact_nested_profile_gate(self):
-        runtime_contract = (CANDIDATE / "control" / "CODEX_SUPERVISOR_RUNTIME.md").read_text(
+        policy = (CANDIDATE / "control" / "CODEX_SUPERVISOR_RUNTIME.md").read_text(encoding="utf-8")
+        self.assertIn("control/SUPERVISOR_PROTOCOL_REFERENCE.md", policy)
+        runtime_contract = (CANDIDATE / "control" / "SUPERVISOR_PROTOCOL_REFERENCE.md").read_text(
             encoding="utf-8"
         )
         template = (CANDIDATE / "control" / "EXECUTOR_TASK_TEMPLATE.md").read_text(

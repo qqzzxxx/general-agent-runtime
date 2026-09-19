@@ -1,4 +1,27 @@
-# Executor task wire template (Supervisor fills values)
+# Executor full-wire compatibility template (Final Verification / Human Decision)
+
+Ordinary dispatches now use `project_state.ordinary_task_proposal`; Runtime builds
+the wire and mirrors. Its required semantic keys are `logical_task`, `logical_stage`,
+`objective`, `inputs`, `outputs`, and `acceptance_criteria`. Optional semantic keys:
+`forbidden_actions`, `stop_conditions`, `max_time` (1..2700 seconds), `max_retries`
+(0..2), and `execution` (V2 autonomy, capabilities, read_paths and network_urls). See
+`docs/v1.4-host-native-executor.md` for current native-tool modes and assurance limits, and
+`docs/v1.4-executor-contract-v2.md` and `docs/v1.4-runtime-owned-dispatch.md`. Do not fill this wire for a new
+ordinary Supervisor turn. The full wire below is retained for Final Verification,
+Human Decision transactions and pre-upgrade recovery.
+
+The canonical prompt now requests `executor_entry.py --contract-version 2` and
+permits available host tools for task work. `executor_work.py` supplies optional
+utilities, native-work checkpoints and semantic finish. V2 exposes outcome,
+selected context, criteria, autonomy, session-dependent capabilities and work paths.
+Runtime handles identity, live authority and publication/completion checks.
+V1 entry remains available for owning historical clients and retains custom
+protocol/FV metadata. V2 rejects unknown legacy protocol instructions instead of
+guessing which are safe to remove: reauthor their substantive requirements in
+INPUTS, ACCEPTANCE_CRITERIA, FORBIDDEN_ACTIONS or task context for a fresh dispatch.
+V2 projects sealed FV v1 claims/standards without identity/hash packaging, supports
+LIVE_READ_ONLY verification, and rejects unsupported FV execution modes.
+The full compatibility wire below remains unchanged for archive validation.
 
 Publish root `TO_ZCODE.md` with a plain compatibility header followed by exactly one fenced JSON object. Keep the task stage-sized, not micro-sized.
 
@@ -74,7 +97,7 @@ Supervisor model note: all Codex turns are fixed to GPT-5.6 Sol + High by the Or
 
 ## Generic profile-bound final-verification specialization
 
-Ordinary tasks remain unchanged. For a new `TASK_KIND: FINAL_VERIFICATION` stage,
+For a new `TASK_KIND: FINAL_VERIFICATION` stage,
 the Supervisor records decision `FINAL_VERIFICATION` and supplies
 `FINAL_VERIFICATION_REQUEST` containing `CRITICAL_CLAIMS`.
 `EXECUTION_MODE` is Runtime-owned and should be omitted from the request.
@@ -118,12 +141,19 @@ missing keys. A claim written with uppercase keys (`CLAIM_ID`, `TYPE`,
 `FALSIFIED_IF`, ...) is rejected as schema-invalid: the dispatch is quarantined, and
 the Supervisor gets one bounded repair turn.
 
-For gate `CONTRACT_VERSION=1`, the Executor supplies `FINAL_VERIFICATION_RESULTS`
-with `OVERALL_STATUS`, exact `CLAIM_RESULTS` and applicable sandbox/incident facts.
+For gate `CONTRACT_VERSION=1`, V2 Executors report semantic `verification` with
+`overall_status`, exact `claims` judgments and applicable sandbox/incident facts.
+Runtime supplies the `FINAL_VERIFICATION_RESULTS` completion container. The older
+`completion.FINAL_VERIFICATION_RESULTS` input remains supported for compatibility.
 The completion helper constructs `FINAL_VERIFICATION` metadata from the sealed
 dispatch; it never invents results. For legacy gates without a contract version,
 the Executor must add the `FINAL_VERIFICATION` receipt object defined in
 `control/FINAL_VERIFICATION_POLICY.md`.
+
+An `INVALID_RESULT/CORRECT_AND_RESUBMIT` response permits the same live owner to
+correct a finish rejected before the durable publication/completion boundary.
+It does not grant a new claim or extend authority. See
+[Phase 7 finish recovery](../docs/v1.4-semantic-finish-recovery.md).
 
 This task is bounded adversarial verification. Do not restart broad market research.
 

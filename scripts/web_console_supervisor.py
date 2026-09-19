@@ -34,6 +34,7 @@ DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 MAX_OFFSET = 10_000_000
 MAX_TURN_RECORD_BYTES = 1024 * 1024
+MAX_CONTROL_DOC_BYTES = 256 * 1024
 MAX_RECEIPT_BYTES = 1024 * 1024
 MAX_TURN_WALK = 5000
 MAX_UNUSABLE_LISTED = 20
@@ -42,14 +43,24 @@ ID_PROJECT = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 TURN_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
-# The Runtime configuration contract's supported reasoning-effort set. This
-# is deliberately the subset of the P7 suggestion vocabulary that the
-# Runtime's Codex integration applies today; the parity is pinned by tests
-# against supervisor_control.SUPERVISOR_CONFIG_EFFORTS.
-SUPPORTED_REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH")
+# The Runtime configuration contract's supported value space, pinned by tests
+# against supervisor_control.SUPERVISOR_CONFIG_MODELS and
+# supervisor_control.SUPERVISOR_CONFIG_EFFORTS. The canonical models and the
+# XHIGH effort were confirmed from the actually installed Codex CLI
+# (codex-cli 0.154.0 `codex debug models`, 2026-09-18; see
+# evidence/v1.4-supervisor-config-ui/).
+SUPPORTED_SUPERVISOR_MODELS = ("gpt-5.6-sol", "gpt-6-astra")
+SUPPORTED_MODEL_DISPLAY_NAMES = {"gpt-5.6-sol": "GPT-5.6 Sol",
+                                 "gpt-6-astra": "GPT-6 Astra"}
+SUPPORTED_MODELS_NOTE = (
+    "the Runtime's Codex integration applies exactly the canonical "
+    "Supervisor models gpt-5.6-sol (GPT-5.6 Sol) and gpt-6-astra (GPT-6 "
+    "Astra) today; any other model id is refused deterministically instead "
+    "of being applied unverified")
+SUPPORTED_REASONING_EFFORTS = ("LOW", "MEDIUM", "HIGH", "XHIGH")
 SUPPORTED_EFFORTS_NOTE = (
-    "the Runtime's Codex integration applies LOW, MEDIUM, and HIGH today; "
-    "other reasoning-effort suggestions are refused deterministically "
+    "the Runtime's Codex integration applies LOW, MEDIUM, HIGH, and XHIGH "
+    "today; other reasoning-effort suggestions are refused deterministically "
     "instead of being applied unverified")
 FIXED_POLICY_NOTE = (
     "no queued configuration is active; the Runtime's fixed Supervisor "
@@ -62,6 +73,10 @@ PENDING_NOTE = (
 DRAFT_NOTE = (
     "Console-owned setup draft (non-authoritative); it only prefills the "
     "form and never changes the Runtime by itself")
+CONFIGURED_POLICY_NOTE = (
+    "the fixed Supervisor policy is configured in the Runtime's control "
+    "document (control/supervisor_control.json); a queued configuration "
+    "still takes precedence at the next eligible Supervisor turn boundary")
 ZCODE_USAGE_NOTE = (
     "ZCode usage is not reported; the Runtime has no reliable "
     "authoritative ZCode token usage source")
@@ -764,50 +779,116 @@ def read_config_document(root: Path) -> dict:
     return {"state": "ok", "config": value, "reason": None}
 
 
+def read_control_fixed_policy(root: Path) -> dict:
+    """Read the optionally configured fixed Supervisor policy, non-raising.
+
+    The authoritative source is the Runtime's own control document
+    (`control/supervisor_control.json`, optional `supervisor_model` /
+    `supervisor_reasoning_effort` fields); the same fields are re-validated
+    by the Runtime at every Supervisor turn boundary. An absent or
+    unreadable control document simply means "not configured" — the
+    built-in default policy applies and nothing is invented here.
+    """
+    path = Path(root) / "control" / "supervisor_control.json"
+    not_configured = {"configured": False, "model": None,
+                      "reasoning_effort": None, "source": "control_config",
+                      "note": None}
+    try:
+        if path.stat().st_size > MAX_CONTROL_DOC_BYTES:
+            return not_configured
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return not_configured
+    if not isinstance(value, dict):
+        return not_configured
+    import supervisor_control
+    policy = supervisor_control.supervisor_fixed_policy_from_control(value)
+    if policy is None:
+        return not_configured
+    return {**not_configured, "configured": True,
+            "model": policy["model"],
+            "reasoning_effort": policy["reasoning_effort"]}
+
+
 def config_view(config_result: dict, *, capability,
-                draft_supervisor) -> dict:
+                draft_supervisor, control_policy=None) -> dict:
     """Honest active-versus-pending configuration presentation."""
     notes: list[str] = []
     state = config_result.get("state")
     config = config_result.get("config")
+
+    def block_supported(model, effort) -> bool:
+        """False only when a stored value is outside the current supported
+        vocabulary — surfaced verbatim (never repaired or hidden) so the
+        operator can see a legacy value and replace it explicitly."""
+        return (model in SUPPORTED_SUPERVISOR_MODELS
+                and effort in SUPPORTED_REASONING_EFFORTS)
+
+    baseline = control_policy if isinstance(control_policy, dict) else None
+    baseline_configured = bool(baseline and baseline.get("configured"))
+    fixed_policy = {"configured": baseline_configured,
+                    "model": baseline.get("model") if baseline_configured else None,
+                    "reasoning_effort": baseline.get("reasoning_effort")
+                    if baseline_configured else None,
+                    "supported": True if baseline_configured else None,
+                    "source": "control_config",
+                    "note": CONFIGURED_POLICY_NOTE if baseline_configured
+                    else FIXED_POLICY_NOTE}
+    if baseline_configured:
+        fixed_policy["supported"] = block_supported(
+            baseline.get("model"), baseline.get("reasoning_effort"))
     active = {"configured": False, "source": "fixed_policy",
               "model": None, "reasoning_effort": None, "applied_at": None,
-              "config_revision": None, "notes": [FIXED_POLICY_NOTE]}
+              "config_revision": None, "supported": True,
+              "notes": [fixed_policy["note"]]}
     pending = None
     if state == "ok" and isinstance(config, dict):
         active_block = config.get("active")
         if isinstance(active_block, dict):
+            active_model = active_block.get("model")
+            active_effort = active_block.get("reasoning_effort")
             active = {"configured": True, "source": "queued",
-                      "model": active_block.get("model"),
-                      "reasoning_effort": active_block.get(
-                          "reasoning_effort"),
+                      "model": active_model,
+                      "reasoning_effort": active_effort,
                       "applied_at": active_block.get("applied_at"),
                       "config_revision": active_block.get("config_revision"),
+                      "supported": block_supported(active_model,
+                                                   active_effort),
                       "notes": []}
         pending_block = config.get("pending")
         if isinstance(pending_block, dict):
-            pending = {"model": pending_block.get("model"),
-                       "reasoning_effort": pending_block.get(
-                           "reasoning_effort"),
+            pending_model = pending_block.get("model")
+            pending_effort = pending_block.get("reasoning_effort")
+            pending = {"model": pending_model,
+                       "reasoning_effort": pending_effort,
                        "queued_at": pending_block.get("queued_at"),
                        "config_revision": pending_block.get(
                            "config_revision"),
                        "applies": "next eligible Supervisor turn",
+                       "supported": block_supported(pending_model,
+                                                    pending_effort),
                        "notes": [PENDING_NOTE]}
     elif state == "unusable":
         notes.append(config_result.get("reason")
                      or "the configuration document is unusable")
     draft = {"available": False, "model": None, "reasoning_effort": None,
-             "note": DRAFT_NOTE}
+             "supported": True, "note": DRAFT_NOTE}
     if isinstance(draft_supervisor, dict):
         draft["available"] = True
         draft["model"] = draft_supervisor.get("model")
         draft["reasoning_effort"] = draft_supervisor.get("reasoning_effort")
+        draft["supported"] = block_supported(draft_supervisor.get("model"),
+                                             draft_supervisor.get(
+                                                 "reasoning_effort"))
     return {"schema_version": SUPERVISOR_SCHEMA_VERSION,
             "state": state,
             "active": active,
             "pending": pending,
+            "fixed_policy": fixed_policy,
             "capability": capability,
+            "supported_models": list(SUPPORTED_SUPERVISOR_MODELS),
+            "supported_model_display_names": dict(SUPPORTED_MODEL_DISPLAY_NAMES),
+            "supported_models_note": SUPPORTED_MODELS_NOTE,
             "supported_reasoning_efforts": list(SUPPORTED_REASONING_EFFORTS),
             "supported_note": SUPPORTED_EFFORTS_NOTE,
             "draft": draft,
@@ -815,7 +896,15 @@ def config_view(config_result: dict, *, capability,
 
 
 def validate_config_change_request(payload) -> dict:
-    """Exactly {"model", "reasoning_effort"} in the supported value space."""
+    """Exactly {"model", "reasoning_effort"} in the supported value space.
+
+    The model must be one of the canonical Supervisor models confirmed from
+    the installed Codex CLI; the effort is normalized to the Runtime's stored
+    uppercase vocabulary, so the CLI-canonical lowercase form ("medium",
+    "high", "xhigh") and the historical uppercase form are one mapping.
+    Anything else is refused with an explicit reason; no value is ever
+    silently substituted.
+    """
     web_console_control._require_object(payload)
     web_console_control._require_exact_keys(
         payload, ("model", "reasoning_effort"))
@@ -830,7 +919,15 @@ def validate_config_change_request(payload) -> dict:
     if any(unicodedata.category(char) == "Cc" for char in model):
         raise web_console_control.ControlRequestError(
             "model must not contain control characters", field="model")
+    if model not in SUPPORTED_SUPERVISOR_MODELS:
+        raise web_console_control.ControlRequestError(
+            "model must be one of the canonical Supervisor models supported "
+            "by this Runtime's Codex CLI: "
+            + ", ".join(SUPPORTED_SUPERVISOR_MODELS),
+            field="model")
     effort = payload["reasoning_effort"]
+    if isinstance(effort, str):
+        effort = effort.strip().upper()
     if effort not in SUPPORTED_REASONING_EFFORTS:
         raise web_console_control.ControlRequestError(
             "reasoning_effort must be one of "

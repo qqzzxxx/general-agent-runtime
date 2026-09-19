@@ -74,6 +74,7 @@ RELEASE_DIRECTORIES = ("docs", "profiles", "scripts", "web_console")
 CONTROL_SEED_FILES = (
     "budget.json",
     "CODEX_SUPERVISOR_RUNTIME.md",
+    "SUPERVISOR_PROTOCOL_REFERENCE.md",
     "EXECUTOR_TASK_TEMPLATE.md",
     "FINAL_VERIFICATION_POLICY.md",
     "HUMAN_DECISION_TEMPLATE.json",
@@ -90,6 +91,9 @@ REQUIRED_RELEASE_PATHS = (
     "orchestrator.py",
     "scripts/supervisor_control.py",
     "scripts/provider_usage.py",
+    "scripts/supervisor_context.py",
+    "scripts/supervisor_inspect.py",
+    "scripts/supervisor_intelligence.py",
     "scripts/executor_claim.py",
     "scripts/executor_fence.py",
     "scripts/executor_completion.py",
@@ -287,10 +291,21 @@ def check_destination_parent(destination: Path) -> None:
 
 
 def plan_copy(source_root: Path) -> dict:
-    """Verify the release skeleton is complete before anything is written."""
+    """Verify the release skeleton is complete before anything is written.
+
+    Validates the full named allowlist (files, directories, control and
+    handoff seeds), not just REQUIRED_RELEASE_PATHS: copy_entry skips absent
+    entries silently, so a source missing any seed would otherwise produce a
+    created Runtime that the fresh-install readiness proof can never verify.
+    """
     source_root = Path(source_root)
-    missing = [rel for rel in REQUIRED_RELEASE_PATHS
-               if not (source_root / rel).is_file()]
+    expected_files = set(RELEASE_FILES) | set(REQUIRED_RELEASE_PATHS)
+    expected_files.update("control/" + name for name in CONTROL_SEED_FILES)
+    expected_files.update("handoff/" + name for name in HANDOFF_SEED_FILES)
+    missing = sorted(rel for rel in expected_files
+                     if not (source_root / rel).is_file())
+    missing.extend(sorted(name for name in RELEASE_DIRECTORIES
+                          if not (source_root / name).is_dir()))
     if missing:
         raise CreateError("CREATE_SOURCE_INCOMPLETE",
                           "the template source is not a complete "

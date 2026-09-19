@@ -5,7 +5,17 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
+
+
+RESULT_PROTOCOL = (
+        "FV contract v1: stage RECEIPT.FINAL_VERIFICATION_RESULTS with OVERALL_STATUS "
+        "(PASS/FAIL/INCONCLUSIVE), exact CLAIM_RESULTS (claim_id, status, checks, evidence_pointers, "
+        "auditor_note), and SANDBOX/ISOLATION_INCIDENT when applicable. "
+        "Use the immutable FINAL_VERIFICATION_GATE claims and POLICY_SNAPSHOT. "
+        "Runtime supplies FINAL_VERIFICATION identity/hash/policy metadata at completion commit. "
+        "Do not substitute a prose report for structured results.")
 
 
 def digest(value):
@@ -21,6 +31,42 @@ def engine(root):
     spec.loader.exec_module(module)
     module.PROFILES_DIR = Path(root) / "profiles"
     return module
+
+
+def record_prepared_identity(root, runtime, identity, claims_hash, prepared_at):
+    """HUMAN-DECISION-FV-BRIDGE-V1 gate provenance.
+
+    Durably record that this exact (MESSAGE_ID, CLAIMS_HASH) gate was
+    Runtime-prepared. Dispatch validation rejects any gate-carrying
+    FINAL_VERIFICATION task without such a record, making "only the Runtime
+    constructs gates" mechanical on every path instead of a model-side promise.
+    Idempotent on crash replay (deduplicated by identity) and bounded to the
+    most recent 50 preparations.
+    """
+    record = {
+        "message_id": int(identity["MESSAGE_ID"]),
+        "task_id": identity.get("TASK_ID"),
+        "stage_id": identity.get("STAGE_ID"),
+        "claims_hash": claims_hash,
+        "prepared_at": prepared_at,
+    }
+    entries = [
+        entry for entry in (runtime.get("final_verification_prepared_identities") or [])
+        if isinstance(entry, dict)
+    ]
+    if not any(
+        entry.get("message_id") == record["message_id"]
+        and str(entry.get("claims_hash") or "") == record["claims_hash"]
+        for entry in entries
+    ):
+        entries.append(record)
+    runtime["final_verification_prepared_identities"] = entries[-50:]
+    path = Path(root) / "control" / "orchestrator_runtime.json"
+    tmp = path.with_name(path.name + ".prepare.tmp")
+    tmp.write_bytes(
+        json.dumps(runtime, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
+    os.replace(tmp, path)
+    return record
 
 
 def prepare(root, state, task):
@@ -89,14 +135,11 @@ def prepare(root, state, task):
     state["final_verification"] = fv
     task.pop("FINAL_VERIFICATION_REQUEST")
     task["FINAL_VERIFICATION_GATE"] = gate
-    task.setdefault("EXECUTOR_PROTOCOL", []).append(
-        "FV contract v1: stage RECEIPT.FINAL_VERIFICATION_RESULTS with OVERALL_STATUS "
-        "(PASS/FAIL/INCONCLUSIVE), exact CLAIM_RESULTS (claim_id, status, checks, evidence_pointers, "
-        "auditor_note), and SANDBOX/ISOLATION_INCIDENT when applicable. "
-        "Use the immutable FINAL_VERIFICATION_GATE claims and POLICY_SNAPSHOT. "
-        "Runtime supplies FINAL_VERIFICATION identity/hash/policy metadata at completion commit. "
-        "Do not substitute a prose report for structured results.")
+    task.setdefault("EXECUTOR_PROTOCOL", []).append(RESULT_PROTOCOL)
     o.validate_final_verification_dispatch(state, task)
+    # Provenance is part of gate authorship: record it only after the fully
+    # constructed task passed dispatch validation.
+    record_prepared_identity(root, runtime, identity, claims_hash, o.stamp())
     return state, task
 
 
@@ -137,6 +180,35 @@ def bound_policy(gate):
     return policy
 
 
+def semantic_results(verification):
+    """Translate substantive judgments; identity/policy/envelopes stay internal.
+
+    Keep the legacy completion API unchanged. Never infer a passing judgment or
+    fill absent claim rows, checks, evidence, or auditor observations.
+    """
+    mapping = {"overall_status": "OVERALL_STATUS", "claims": "CLAIM_RESULTS",
+               "sandbox": "SANDBOX", "isolation_incident": "ISOLATION_INCIDENT"}
+    if (not isinstance(verification, dict)
+            or not {"overall_status", "claims"} <= set(verification)
+            or set(verification) - mapping.keys()):
+        raise ValueError("verification requires overall_status and claims; only sandbox and isolation_incident are optional")
+    rows = verification["claims"]
+    required = {"claim_id", "status", "checks", "evidence_pointers", "auditor_note"}
+    if not isinstance(rows, list):
+        raise ValueError("verification claims must be an array")
+    for row in rows:
+        if (not isinstance(row, dict) or set(row) != required
+                or not isinstance(row["evidence_pointers"], list)
+                or any(not isinstance(p, str) or not p.strip() for p in row["evidence_pointers"])
+                or not isinstance(row["auditor_note"], str) or not row["auditor_note"].strip()):
+            raise ValueError("verification claim requires claim_id, status, checks, evidence_pointers (strings), and nonempty auditor_note")
+    if "sandbox" in verification and not isinstance(verification["sandbox"], dict):
+        raise ValueError("verification sandbox must be an object")
+    if "isolation_incident" in verification and type(verification["isolation_incident"]) is not bool:
+        raise ValueError("verification isolation_incident must be boolean")
+    return {mapping[key]: copy.deepcopy(value) for key, value in verification.items()}
+
+
 def construct_receipt(root, authorization, receipt):
     """Only the fresh contract permits construction; legacy receipts stay exact."""
     if "SUPERVISOR_DISPATCH_ARCHIVE" not in authorization:
@@ -166,6 +238,33 @@ def construct_receipt(root, authorization, receipt):
             or any(row.get("status") not in policy["allowed_result_statuses"]
                    or not isinstance(row.get("checks"), dict) for row in rows)):
         raise RuntimeError("FV result claim coverage/status/checks malformed")
+    # FV-REQUIRED-CHECKS-V1: require the bound policy's per-claim-type check
+    # fields to be PRESENT for claims reported as SUPPORTED or
+    # PARTIALLY_SUPPORTED — those are the verdicts that can be accepted, so
+    # omitting the policy-required fields would doom the receipt to mechanical
+    # failure after staging (F-004). Negative verdicts (WEAK, UNSUPPORTED,
+    # CONTRADICTED, NOT_VERIFIABLE) are exempt: an honest "could not verify"
+    # may have no evidence fields to cite, and the orchestrator's mechanical
+    # evaluation still owns the value semantics.
+    gate_claims = {c.get("claim_id"): c for c in gate.get("CRITICAL_CLAIMS", [])
+                   if isinstance(c, dict)}
+    required_by_type = policy.get("claim_types") or {}
+    affirmative = {"SUPPORTED", "PARTIALLY_SUPPORTED"}
+    issues = []
+    for row in rows:
+        if str(row.get("status") or "").upper() not in affirmative:
+            continue
+        claim = gate_claims.get(row.get("claim_id")) or {}
+        rules = (required_by_type.get(str(claim.get("claim_type") or "").upper())
+                 or {}).get("required_checks", [])
+        checks = row.get("checks") if isinstance(row.get("checks"), dict) else {}
+        for rule in rules:
+            if rule.get("field") not in checks:
+                issues.append(f"{row.get('claim_id')}: missing policy-required "
+                              f"check field {rule.get('field')!r}")
+    if issues:
+        raise RuntimeError(
+            "FV result checks omit policy-required fields: " + "; ".join(issues))
     result = copy.deepcopy(receipt)
     result["FINAL_VERIFICATION"] = {
         **copy.deepcopy(results),

@@ -213,6 +213,49 @@ class ValidateHumanDecisionApplyRequestTests(unittest.TestCase):
             wcc.validate_human_decision_apply_request({"receipt_id": "x"})
 
 
+class PreparedDecisionSummaryTests(unittest.TestCase):
+    def stored_receipt(self, **overrides):
+        receipt = {
+            "schema_version": 1,
+            "receipt_id": "human-decision-" + "a" * 32,
+            "project_id": "proj-x",
+            "previous_status": "HUMAN_REVIEW",
+            "human_decision": {"decision_content": "continue",
+                               "constraints_verbatim": ["keep the baseline"]},
+            "submitted_at": "2026-09-15T14:03:26+00:00",
+            "previous_project_state_sha256": "b" * 64,
+            "receipt_sha256": "c" * 64,
+        }
+        receipt.update(overrides)
+        return receipt
+
+    def test_valid_receipt_is_summarized_with_its_own_fields(self):
+        self.assertEqual(
+            wcc.prepared_decision_summary(self.stored_receipt()),
+            {"receipt_id": "human-decision-" + "a" * 32,
+             "receipt_sha256": "c" * 64,
+             "submitted_at": "2026-09-15T14:03:26+00:00"})
+
+    def test_summary_never_includes_decision_content(self):
+        summary = wcc.prepared_decision_summary(self.stored_receipt())
+        self.assertNotIn("human_decision", summary)
+        self.assertNotIn("previous_project_state_sha256", summary)
+
+    def test_missing_submitted_at_is_tolerated_as_none(self):
+        summary = wcc.prepared_decision_summary(
+            self.stored_receipt(submitted_at=None))
+        self.assertIsNone(summary["submitted_at"])
+
+    def test_malformed_records_are_rejected(self):
+        bad_id = self.stored_receipt(
+            receipt_id="human-decision-UPPER" + "a" * 23)
+        bad_hash = self.stored_receipt(receipt_sha256="c" * 63)
+        for stored in (None, [], "receipt", {}, {"receipt_id": "x"},
+                       bad_id, bad_hash):
+            self.assertIsNone(wcc.prepared_decision_summary(stored),
+                              repr(stored))
+
+
 def status_doc(**overrides):
     doc = {
         "schema_version": 1, "PROJECT_ID": "proj-x",
@@ -281,6 +324,40 @@ class ProjectPendingControlsTests(unittest.TestCase):
         self.assertEqual(doc["pause"]["state"], "APPLIED")
         self.assertEqual(doc["pause"]["paused_at"],
                          "2026-09-12T01:05:00+00:00")
+
+    def test_parked_dispatch_is_surfaced_as_waiting_work(self):
+        # QUOTA-PAUSE-PARK-V1: parked work is paused logical work, so the
+        # controls document must expose it for the "waiting, not failed" note.
+        pause = {"status": "PAUSED",
+                 "requested_at": "2026-09-16T01:00:00+00:00",
+                 "mode": "SAFE", "resumed_at": None,
+                 "paused_at": "2026-09-16T01:05:00+00:00",
+                 "disposition": "PAUSED_UNCLAIMED_PARKED",
+                 "parked_dispatch": {
+                     "MESSAGE_ID": 700120, "TASK_ID": "T-700120",
+                     "STAGE_ID": "S-700120", "ATTEMPT": 1, "NONCE": "n-1",
+                     "PARKED_AT": "2026-09-16T01:05:00+00:00",
+                     "EXPIRES_AT": "2026-09-16T03:00:00+00:00",
+                     "QUARANTINE": "handoff/quarantine/to-zcode-700120.md",
+                     "CONVERTED_AT": "2026-09-16T02:00:00+00:00",
+                     "CONVERTED_REASON": "PARKED_STAGE_RESUME"}}
+        doc = wcc.project_pending_controls(status_doc(pause=pause), [])
+        parked = doc["pause"]["parked_dispatch"]
+        self.assertEqual(parked["message_id"], 700120)
+        self.assertEqual(parked["task_id"], "T-700120")
+        self.assertEqual(parked["parked_at"], "2026-09-16T01:05:00+00:00")
+        self.assertEqual(parked["expires_at"], "2026-09-16T03:00:00+00:00")
+        self.assertEqual(parked["converted_at"], "2026-09-16T02:00:00+00:00")
+
+    def test_malformed_parked_dispatch_is_not_surfaced(self):
+        for parked in ("garbage", {"TASK_ID": "no-message-id"}, 7):
+            with self.subTest(parked=parked):
+                pause = {"status": "PAUSED", "mode": "SAFE",
+                         "requested_at": None, "resumed_at": None,
+                         "disposition": "PAUSED_UNCLAIMED_PARKED",
+                         "parked_dispatch": parked}
+                doc = wcc.project_pending_controls(status_doc(pause=pause), [])
+                self.assertIsNone(doc["pause"]["parked_dispatch"])
 
     def test_completion_wins_disposition_is_surfaced_as_superseded(self):
         pause = {"status": "PENDING_AFTER_CURRENT_STAGE",
@@ -528,6 +605,175 @@ class HumanReviewPresentationTests(unittest.TestCase):
                                               truncated=False)
         self.assertFalse(block["active"])
         self.assertEqual(block["reason"]["available"], False)
+
+
+def applied_runtime_doc(**event_overrides):
+    event = {
+        "reason": wcc.HUMAN_DECISION_RESUME_REASON,
+        "event": {
+            "type": "HUMAN_DECISION_RESUME",
+            "project_id": "proj-x",
+            "receipt_id": "human-decision-" + "a" * 32,
+            "receipt_sha256": "c" * 64,
+            "previous_status": "HUMAN_REVIEW",
+        },
+        "recorded_at": "2026-09-16T00:00:00+00:00",
+        "decision_attempts": 0,
+        "retry_exhausted": False,
+        "rearmed_by_receipt": "human-decision-" + "a" * 32,
+    }
+    event.update(event_overrides)
+    return {"schema_version": 2, "status": "SUPERVISOR_TURN",
+            "pending_supervisor_event": event}
+
+
+class AutoResumeGateTests(unittest.TestCase):
+    """The mechanical safety gate for the automatic resume after a Human
+    Decision Apply: every input that cannot be proven must refuse."""
+
+    def gate(self, status="default", runtime="ok", owner=None,
+             owner_error=None, expected_receipt_id=None):
+        if status == "default":
+            status = status_doc(project_status="SUPERVISOR_TURN",
+                                runtime_status="SUPERVISOR_TURN",
+                                human_review=False)
+        runtime_doc = None if runtime == "missing" else (
+            applied_runtime_doc() if runtime == "ok" else runtime)
+        return wcc.evaluate_auto_resume_gate(
+            status, runtime_doc, live_owner=owner, owner_error=owner_error,
+            expected_receipt_id=expected_receipt_id)
+
+    def allowed(self, **kwargs):
+        gate = self.gate(**kwargs)
+        self.assertTrue(gate["allowed"], gate)
+        self.assertEqual(gate["blocked"], [])
+        return gate
+
+    def test_proven_state_allows_the_start(self):
+        gate = self.allowed()
+        self.assertEqual(gate["receipt_id"], "human-decision-" + "a" * 32)
+        self.assertEqual(gate["project_id"], "proj-x")
+
+    def test_receipt_binding_is_enforced_on_the_apply_path(self):
+        self.allowed(expected_receipt_id="human-decision-" + "a" * 32)
+        gate = self.gate(
+            expected_receipt_id="human-decision-" + "b" * 32)
+        self.assertFalse(gate["allowed"])
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["RECEIPT_MISMATCH"])
+
+    def test_stop_refuses(self):
+        gate = self.gate(status=status_doc(project_status="SUPERVISOR_TURN",
+                                           stop=True))
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["STOP_PRESENT"])
+
+    def test_active_human_review_refuses(self):
+        gate = self.gate(status=status_doc(
+            project_status="SUPERVISOR_TURN", human_review=True))
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["HUMAN_REVIEW_ACTIVE"])
+
+    def test_uncommitted_transition_refuses(self):
+        gate = self.gate(status=status_doc(project_status="HUMAN_REVIEW",
+                                           human_review=True))
+        self.assertEqual(
+            sorted(item["code"] for item in gate["blocked"]),
+            ["HUMAN_REVIEW_ACTIVE", "PROJECT_NOT_SUPERVISOR_TURN"])
+
+    def test_missing_project_identity_refuses(self):
+        gate = self.gate(status=status_doc(project_status="SUPERVISOR_TURN",
+                                           PROJECT_ID=None))
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["PROJECT_ID_UNAVAILABLE"])
+
+    def test_unavailable_status_refuses_fail_closed(self):
+        for broken in (None, {}, "status"):
+            gate = self.gate(status=broken)
+            self.assertFalse(gate["allowed"], repr(broken))
+            self.assertEqual([item["code"] for item in gate["blocked"]],
+                             ["STATUS_UNAVAILABLE"], repr(broken))
+
+    def test_missing_runtime_document_refuses(self):
+        gate = self.gate(runtime="missing")
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["RESUME_EVENT_UNAVAILABLE"])
+
+    def test_missing_or_consumed_event_refuses(self):
+        gate = self.gate(runtime={"schema_version": 2,
+                                  "status": "SUPERVISOR_TURN"})
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["RESUME_EVENT_MISSING"])
+
+    def test_malformed_event_refuses(self):
+        cases = (
+            applied_runtime_doc(reason="OTHER"),
+            applied_runtime_doc(event={"type": "HUMAN_DECISION_RESUME",
+                                       "receipt_id": "r"}),
+            applied_runtime_doc(event={"type": "HUMAN_DECISION_RESUME",
+                                       "project_id": "proj-x"}),
+        )
+        for broken in cases:
+            gate = self.gate(runtime=broken)
+            self.assertEqual([item["code"] for item in gate["blocked"]],
+                             ["RESUME_EVENT_MISSING"], repr(broken))
+
+    def test_project_mismatch_refuses(self):
+        status = status_doc(project_status="SUPERVISOR_TURN",
+                            PROJECT_ID="proj-other")
+        gate = self.gate(status=status)
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["PROJECT_MISMATCH"])
+
+    def test_live_owner_refuses_a_second_start(self):
+        gate = self.gate(owner={"pid": 4242, "owner_id": "x",
+                                "process_identity": 7})
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["LIVE_OWNER"])
+
+    def test_unverifiable_owner_refuses_fail_closed(self):
+        gate = self.gate(owner_error="scheduler ownership cannot be verified")
+        self.assertEqual([item["code"] for item in gate["blocked"]],
+                         ["OWNER_UNVERIFIABLE"])
+
+    def test_all_reasons_are_reported_together(self):
+        status = status_doc(project_status="WAITING_EXECUTOR", stop=True)
+        gate = self.gate(status=status, runtime="missing", owner_error="x")
+        self.assertEqual(
+            sorted(item["code"] for item in gate["blocked"]),
+            ["OWNER_UNVERIFIABLE", "PROJECT_NOT_SUPERVISOR_TURN",
+             "RESUME_EVENT_UNAVAILABLE", "STOP_PRESENT"])
+
+    def test_blocked_gate_constructor_shape(self):
+        gate = wcc.auto_resume_gate_blocked(
+            "START_IN_PROGRESS", "another start holds the lock")
+        self.assertFalse(gate["allowed"])
+        self.assertIsNone(gate["receipt_id"])
+        self.assertEqual(gate["blocked"],
+                         [{"code": "START_IN_PROGRESS",
+                           "message": "another start holds the lock"}])
+
+    def test_applied_resume_facts_projection(self):
+        facts = wcc.applied_resume_facts(self.allowed())
+        self.assertEqual(facts, {
+            "schema_version": wcc.AUTO_RESUME_SCHEMA_VERSION,
+            "event_pending": True,
+            "receipt_id": "human-decision-" + "a" * 32,
+            "project_id": "proj-x",
+            "auto_resume_allowed": True,
+            "owner_live": False,
+            "blocked": []})
+        consumed = wcc.applied_resume_facts(
+            self.gate(runtime={"schema_version": 2}))
+        self.assertFalse(consumed["event_pending"])
+        running = wcc.applied_resume_facts(
+            self.gate(owner={"pid": 1, "owner_id": "o"}))
+        self.assertTrue(running["event_pending"])
+        self.assertTrue(running["owner_live"])
+        self.assertFalse(running["auto_resume_allowed"])
+        unavailable = wcc.applied_resume_facts(None)
+        self.assertFalse(unavailable["event_pending"])
+        self.assertFalse(unavailable["auto_resume_allowed"])
 
 
 if __name__ == "__main__":

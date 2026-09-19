@@ -503,39 +503,121 @@ class ConfigDocumentTests(unittest.TestCase):
                             for note in view["active"]["notes"]))
         self.assertIsNone(view["pending"])
 
+    # -- configurable fixed-policy baseline (control/supervisor_control.json)
+
+    def _write_control_doc(self, text):
+        path = self.root / "control" / "supervisor_control.json"
+        path.write_text(text, encoding="utf-8")
+
+    def test_configured_baseline_is_reported_from_control_document(self):
+        import supervisor_control as sc
+        sc.save_control(self.root, {
+            "schema_version": 1, "revision": 0,
+            "intervention_generation": 0,
+            "pause": {"status": "RUNNING", "requested_at": None,
+                      "mode": None, "resumed_at": None},
+            "supervisor_model": "gpt-6-astra",
+            "supervisor_reasoning_effort": "high"})
+        policy = wsup.read_control_fixed_policy(self.root)
+        self.assertTrue(policy["configured"])
+        self.assertEqual(policy["model"], "gpt-6-astra")
+        self.assertEqual(policy["reasoning_effort"], "high")
+        result = wsup.read_config_document(self.root)
+        self.assertEqual(result["state"], "absent")
+        view = wsup.config_view(
+            result, capability=web_console_setup.capability_report(None),
+            draft_supervisor=None, control_policy=policy)
+        self.assertTrue(view["fixed_policy"]["configured"])
+        self.assertEqual(view["fixed_policy"]["model"], "gpt-6-astra")
+        self.assertEqual(view["fixed_policy"]["reasoning_effort"], "high")
+        self.assertFalse(view["active"]["configured"])
+        self.assertTrue(any("control" in note.lower()
+                            for note in view["active"]["notes"]))
+
+    def test_queued_active_wins_while_baseline_still_shown(self):
+        import supervisor_control as sc
+        sc.save_control(self.root, {
+            "schema_version": 1, "revision": 0,
+            "intervention_generation": 0,
+            "pause": {"status": "RUNNING", "requested_at": None,
+                      "mode": None, "resumed_at": None},
+            "supervisor_model": "gpt-6-astra",
+            "supervisor_reasoning_effort": "high"})
+        sc.queue_supervisor_config(
+            self.root, {"model": "gpt-5.6-sol", "reasoning_effort": "LOW"})
+        sc.begin_supervisor_turn(self.root, "baseline-view-fixture")
+        view = wsup.config_view(
+            wsup.read_config_document(self.root),
+            capability=web_console_setup.capability_report(None),
+            draft_supervisor=None,
+            control_policy=wsup.read_control_fixed_policy(self.root))
+        self.assertTrue(view["active"]["configured"])
+        self.assertEqual(view["active"]["source"], "queued")
+        self.assertEqual(view["active"]["model"], "gpt-5.6-sol")
+        self.assertTrue(view["fixed_policy"]["configured"])
+        self.assertEqual(view["fixed_policy"]["model"], "gpt-6-astra")
+
+    def test_absent_or_corrupt_control_document_means_not_configured(self):
+        self.assertFalse(
+            wsup.read_control_fixed_policy(self.root)["configured"])
+        self._write_control_doc("{broken")
+        self.assertFalse(
+            wsup.read_control_fixed_policy(self.root)["configured"])
+        self._write_control_doc(json.dumps({
+            "schema_version": 1, "revision": 0,
+            "intervention_generation": 0,
+            "pause": {"status": "RUNNING", "requested_at": None,
+                      "mode": None, "resumed_at": None},
+            "supervisor_model": "gpt-6-astra",
+            "supervisor_reasoning_effort": "ULTRA"}))
+        policy = wsup.read_control_fixed_policy(self.root)
+        self.assertFalse(policy["configured"])
+        self.assertIsNone(policy["model"])
+
     def test_real_runtime_queue_then_view(self):
         # Build the configuration through the real Runtime contract.
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "HIGH"})
         result = wsup.read_config_document(self.root)
         self.assertEqual(result["state"], "ok")
         view = wsup.config_view(
             result, capability=web_console_setup.capability_report(None),
-            draft_supervisor={"model": "gpt-6", "reasoning_effort": "HIGHEST",
+            draft_supervisor={"model": "gpt-6-astra",
+                              "reasoning_effort": "XHIGH",
                               "explanation_mode": "COMPACT"})
         self.assertFalse(view["active"]["configured"])
-        self.assertEqual(view["pending"]["model"], "gpt-6")
+        self.assertEqual(view["pending"]["model"], "gpt-6-astra")
         self.assertEqual(view["pending"]["reasoning_effort"], "HIGH")
+        self.assertTrue(view["pending"]["supported"])
         self.assertEqual(view["pending"]["applies"],
                          "next eligible Supervisor turn")
-        self.assertEqual(view["draft"]["model"], "gpt-6")
-        self.assertEqual(view["draft"]["reasoning_effort"], "HIGHEST")
+        self.assertEqual(view["draft"]["model"], "gpt-6-astra")
+        self.assertEqual(view["draft"]["reasoning_effort"], "XHIGH")
+        self.assertTrue(view["draft"]["supported"])
         self.assertFalse(view["capability"]["reported"])
         self.assertEqual(view["supported_reasoning_efforts"],
                          list(wsup.SUPPORTED_REASONING_EFFORTS))
         self.assertNotIn("HIGHEST", view["supported_reasoning_efforts"])
+        self.assertNotIn("ULTRA", view["supported_reasoning_efforts"])
+        # The canonical model menu is exposed with its UI display names.
+        self.assertEqual(view["supported_models"],
+                         list(wsup.SUPPORTED_SUPERVISOR_MODELS))
+        self.assertEqual(view["supported_model_display_names"],
+                         dict(wsup.SUPPORTED_MODEL_DISPLAY_NAMES))
+        self.assertIn("gpt-5.6-sol", view["supported_models_note"])
 
     def test_active_config_after_consumption(self):
         sc.queue_supervisor_config(
-            self.root, {"model": "gpt-6", "reasoning_effort": "LOW"})
+            self.root, {"model": "gpt-5.6-sol", "reasoning_effort": "LOW"})
         turn = sc.begin_supervisor_turn(self.root, "config-view-fixture")
         result = wsup.read_config_document(self.root)
         view = wsup.config_view(
             result, capability=web_console_setup.capability_report(None),
             draft_supervisor=None)
         self.assertTrue(view["active"]["configured"])
-        self.assertEqual(view["active"]["model"], "gpt-6")
+        self.assertEqual(view["active"]["model"], "gpt-5.6-sol")
         self.assertEqual(view["active"]["reasoning_effort"], "LOW")
+        self.assertTrue(view["active"]["supported"])
         self.assertIsNone(view["pending"])
         sc.finish_supervisor_turn(self.root, turn, processed=False)
 
@@ -563,22 +645,48 @@ class ConfigDocumentTests(unittest.TestCase):
 
     def test_request_validation_matrix(self):
         good = wsup.validate_config_change_request(
-            {"model": " gpt-6 ", "reasoning_effort": "HIGH"})
-        self.assertEqual(good, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+            {"model": " gpt-5.6-sol ", "reasoning_effort": "HIGH"})
+        self.assertEqual(good, {"model": "gpt-5.6-sol",
+                                "reasoning_effort": "HIGH"})
+        # The CLI-canonical lowercase effort form is one mapping with the
+        # stored uppercase vocabulary.
+        for effort in ("xhigh", "XHIGH", " xhigh "):
+            self.assertEqual(
+                wsup.validate_config_change_request(
+                    {"model": "gpt-6-astra",
+                     "reasoning_effort": effort})["reasoning_effort"],
+                "XHIGH")
         bad_payloads = [
-            {"model": "gpt-6"},
+            {"model": "gpt-5.6-sol"},
             {"reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "HIGH", "x": 1},
+            {"model": "gpt-5.6-sol", "reasoning_effort": "HIGH", "x": 1},
             {"model": "", "reasoning_effort": "HIGH"},
             {"model": "x" * 81, "reasoning_effort": "HIGH"},
-            {"model": "gpt-6", "reasoning_effort": "ULTRA"},
-            {"model": "gpt-6", "reasoning_effort": 5},
+            {"model": "gpt-5.6-sol", "reasoning_effort": "ULTRA"},
+            {"model": "gpt-5.6-sol", "reasoning_effort": 5},
+            # Out-of-vocabulary models are refused with an explicit reason;
+            # nothing is silently substituted.
+            {"model": "gpt-6", "reasoning_effort": "HIGH"},
+            {"model": "gpt-5.5", "reasoning_effort": "high"},
+            {"model": "gpt-5.6-terra", "reasoning_effort": "high"},
+            {"model": "my-model", "reasoning_effort": "high"},
+            {"model": "GPT-5.6 Sol", "reasoning_effort": "high"},
+            {"model": "gpt-5.6-sol ", "reasoning_effort": "ultra"},
         ]
         for payload in bad_payloads:
             with self.subTest(payload=payload):
                 with self.assertRaises(
                         web_console_control.ControlRequestError):
                     wsup.validate_config_change_request(payload)
+        for payload in ({"model": "gpt-6", "reasoning_effort": "HIGH"},
+                        {"model": "GPT-5.6 Sol",
+                         "reasoning_effort": "high"}):
+            with self.subTest(payload=payload):
+                with self.assertRaises(
+                        web_console_control.ControlRequestError) as caught:
+                    wsup.validate_config_change_request(payload)
+                self.assertIn("gpt-5.6-sol", str(caught.exception))
+                self.assertIn("gpt-6-astra", str(caught.exception))
 
     def test_supported_efforts_match_runtime_contract(self):
         self.assertEqual(
@@ -586,6 +694,70 @@ class ConfigDocumentTests(unittest.TestCase):
             set(sc.SUPERVISOR_CONFIG_EFFORTS),
             "the Console vocabulary must never diverge from the Runtime "
             "configuration contract")
+        self.assertIn("XHIGH", wsup.SUPPORTED_REASONING_EFFORTS)
+
+    def test_supported_models_match_runtime_contract(self):
+        self.assertEqual(
+            list(wsup.SUPPORTED_SUPERVISOR_MODELS),
+            list(sc.SUPERVISOR_CONFIG_MODELS),
+            "the Console canonical model menu must never diverge from the "
+            "Runtime configuration contract")
+        self.assertEqual(
+            set(wsup.SUPPORTED_MODEL_DISPLAY_NAMES),
+            set(wsup.SUPPORTED_SUPERVISOR_MODELS))
+
+    def test_legacy_stored_model_loads_verbatim_and_is_marked_unsupported(self):
+        # A configuration document written before the canonical-model
+        # contract keeps loading: the page reflects the real state instead
+        # of failing or silently rewriting it.
+        path = self.root / "control" / "supervisor_config.json"
+        path.write_text(json.dumps({
+            "schema_version": 1, "PROJECT_ID": self.PROJECT,
+            "active": {"model": "gpt-6", "reasoning_effort": "HIGH",
+                       "queued_at": "2026-01-01T00:00:00+00:00",
+                       "config_revision": 1,
+                       "applied_at": "2026-01-01T00:01:00+00:00",
+                       "source_turn_id": "supervisor-turn-legacy"},
+            "pending": None, "updated_at": "2026-01-01T00:01:00+00:00"}),
+            encoding="utf-8")
+        result = wsup.read_config_document(self.root)
+        self.assertEqual(result["state"], "ok")
+        view = wsup.config_view(
+            result, capability=web_console_setup.capability_report(None),
+            draft_supervisor=None)
+        self.assertTrue(view["active"]["configured"])
+        self.assertEqual(view["active"]["model"], "gpt-6")
+        self.assertFalse(view["active"]["supported"])
+
+    def test_config_view_flags_out_of_menu_draft_and_effort(self):
+        view = wsup.config_view(
+            wsup.read_config_document(self.root),
+            capability=web_console_setup.capability_report(None),
+            draft_supervisor={"model": "gpt-5.6-sol",
+                              "reasoning_effort": "HIGHEST",
+                              "explanation_mode": "COMPACT"})
+        self.assertTrue(view["draft"]["available"])
+        self.assertFalse(view["draft"]["supported"])
+
+    def test_runtime_queue_rejects_non_canonical_model(self):
+        with self.assertRaises(sc.ControlError) as caught:
+            sc.queue_supervisor_config(
+                self.root, {"model": "gpt-6", "reasoning_effort": "HIGH"})
+        self.assertIn("gpt-5.6-sol", str(caught.exception))
+        self.assertIn("gpt-6-astra", str(caught.exception))
+        # The refusal left no queued state behind.
+        self.assertEqual(wsup.read_config_document(self.root)["state"],
+                         "absent")
+
+    def test_runtime_queue_normalizes_lowercase_xhigh(self):
+        result = sc.queue_supervisor_config(
+            self.root, {"model": "gpt-6-astra", "reasoning_effort": "xhigh"})
+        self.assertEqual(result["pending"]["reasoning_effort"], "XHIGH")
+        turn = sc.begin_supervisor_turn(self.root, self.PROJECT)
+        self.assertEqual(turn["supervisor_config"]["reasoning_effort"],
+                         "XHIGH")
+        self.assertEqual(turn["supervisor_config"]["model"], "gpt-6-astra")
+        sc.finish_supervisor_turn(self.root, turn, processed=False)
 
 
 if __name__ == "__main__":

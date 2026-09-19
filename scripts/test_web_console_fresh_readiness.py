@@ -164,6 +164,55 @@ class FreshReadinessTests(unittest.TestCase):
                 finally:
                     path.rmdir()
 
+    def test_console_owned_artifacts_keep_first_project_ready(self):
+        # The Console's own data directory and a factory-neutral control store
+        # exist by design (self-hosted Runtime) and carry no lifecycle state.
+        data_dir = self.fixture.runtime / "web_console_data"
+        (data_dir / "setup" / "sometime").mkdir(parents=True)
+        (data_dir / "setup" / "sometime" / "draft.json").write_text(
+            "{}", encoding="utf-8")
+        control = self.fixture.runtime / "control" / "supervisor_control.json"
+        control.write_text(json.dumps({
+            "schema_version": 1, "revision": 0, "intervention_generation": 0,
+            "pause": {"status": "RUNNING", "requested_at": None,
+                      "mode": None, "resumed_at": None},
+            "supervisor_model": "gpt-6-astra",
+            "supervisor_reasoning_effort": "high"}), encoding="utf-8")
+        self.assertTrue(self.readiness()["ready"])
+        # Any lifecycle signal in the store refuses the freshness proof.
+        for mutation in (
+                {"revision": 1},
+                {"intervention_generation": 2},
+                {"pause": {"status": "PAUSED", "requested_at": "x",
+                           "mode": "M", "resumed_at": None}},
+                {"unknown_field": True}):
+            with self.subTest(mutation=mutation):
+                original = json.loads(control.read_text(encoding="utf-8"))
+                control.write_text(json.dumps({**original, **mutation}),
+                                   encoding="utf-8")
+                self.assert_blocked()
+                control.write_text(json.dumps(original), encoding="utf-8")
+        control.unlink()
+        self.assertTrue(self.readiness()["ready"])
+
+    def test_garbage_or_foreign_control_store_is_never_fresh(self):
+        control = self.fixture.runtime / "control" / "supervisor_control.json"
+        for content in ("{broken", "[]", '{"schema_version": 2}',
+                        '{"schema_version": 1, "revision": 0, '
+                        '"intervention_generation": 0, "pause": '
+                        '{"status": "RUNNING", "requested_at": null, '
+                        '"mode": null, "resumed_at": null}, '
+                        '"supervisor_model": "gpt-6-astra"}',
+                        '{"schema_version": 1, "revision": 0, '
+                        '"intervention_generation": 0, "pause": '
+                        '{"status": "RUNNING", "requested_at": null, '
+                        '"mode": null, "resumed_at": null}, '
+                        '"supervisor_reasoning_effort": "EXTREME"}'):
+            with self.subTest(content=content[:40]):
+                control.write_text(content, encoding="utf-8")
+                self.assert_blocked()
+                control.unlink()
+
     def test_existing_project_missing_state_stays_blocked_with_or_without_pointer(self):
         project = self.bootstrap()
         (project / "project_state.json").unlink()

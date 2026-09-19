@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "PROJECT_ID": "console-b3-001",
+  "MESSAGE_ID": 700100,
+  "TASK_ID": "task-024d9ef3144205feb45eedef",
+  "STAGE_ID": "stage-2666beda1b1240d0f5b2d0ee",
+  "ATTEMPT": 1,
+  "NONCE": "c42f09536501d9f6f3250f8fd7996b6f2535a769fe4aa8c0",
+  "archived_at": "2026-09-14T12:39:06+00:00",
+  "dispatch_sha256": "13eade13e099ced3cec0a2ab01119e2a7eed9dad4dade1805a6b0fbe943ce94c",
+  "archive_file": "handoff/supervisor_dispatch_archive/console-b3-001/dispatch-700100-36f080db74d4373418e0190e.md",
+  "originating_control_revision": 0,
+  "supervisor_turn_id": "supervisor-turn-88c10c360c1945148aa5b9b3065ed539",
+  "decision_receipt_sha256": "b4ea00f75e98e56e8244c2ccf30e6d7ca618976421892f79800c0cbba8ae41c9"
+}

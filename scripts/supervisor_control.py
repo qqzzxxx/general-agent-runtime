@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -39,7 +40,13 @@ SUPERVISOR_TURN_RECORD_SCHEMA_VERSION = 1
 # this Runtime's Codex integration applies today; other suggestions from the
 # Console vocabulary are refused deterministically instead of guessed.
 SUPERVISOR_CONFIG_SCHEMA_VERSION = 1
-SUPERVISOR_CONFIG_EFFORTS = ("LOW", "MEDIUM", "HIGH")
+# Canonical Supervisor models, confirmed from the actually installed Codex CLI
+# (`codex debug models`, codex-cli 0.154.0, 2026-09-18; see
+# evidence/v1.4-supervisor-config-ui/). Queued changes accept only these ids;
+# anything else is refused with an explicit reason instead of being handed to
+# Codex as free text.
+SUPERVISOR_CONFIG_MODELS = ("gpt-5.6-sol", "gpt-6-astra")
+SUPERVISOR_CONFIG_EFFORTS = ("LOW", "MEDIUM", "HIGH", "XHIGH")
 SUPERVISOR_CONFIG_MODEL_MAX_CHARS = 80
 INTERVENTION_MODES = ("STEER", "AUDIT")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -617,6 +624,39 @@ def save_control(root: Path, value: dict) -> None:
     _atomic_json(control_path(root), value)
 
 
+def supervisor_fixed_policy_from_control(control) -> dict | None:
+    """Extract the optional configured fixed Supervisor policy, non-raising.
+
+    The operator may pin the baseline Supervisor model and reasoning effort
+    in `control/supervisor_control.json` via the optional
+    `supervisor_model` and `supervisor_reasoning_effort` fields. Both fields
+    must be present and valid together; an absent pair means "not
+    configured", and any partial, malformed, or out-of-vocabulary value also
+    returns None so callers fall back to the built-in default policy instead
+    of guessing. The effort is normalized to the lowercase form the Codex
+    invocation applies.
+    """
+    if not isinstance(control, dict):
+        return None
+    model = control.get("supervisor_model")
+    effort = control.get("supervisor_reasoning_effort")
+    if model is None and effort is None:
+        return None
+    if not isinstance(model, str):
+        return None
+    model = model.strip()
+    if not model or len(model) > SUPERVISOR_CONFIG_MODEL_MAX_CHARS:
+        return None
+    if any(unicodedata.category(char) == "Cc" for char in model):
+        return None
+    if not isinstance(effort, str):
+        return None
+    normalized = effort.strip().upper()
+    if normalized not in SUPERVISOR_CONFIG_EFFORTS:
+        return None
+    return {"model": model, "reasoning_effort": normalized.lower()}
+
+
 def intervention_root(root: Path, project_id: str | None) -> Path:
     return Path(root) / "handoff" / "supervisor_interventions" / project_key(project_id)
 
@@ -806,6 +846,15 @@ def _intervention_plan(root: Path, state: dict, runtime: dict,
         return {"action": "PRESERVE_RUNNING", "subject_identity": subject,
                 "disposition": ("PENDING_AFTER_CURRENT_STAGE" if kind == "INTERVENTION"
                                 else "PAUSE_PENDING_AFTER_CURRENT_STAGE")}
+    if (kind == "PAUSE" and not interrupt_current
+            and active_view["identity"] is not None
+            and not active_view["claimed"] and not active_view["retired"]):
+        # QUOTA-PAUSE-PARK-V1: a plain scheduling pause parks a dispatched-but-
+        # unclaimed task instead of retiring it. The inbox is quarantined so no
+        # Executor can claim or spend quota while paused; the logical task, its
+        # authorization and its retry budget all survive the pause.
+        return {"action": "PARK", "subject_identity": subject,
+                "disposition": "PAUSED_UNCLAIMED_PARKED"}
     if subject is not None:
         return {
             "action": "RETIRE", "subject_identity": subject,
@@ -967,7 +1016,7 @@ def _apply_pause_transaction_locked(root: Path) -> dict | None:
     if (not isinstance(txn, dict) or txn.get("schema_version") != 1
             or txn.get("control_revision") != control.get("revision")
             or txn.get("action") not in {
-                "COMPLETION_WINS", "PRESERVE_RUNNING", "RETIRE", "NONE"
+                "COMPLETION_WINS", "PRESERVE_RUNNING", "RETIRE", "PARK", "NONE"
             }):
         raise ControlError("pause transaction is malformed")
     subject = txn.get("subject_identity")
@@ -982,6 +1031,27 @@ def _apply_pause_transaction_locked(root: Path) -> dict | None:
     if subject is not None and _completion_for_identity(root, subject) is not None:
         action = "COMPLETION_WINS"
     quarantine = None
+    parked_dispatch = None
+    if action == "PARK":
+        # Park is not retirement: the identity stays valid, the state stays
+        # WAITING_EXECUTOR, and no retry budget is consumed. Only the inbox is
+        # removed so nothing can be claimed or executed while paused.
+        quarantine = _quarantine_current(root, subject, "pause")
+        parked_ids = runtime.get("parked_message_ids")
+        if parked_ids is None:
+            parked_ids = []
+            runtime["parked_message_ids"] = parked_ids
+        if not isinstance(parked_ids, list) or any(type(value) is not int for value in parked_ids):
+            raise ControlError("parked_message_ids is malformed")
+        if subject["MESSAGE_ID"] not in parked_ids:
+            parked_ids.append(subject["MESSAGE_ID"])
+        authorization = runtime.get("authorized_dispatch") or {}
+        parked_dispatch = {
+            **subject,
+            "PARKED_AT": now_iso(),
+            "EXPIRES_AT": authorization.get("EXPIRES_AT"),
+            "QUARANTINE": quarantine,
+        }
     if action == "RETIRE":
         _retire(runtime, subject, txn["retirement_reason"])
         quarantine = _quarantine_current(root, subject, "pause")
@@ -1013,6 +1083,12 @@ def _apply_pause_transaction_locked(root: Path) -> dict | None:
         "applied_at": now_iso(),
         "quarantine": quarantine,
     }
+    if parked_dispatch is not None:
+        pause["parked_dispatch"] = parked_dispatch
+    else:
+        # A pause that parks nothing must not advertise a stale parked task
+        # from an earlier pause generation.
+        pause.pop("parked_dispatch", None)
     pause.pop("transaction", None)
     if quarantine is not None:
         control["last_quarantined_candidate"] = quarantine
@@ -1290,7 +1366,14 @@ def queue_supervisor_config(root: Path, config: dict,
             'Supervisor config change must be exactly {"model", '
             '"reasoning_effort"}')
     model = _validate_config_model(config["model"])
+    if model not in SUPERVISOR_CONFIG_MODELS:
+        raise ControlError(
+            "Supervisor config model must be one of the canonical models "
+            "supported by this Runtime's Codex CLI: "
+            + ", ".join(SUPERVISOR_CONFIG_MODELS))
     effort = config["reasoning_effort"]
+    if isinstance(effort, str):
+        effort = effort.strip().upper()
     if effort not in SUPERVISOR_CONFIG_EFFORTS:
         raise ControlError(
             "Supervisor config reasoning_effort must be one of "
@@ -1454,12 +1537,26 @@ def _decision_transaction(root: Path, turn: dict) -> tuple[dict, dict | None]:
     if status not in {"WAITING_EXECUTOR", "COMPLETE", "BLOCKED", "STOPPED", "HUMAN_REVIEW"}:
         raise ControlError("Supervisor did not commit a valid lifecycle decision")
     candidate = None
+    import ordinary_dispatch
+    human_decision_turn = (turn.get("invocation") or {}).get("reason") == "HUMAN_DECISION_RESUME"
+    if (not human_decision_turn and ("ordinary_task_proposal" in state
+            or ordinary_dispatch.preparation_path(root, turn).exists())):
+        try:
+            state = ordinary_dispatch.prepare_locked(root, turn, state, state_path)
+        except Exception as exc:
+            raise CandidateValidationError(f"ordinary dispatch preparation: {exc}") from exc
+        state_bytes = state_path.read_bytes()
+        decision = state["decision_history"][-1]
     if status == "WAITING_EXECUTOR":
         current = state.get("current_task")
         identity = normalize_identity(current, "Supervisor current_task")
         inbox = Path(root) / "TO_ZCODE.md"
         data = inbox.read_bytes()
         payload = _parse_dispatch_bytes(data)
+        if (turn.get("ordinary_dispatch_required")
+                and not ordinary_dispatch.preparation_path(root, turn).exists()
+                and payload.get("TASK_KIND") != "FINAL_VERIFICATION"):
+            raise CandidateValidationError("ordinary dispatch requires ordinary_task_proposal")
         if normalize_identity(payload, "Supervisor dispatch") != identity:
             raise ControlError("Supervisor dispatch/current_task identity mismatch")
         if "FINAL_VERIFICATION_REQUEST" in payload:
@@ -1475,6 +1572,31 @@ def _decision_transaction(root: Path, turn: dict) -> tuple[dict, dict | None]:
             _atomic_json(state_path, state)
             _atomic_write_bytes(inbox, data)
             state_bytes = state_path.read_bytes()
+        # FV-PROTOCOL-STAMP-V1: EXECUTOR_PROTOCOL is Runtime-owned wire text
+        # (Executor V2 WIRE_ONLY) that the task template mandates copying
+        # unchanged. A copied-with-drift array can never pass the V2
+        # projection's byte-exact protocol guard and dead-ends the dispatch —
+        # with zero retries on a Final Verification stage. Stamp the canonical
+        # array so inbox, decision receipt, archive and authorization all bind
+        # one Runtime-owned protocol; the model owns task semantics, never
+        # protocol text. Idempotent: an exact copy is never rewritten.
+        import final_verification_contract as fv_wire
+        canonical_protocol = list(ordinary_dispatch.EXECUTOR_PROTOCOL)
+        if (str(payload.get("TASK_KIND") or "").upper() == "FINAL_VERIFICATION"
+                or "FINAL_VERIFICATION_REQUEST" in payload):
+            canonical_protocol.append(fv_wire.RESULT_PROTOCOL)
+        if payload.get("EXECUTOR_PROTOCOL") != canonical_protocol:
+            payload["EXECUTOR_PROTOCOL"] = canonical_protocol
+            # The fence replacement must be a callable: json.dumps output
+            # contains backslash escapes that a plain re.sub replacement
+            # template would unescape into invalid JSON.
+            stamped = re.sub(r"```json\s*.*?\s*```",
+                             lambda _match: "```json\n"
+                             + json.dumps(payload, ensure_ascii=False, indent=2)
+                             + "\n```",
+                             data.decode("utf-8"), count=1, flags=re.DOTALL)
+            data = stamped.encode("utf-8")
+            _atomic_write_bytes(inbox, data)
         candidate = {
             **identity,
             "dispatch_sha256": sha256_bytes(data),
@@ -1653,7 +1775,8 @@ def verify_candidate_origin(root: Path, identity: dict, dispatch_bytes: bytes,
     return value
 
 
-def _invalidate_candidate_locked(root: Path, reason: str) -> dict:
+def _invalidate_candidate_locked(root: Path, reason: str,
+                                 label: str = "stale-control-revision") -> dict:
     _, _, state_path, state, runtime = _load_live(root)
     current = state.get("current_task") or {}
     invalidated = False
@@ -1663,14 +1786,18 @@ def _invalidate_candidate_locked(root: Path, reason: str) -> dict:
         completion = _completion_for_identity(root, identity)
         if completion is None:
             _retire(runtime, identity, reason)
-            quarantine = _quarantine_current(root, identity, "stale-control-revision")
+            quarantine = _quarantine_current(root, identity, label)
             state["status"] = "SUPERVISOR_TURN"
             state["current_task"] = None
             state["updated_at"] = now_iso()
             _atomic_json(state_path, state)
             _atomic_json(Path(root) / "control" / "orchestrator_runtime.json", runtime)
             invalidated = True
-    elif state.get("status") in {"COMPLETE", "BLOCKED"}:
+    elif (state.get("status") in {"COMPLETE", "BLOCKED"}
+          or (state.get("status") == "WAITING_EXECUTOR"
+              and "ordinary_task_proposal" in state)):
+        # A paused/stale semantic proposal may not have a physical task yet.
+        # Restore a schedulable Supervisor state without retiring any identity.
         state["status"] = "SUPERVISOR_TURN"
         state["current_task"] = None
         state["updated_at"] = now_iso()
@@ -1686,7 +1813,8 @@ def _invalidate_candidate_locked(root: Path, reason: str) -> dict:
 
 
 def begin_supervisor_turn(root: Path, project_id: str | None,
-                          invocation: dict | None = None) -> dict:
+                          invocation: dict | None = None, *,
+                          ordinary_dispatch_required: bool = False) -> dict:
     """Snapshot pending human inputs and the revision a candidate must bind."""
     root = Path(root).resolve()
     if invocation is not None:
@@ -1727,6 +1855,13 @@ def begin_supervisor_turn(root: Path, project_id: str | None,
                  "intervention_ids": [item.get("intervention_id") for item in items],
                  "invocation": invocation,
                  "started_at": now_iso()}
+        # Snapshot model-independent projection inputs before the external writer.
+        turn["ordinary_dispatch_required"] = ordinary_dispatch_required
+        turn["dispatch_projection_before"] = {
+            key: state.get(key) for key in ("current_task", "next_message_id")}
+        inbox = root / "TO_ZCODE.md"
+        turn["dispatch_inbox_sha256_before"] = (
+            sha256_bytes(inbox.read_bytes()) if inbox.exists() else None)
         # SUPERVISOR-TURN-OBSERVABILITY-V1 / explicit configuration: the turn
         # boundary is the only point where a queued configuration change
         # becomes active. It is consumed under the same durable lock as the
@@ -1986,6 +2121,15 @@ def _write_supervisor_turn_record(root: Path, turn: dict, *, committed: bool,
     # supply token counts, and decision replay never creates a second capture.
     import provider_usage
     usage = provider_usage.read_usage(root, turn.get("turn_id"), turn.get("PROJECT_ID"))
+    import supervisor_intelligence
+    intelligence = supervisor_intelligence.read(root, turn.get("turn_id"), turn.get("PROJECT_ID"))
+    manifest = observed.get("context_manifest")
+    duration = observed.get("elapsed_seconds")
+    if intelligence is not None:
+        manifest = copy.deepcopy(intelligence.get("context_manifest") or manifest or {})
+        manifest["targeted_reads"] = intelligence["targeted_reads"]
+        manifest["input_cache"] = supervisor_intelligence.cache_split(usage)
+        duration = intelligence["duration_seconds"]
     record = {
         "schema": SUPERVISOR_TURN_RECORD_SCHEMA,
         "schema_version": SUPERVISOR_TURN_RECORD_SCHEMA_VERSION,
@@ -1994,10 +2138,10 @@ def _write_supervisor_turn_record(root: Path, turn: dict, *, committed: bool,
         "invocation": turn.get("invocation"),
         "started_at": turn.get("started_at"),
         "finished_at": now_iso(),
-        "duration_seconds": observed.get("elapsed_seconds"),
+        "duration_seconds": duration,
         "supervisor_config": config_block,
         "usage": usage,
-        "context_manifest": observed.get("context_manifest"),
+        "context_manifest": manifest,
         "decision": decision,
         "dispatch_linkage": candidate,
         "intervention_ids": list(turn.get("intervention_ids") or []),
@@ -2161,12 +2305,13 @@ def reconcile_inflight_turn(root: Path, candidate_validator=None) -> dict | None
         )
 
 
-def invalidate_candidate(root: Path, reason: str) -> dict:
+def invalidate_candidate(root: Path, reason: str,
+                         label: str = "stale-control-revision") -> dict:
     root = Path(root).resolve()
     import executor_fence
     with executor_fence.runtime_lock(root):
         reconcile_control_transactions_locked(root)
-        return _invalidate_candidate_locked(root, reason)
+        return _invalidate_candidate_locked(root, reason, label=label)
 
 
 def _bounded_inflight_view(inflight) -> dict | None:
@@ -2285,6 +2430,16 @@ def current_status(root: Path) -> dict:
     if isinstance(completion, dict):
         completion_view = {"status": completion.get("STATUS"),
                            "committed_at": completion.get("COMMITTED_AT")}
+    # QUOTA-PAUSE-PARK-V1 additive observability: a parked dispatch is paused
+    # logical work, not a failure. Bounded identity facts only.
+    pause_record = control.get("pause") if isinstance(control.get("pause"), dict) else {}
+    parked_record = pause_record.get("parked_dispatch")
+    parked_view = None
+    if isinstance(parked_record, dict) and type(parked_record.get("MESSAGE_ID")) is int:
+        parked_view = {key: parked_record.get(key) for key in (
+            "MESSAGE_ID", "TASK_ID", "STAGE_ID", "ATTEMPT", "NONCE",
+            "PARKED_AT", "EXPIRES_AT", "QUARANTINE", "CONVERTED_AT",
+            "CONVERTED_REASON")}
     return {
         "schema_version": 1,
         "PROJECT_ID": project_id,
@@ -2295,6 +2450,10 @@ def current_status(root: Path) -> dict:
         "last_authorized_dispatch": active,
         "active_task_claimed": lifecycle["running"],
         "active_task_claim_recorded": lifecycle["claimed"],
+        "active_task_parked": bool(
+            parked_view is not None and active_current is not None
+            and _same_identity(parked_record, active_current)),
+        "parked_dispatch": parked_view,
         "active_task_completion_status": (
             lifecycle["completion"].get("STATUS") if lifecycle["completion"] else None
         ),

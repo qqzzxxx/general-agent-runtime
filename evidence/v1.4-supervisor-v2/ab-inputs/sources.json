@@ -1,0 +1,27 @@
+{
+  "PROJECT_GOAL.md": {
+    "source": "C:\\goals\\ai-agent-console-ab-goal.md",
+    "sha256": "0bab3c058c3ff506b77a1e0711d659e158f36e5b39a896716e215192a7573a7b",
+    "bytes": 584
+  },
+  "index.html": {
+    "source": "C:\\general-agent-runtime-ab-fixture\\index.html",
+    "sha256": "850edca623d241c6267f77aad4393d98d4a1aa1c89238b4384b6353223770f10",
+    "bytes": 8800
+  },
+  "styles.css": {
+    "source": "C:\\general-agent-runtime-ab-fixture\\styles.css",
+    "sha256": "be7855d2778f77bb8d16fc2a3585034e6bd2b0db2f70f61a8e65b547f7be8004",
+    "bytes": 1742
+  },
+  "a-first-dispatch.md": {
+    "source": "C:\\general-agent-runtime-ab-v13\\handoff\\supervisor_dispatch_archive\\console-a-001\\dispatch-700100-8216361f31f4e48bb1546508.md",
+    "sha256": "a61199c45d8287e523ff6b45de2f7eaf60e18c49c4e7a99c6fbe34749e33bd99",
+    "bytes": 7238
+  },
+  "b2-first-dispatch.md": {
+    "source": "C:\\general-agent-runtime-ab-v14-b2\\handoff\\supervisor_dispatch_archive\\console-b2-001\\dispatch-700100-b5c3b244ccafb13d52d9cf2e.md",
+    "sha256": "f56cf878a0dfaec390dded2b90e9777855f9f77dc7bf84c7efc352f55b3fbb0c",
+    "bytes": 7276
+  }
+}

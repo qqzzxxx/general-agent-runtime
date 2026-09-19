@@ -179,11 +179,17 @@ class ExecutorFenceTests(unittest.TestCase):
         _, digest = self.candidate(identity, "candidate")
         check = fence.check_locked
         calls = []
+        claim_path = claim.claim_dir(self.root, identity["MESSAGE_ID"],
+                                     identity["NONCE"]) / "claim.json"
         def expiring_check(*args, **kwargs):
             calls.append(True)
             if len(calls) == 2:
-                self.runtime["authorized_dispatch"]["EXPIRES_AT"] = "2000-01-01T00:00:00+00:00"
-                self.o.save_runtime(self.runtime)
+                # The execution budget (CLAIMED_AT + MAX_TIME) may pass during
+                # snapshot IO; push the durable claim instant into the past to
+                # simulate that passage.
+                claim_data = json.loads(claim_path.read_text(encoding="utf-8-sig"))
+                claim_data["CLAIMED_AT"] = "2000-01-01T00:00:00+00:00"
+                claim_path.write_text(json.dumps(claim_data), encoding="utf-8")
             return check(*args, **kwargs)
         with patch.object(fence, "check_locked", side_effect=expiring_check):
             with self.assertRaisesRegex(fence.FenceError, "expired"):
@@ -195,8 +201,14 @@ class ExecutorFenceTests(unittest.TestCase):
         identity = self.dispatch()
         self.acquire(identity)
         _, digest = self.candidate(identity, "candidate")
-        self.runtime["authorized_dispatch"]["EXPIRES_AT"] = "2000-01-01T00:00:00+00:00"
-        self.o.save_runtime(self.runtime)
+        # Exhaust the execution budget (CLAIMED_AT + MAX_TIME) directly; the
+        # pickup window (EXPIRES_AT) legitimately no longer binds a claimed
+        # owner, so the fence must refuse on the execution clock alone.
+        claim_path = claim.claim_dir(self.root, identity["MESSAGE_ID"],
+                                     identity["NONCE"]) / "claim.json"
+        claim_data = json.loads(claim_path.read_text(encoding="utf-8-sig"))
+        claim_data["CLAIMED_AT"] = "2000-01-01T00:00:00+00:00"
+        claim_path.write_text(json.dumps(claim_data), encoding="utf-8")
         for action in (lambda: self.check(identity),
                        lambda: self.publish(identity, "workspace/U1.txt", digest)):
             with self.assertRaisesRegex(fence.FenceError, "expired"):
@@ -242,13 +254,20 @@ class ExecutorFenceTests(unittest.TestCase):
         events = []
         def supervisor(runtime, reason, event):
             events.append((reason, event))
-            raise KeyboardInterrupt
+            if reason == "PICKUP_TIMEOUT_STAGE_RESUME":
+                raise KeyboardInterrupt
         with patch.object(self.o, "goal_anchor_gate", return_value=True), \
              patch.object(self.o, "invoke_codex", side_effect=supervisor), \
-             patch.object(self.o, "register_dispatched_task") as register:
+             patch.object(self.o, "register_dispatched_task") as register, \
+             patch.object(self.o.time, "sleep", lambda *_: None):
             self.o.main()
-        self.assertEqual(events[0][0], "EXECUTOR_TIMEOUT")
-        self.assertEqual(events[0][1]["message_id"], 700110)
+        # PICKUP-EXECUTION-LIFECYCLE: the dispatch was never claimed, so the
+        # expiry was converted into the parked pickup recovery event; restart
+        # replays that durable event and still never re-authorizes the retired
+        # wait.
+        pickup = [item for item in events if item[0] == "PICKUP_TIMEOUT_STAGE_RESUME"]
+        self.assertEqual(len(pickup), 1)
+        self.assertEqual(pickup[0][1]["message_id"], 700110)
         register.assert_not_called()
 
     def delayed_starter_preserves_retirement(self, issued_at):

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "PROJECT_ID": "console-a-001",
+  "MESSAGE_ID": 700100,
+  "TASK_ID": "console-ui-polish",
+  "STAGE_ID": "implementation-1",
+  "ATTEMPT": 1,
+  "NONCE": "e681cf7dff8940da9698a24cc7449f023d769426f6a544fb-700100",
+  "archived_at": "2026-09-13T23:15:51+00:00",
+  "dispatch_sha256": "a61199c45d8287e523ff6b45de2f7eaf60e18c49c4e7a99c6fbe34749e33bd99",
+  "archive_file": "handoff/supervisor_dispatch_archive/console-a-001/dispatch-700100-8216361f31f4e48bb1546508.md",
+  "originating_control_revision": 0,
+  "supervisor_turn_id": "supervisor-turn-e0b2e2444561432aa23bf4aa9055cd5b",
+  "decision_receipt_sha256": "e2dfbfff20765af8fe70db524ea8b990d0e40171a910122fec382cd3b2b2f5d0"
+}

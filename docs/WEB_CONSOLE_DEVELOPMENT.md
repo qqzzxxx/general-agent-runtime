@@ -59,6 +59,7 @@ copy (deferred to P9) still do not exist in this tree.
 | `scripts/test_web_console_artifacts.py` | P6 pure-layer tests: path normalization matrix, format classification, query bounds, index/catalog determinism and honesty, preview states, feedback schema and binding. |
 | `scripts/test_web_console_artifacts_http.py` | P6 HTTP tests: catalog/detail/preview/raw routes over stub fixtures with real artifact files, hash/magic/polyglot/oversized/non-UTF-8 refusals, isolation, feedback argv contract and refusals, method allowlists. |
 | `scripts/test_web_console_artifacts_frontend.py` | P6 static frontend tests: Artifact Center markers, filters, preview states, provenance labels, feedback form, text-only rendering, per-Runtime reset. |
+| `scripts/test_web_console_round_artifacts.py` | Artifact provenance / task-scoping e2e: catalog artifacts locate back to MESSAGE 700100, Task Detail shows only that MESSAGE's artifacts, DISPATCHED_NO_COMPLETION with/without Runtime publication records (provisional vs none), completion integrity failure never fakes final metadata, publication-record validator refusal matrix, frontend copy pins. |
 | `scripts/web_console_setup.py` | P7 pure Setup Wizard layer: Goal validator decision table, Supervisor config schema + capability honesty, input-request schema + inventory projection, canonical ZCode prompt rendering, readiness decision table, bounded context pack/startup prompt composition, draft schema. No clock, no AI, no filesystem, no subprocess. |
 | `scripts/test_web_console_setup.py` | P7 pure-layer tests: Goal validator decision table (Unicode, malformed Markdown, hostile publication roots, routing-internals warnings), config schema, capability honesty, inventory projection, prompt rendering (BOM/placeholder fail-closed), readiness matrix, workshop pack bounds, draft normalization. |
 | `scripts/test_web_console_setup_http.py` | P7 HTTP tests: all setup routes over the wire, real `start_project.py` bootstrap and real preflight in disposable Runtime fixtures, refusal matrices (traversal, dot segments, reparse points, cross-root bindings, existing projects, occupied active projects), racing start requests, restart persistence, method allowlists, canonical prompt byte-equivalence with the official PS1 helper. |
@@ -352,9 +353,18 @@ The message id must be 1..9 ASCII digits (route pattern; anything else is
   executor receipt (status, outcome, committed/consumed/sealed timestamps,
   commit id, ledger file);
 - **interventions** — the records targeting this MESSAGE_ID (bounded);
-- **artifacts** — read-only metadata/provenance from the receipt's
-  `PUBLISHED_PATHS` (path + sha256; content previews are deferred to the
-  Artifact Center stage);
+- **artifacts** — task-scoped publication metadata in one of four states:
+  `final` (completion and publication integrity both OK; paths carry
+  message/task/stage identity, the commit id, and the publication hash),
+  `provisional` (the Runtime's own pre-completion publication records from
+  `handoff/executor_publications/<commit_id>/`, read server-side only when
+  the archived dispatch verified as `AUTHORIZED_VALID`; never presented as
+  final metadata, so a dispatched-not-completed round can honestly answer
+  "published, task not complete"), `none` (dispatch verified, clean read,
+  nothing published yet), or `unavailable` (a broken completion integrity is
+  surfaced with its reason and nothing is shown as bound). Content previews
+  stay deferred to the Artifact Center; "none" is an observed fact only
+  after a clean record read — a failed projection stays `unavailable`;
 - **decision** — the Supervisor decision receipt, presented only when its
   canonical SHA-256 matches the `decision_receipt_sha256` recorded in the
   dispatch archive metadata and its candidate binding matches the dispatch
@@ -410,9 +420,14 @@ Browser ──127.0.0.1 only──> index.html (Human Control + Pending Controls
   CONTROL_PLANE_UNAVAILABLE`; oversized/unparseable output → `502
   CONTROL_PLANE_OUTPUT_TOO_LARGE` / `CONTROL_PLANE_MALFORMED_OUTPUT`.
 - **Cooperative interruption.** Interrupt is an option of Pause
-  (`--interrupt-current-task`) and of interventions. Outcomes are surfaced
+  (`--interrupt-current-task`) and of interventions. A plain Pause
+  (QUOTA-PAUSE-PARK-V1) parks a dispatched-but-unclaimed task
+  (`PAUSED_UNCLAIMED_PARKED`) instead of retiring it: parked work is shown as
+  waiting, never as a failure, and Resume continues it automatically.
+  Outcomes are surfaced
   verbatim from the Runtime's disposition (`PRESERVE_RUNNING`,
-  `COMPLETION_COMMITTED_WINS`, `PAUSED_UNCLAIMED_RETIRED`,
+  `COMPLETION_COMMITTED_WINS`, `PAUSED_UNCLAIMED_PARKED`,
+  `PAUSED_UNCLAIMED_RETIRED`,
   `PAUSED_CURRENT_REVOKED`, `UNCLAIMED_TASK_RETIRED`,
   `PENDING_NEXT_SUPERVISOR_TURN`), never invented. The Console never kills
   processes; interruption revokes authority through the Runtime's own
@@ -441,6 +456,25 @@ Browser ──127.0.0.1 only──> index.html (Human Control + Pending Controls
   HUMAN_DECISION_RECEIPT_MISMATCH`), and deletes the receipt after a
   successful apply so a replayed confirmation cannot reapply (`404`).
   Helper refusals (exit 3/4) map to `409 HUMAN_DECISION_REFUSED`.
+  After a successful apply the Console attempts one **gated automatic
+  resume**: the pure gate (`web_console_control.evaluate_auto_resume_gate`)
+  re-proves from authoritative Runtime state — a fresh status probe
+  (project `SUPERVISOR_TURN`, HUMAN_REVIEW gone, no STOP), the persisted
+  `HUMAN_DECISION_RESUME` event in `control/orchestrator_runtime.json`
+  bound to the applied receipt and the active project, and no live
+  scheduler owner via `runtime_lifecycle.live_owner` — then starts the
+  Runtime only through its documented `START_AGENT_SYSTEM.ps1` entry point
+  (the same `_run_start_entry` helper and per-Runtime in-process start lock
+  the Setup Wizard's `setup/start` uses; orchestrator.py's exclusive-create
+  `.orchestrator.lock` remains the final two-instance arbiter). A blocked
+  or failed start never rolls the apply back: the apply answers `200` with
+  `human_decision_result` plus an honest `auto_resume` document
+  (`attempted`/`start_invoked`/`verification`/`gate.blocked`/`error`),
+  the controls document projects the same verdict under
+  `human_review.applied_resume`, and `POST
+  …/controls/human-review/resume` re-runs the identical gate as the
+  one-click retry (`409 HUMAN_REVIEW_RESUME_BLOCKED` with the blocking
+  reasons, `502 RESUME_START_FAILED` when the entry point fails).
 - **Pending Controls.** `GET /controls` composes `status --json` +
   `interventions --json` + a bounded (64 KiB) server-side read of the
   Runtime's own `control/HUMAN_REVIEW` reason flag. Intervention records are
@@ -686,14 +720,14 @@ keeps the original 64 KiB cap.
   and the validation/error outcome. The recovery path (crash between the
   decision commit and the accounting write) writes the same record with
   `recovered_after_crash: true`; an existing record is never overwritten.
-  Dogfood Fix 04 recovers usage from the separately captured invocation receipt,
-  even when the transient observation is lost. Decision receipts are unchanged.
+  Token accounting recovers usage from the separately captured invocation
+  receipt, even when the transient observation is lost. Decision receipts are unchanged.
 - **Orchestrator observation.** `invoke_codex` records the effective
   model/effort, elapsed time, and the bounded context manifest
   (input classes only: supervisor rules, project state, research state,
   goal, profile, human decision receipt, interventions, executor brief,
   mechanical event — never file contents or model reasoning).
-- **Authoritative usage (Dogfood Fix 04).** `codex exec --json` stdout supplies
+- **Authoritative usage.** `codex exec --json` stdout supplies
   `turn.completed.usage`; `-o` contains model-authored text and is never a usage
   source. Runtime captures only `input_tokens`, `cached_input_tokens`,
   `output_tokens`, and `reasoning_output_tokens` when supplied. No total is
@@ -702,12 +736,14 @@ keeps the original 64 KiB cap.
   Codex thread UUID, and canonical hashes. Live completion and recovery read the
   same capture; Console validates its binding before displaying or summing it.
   Old reported blocks without this evidence are read as unavailable, without
-  rewriting history. See [the complete trace and validation report](DOGFOOD_FIX_04_TOKEN_TELEMETRY.md).
+  rewriting history.
 - **Explicit queued configuration (Runtime contract).**
   `supervisor_control.py queue-supervisor-config --model M --effort E`
-  validates `{model, reasoning_effort}` (bounded model string;
-  `SUPERVISOR_CONFIG_EFFORTS = LOW/MEDIUM/HIGH` — the domain the Runtime's
-  Codex integration applies today) under the fence lock and writes
+  validates `{model, reasoning_effort}` (model must be one of the canonical
+  `SUPERVISOR_CONFIG_MODELS = gpt-5.6-sol / gpt-6-astra`, confirmed against
+  the installed Codex CLI — see `evidence/v1.4-supervisor-config-ui/`;
+  effort accepts `SUPERVISOR_CONFIG_EFFORTS = LOW/MEDIUM/HIGH/XHIGH`
+  case-insensitively) under the fence lock and writes
   `control/supervisor_config.json` as *pending*. `begin_supervisor_turn`
   is the only consumer: at that turn boundary pending becomes *active*
   (and stays active until replaced), the turn snapshot records the source,
@@ -763,8 +799,9 @@ authoritative Runtime state directly.
 - **Settings are Console-owned and versioned.** Global defaults live in
   `web_console_data/settings.json`; per-Runtime overrides and the operator
   note live in `web_console_data/settings/<runtime id>.json`. Keys:
-  `supervisor_model`, `supervisor_reasoning_effort` (LOW/MEDIUM/HIGH or
-  empty = the Runtime's fixed policy), `decision_summary_mode`
+  `supervisor_model`, `supervisor_reasoning_effort`
+  (LOW/MEDIUM/HIGH/XHIGH, case-insensitive, or empty = the Runtime's
+  fixed policy; the UI pickers offer the fixed product menu), `decision_summary_mode`
   (compact/full), `timeline_page_size` (5–100), `alert_thresholds`
   (seven bounded, range-checked values), and `notifications` (four
   opt-in informational events, four must-attention events on by
@@ -1014,7 +1051,14 @@ operation. New error codes: `CONTROL_INVALID_PAYLOAD` (400),
   `{"decision_content": str(≤24000), "constraints_verbatim": [str, …]}` per
   the helper's schema; requires active HUMAN_REVIEW.
 - `POST …/controls/human-review/apply` — body exactly
-  `{"receipt_id": "human-decision-<32hex>", "receipt_sha256": <64hex>}`.
+  `{"receipt_id": "human-decision-<32hex>", "receipt_sha256": <64hex>}`;
+  on success attempts one gated automatic resume (see §4c) and answers with
+  `human_decision_result` + `auto_resume`.
+- `POST …/controls/human-review/resume` — body exactly `{}` (or none);
+  re-runs the auto-resume safety gate and starts the Runtime through its
+  documented entry point; `409 HUMAN_REVIEW_RESUME_BLOCKED` names every
+  blocking reason, `502 RESUME_START_FAILED` leaves the applied decision
+  untouched.
 
 ### Request body bounds (Registry POST routes)
 
@@ -1061,7 +1105,10 @@ foundation from the product specification:
   two-step inline confirmations, the bounded intervention form with optional
   historical MESSAGE_ID targeting and cooperative interrupt, the
   HUMAN_REVIEW presentation with the Runtime's own reason and the two-step
-  Human Decision prepare/apply flow, and a visually distinct high-risk area
+  Human Decision prepare / apply-and-continue flow — apply attempts the
+  gated automatic resume and an `hc-resume-state` card reports "Decision
+  applied, Runtime not resumed" with the blocking reasons and the gated
+  one-click resume — plus a visually distinct high-risk area
   holding Interrupt Current Task and the challenge-confirmed Formal STOP),
   and the **P5 Pending Controls panel** (authoritative pause/stop/
   intervention facts with honest categories, counts, and notes, polled every

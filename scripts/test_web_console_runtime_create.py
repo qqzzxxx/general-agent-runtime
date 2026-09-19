@@ -98,6 +98,9 @@ class SkeletonContractTests(unittest.TestCase):
     def test_handoff_seed_is_only_the_static_protocol_document(self):
         self.assertEqual(set(wcr.HANDOFF_SEED_FILES), {"PROTOCOL.md"})
 
+    def test_supervisor_v2_reference_is_a_static_release_seed(self):
+        self.assertIn("SUPERVISOR_PROTOCOL_REFERENCE.md", wcr.CONTROL_SEED_FILES)
+
     def test_required_release_paths_are_verified_after_copy(self):
         for rel in ("orchestrator.py", "scripts/supervisor_control.py",
                     "scripts/executor_claim.py", "scripts/executor_fence.py",
@@ -294,6 +297,7 @@ class CopyContractTests(unittest.TestCase):
         (root / "web_console" / "index.html").write_text("<html></html>",
                                                          encoding="utf-8")
         for name in ("supervisor_control.py", "provider_usage.py", "executor_claim.py",
+                     "supervisor_context.py", "supervisor_inspect.py", "supervisor_intelligence.py",
                      "executor_fence.py", "executor_completion.py",
                      "preflight.py", "start_project.py"):
             (root / "scripts" / name).write_text(f"# {name}\n",

@@ -292,14 +292,23 @@ class SupervisorConfigTests(unittest.TestCase):
                      "explanation_mode": bad})
 
     def test_reasoning_effort_enum(self):
+        self.assertEqual(
+            setup.REASONING_EFFORTS, ("LOW", "MEDIUM", "HIGH", "XHIGH"),
+            "the draft vocabulary mirrors the Runtime queue contract")
         for effort in setup.REASONING_EFFORTS:
             setup.validate_supervisor_config(
                 {"model": None, "reasoning_effort": effort,
                  "explanation_mode": "COMPACT"})
-        with self.assertRaises(web_console_control.ControlRequestError):
-            setup.validate_supervisor_config(
-                {"model": None, "reasoning_effort": "MAXIMUM",
-                 "explanation_mode": "COMPACT"})
+        # The CLI-canonical lowercase form normalizes to the stored form.
+        config = setup.validate_supervisor_config(
+            {"model": None, "reasoning_effort": "xhigh",
+             "explanation_mode": "COMPACT"})
+        self.assertEqual(config["reasoning_effort"], "XHIGH")
+        for bad in ("MAXIMUM", "ULTRA", "HIGHEST", "EXTRA_HIGH"):
+            with self.assertRaises(web_console_control.ControlRequestError):
+                setup.validate_supervisor_config(
+                    {"model": None, "reasoning_effort": bad,
+                     "explanation_mode": "COMPACT"})
 
     def test_model_bounds(self):
         with self.assertRaises(web_console_control.ControlRequestError):

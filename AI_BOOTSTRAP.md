@@ -1,5 +1,20 @@
 # General Agent Runtime — AI Bootstrap
 
+Supervisor decisions use [Phase 8 Context V2](docs/v1.4-supervisor-v2.md).
+The Supervisor owns the user's outcome, quality and next valuable work. It separates
+hard constraints from current implementation facts and revisable assumptions.
+The prompt is a decision view; full records stay available by reference. Ordinary
+physical task construction and all existing authority/lifecycle gates remain Runtime-owned.
+
+The v1.4 development checkout uses the
+[Phase 6 host-native Executor](docs/v1.4-host-native-executor.md): available host
+tools serve one authorized outcome; Runtime owns entry, checkpoints, publication
+and completion. Final Verification must preserve the verified deliverables.
+Use [Phase 3 publication/completion](docs/v1.4-runtime-owned-completion.md) for the
+underlying mechanics. Existing low-level helper
+examples below remain compatibility references; normal Executors supply semantic
+results and Runtime constructs publication/staging/receipt machinery.
+
 > Status: maintainer knowledge pack for General Agent Runtime V1.x.
 > Purpose: give any capable new AI enough context to design, start, operate, debug, maintain, or extend a project without relying on a previous chat.
 

@@ -111,6 +111,7 @@ def read_usage(root, turn_id, project_id):
 
 class Capture:
     def __init__(self, root, turn):
+        self.intelligence = None
         self.thread_id = None
         self.started = False
         self.done = False
@@ -132,6 +133,8 @@ class Capture:
             if not isinstance(event, dict):
                 return
             kind = event.get("type")
+            if self.intelligence is not None:
+                self.intelligence.accept(event)
             if kind == "thread.started":
                 if self.thread_id is not None:
                     raise ValueError("multiple threads in fresh exec")
@@ -161,6 +164,8 @@ class Capture:
                 if not line:
                     return
                 if len(line) > MAX_LINE:
+                    if self.intelligence is not None:
+                        self.intelligence.incomplete = True
                     # Drain an oversized item without retaining its contents.
                     while line and not line.endswith(b"\n"):
                         line = stream.readline(MAX_LINE + 1)
@@ -170,7 +175,7 @@ class Capture:
 
 
 @contextlib.contextmanager
-def stdout_capture(root, turn):
+def stdout_capture(root, turn, *, context_manifest=None):
     """Keep subprocess.run timeout/exit semantics; durably capture while running.
 
     Storage failure disables telemetry only. The reader always drains the pipe
@@ -178,6 +183,8 @@ def stdout_capture(root, turn):
     """
     try:
         capture = Capture(root, turn)
+        import supervisor_intelligence
+        capture.intelligence = supervisor_intelligence.Capture(capture, context_manifest)
         read_fd, write_fd = os.pipe()
     except (OSError, ValueError, KeyError):
         yield None
@@ -193,3 +200,5 @@ def stdout_capture(root, turn):
         # subprocess.run has already waited/killed the child. A descendant that
         # inherited stdout must not hold up Runtime timeout or STOP handling.
         reader.join(timeout=2)
+        capture.intelligence.finish(stream_complete=(not reader.is_alive()
+                                    and capture.done and not capture.disabled))

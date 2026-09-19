@@ -433,6 +433,697 @@ def _validate_last_claim(m, runtime: dict, message_id: int) -> None:
         )
 
 
+def _assert_pre_dispatch_quiescent(m, runtime: dict) -> bool:
+    """Mechanical proof that this Runtime never published an Executor task.
+
+    HUMAN_REVIEW quiescence has two legal shapes: post-task (the previous task
+    was dispatched AND fully consumed/sealed) and pre-dispatch (no task was ever
+    published, so the bootstrap compatibility consumed pointer is the only
+    Executor history). This proof establishes the pre-dispatch shape from every
+    observable surface; any counter-evidence returns False so the caller falls
+    through to the strict post-task checks and fails closed. Hard corruption
+    (e.g. a malformed processed pointer) still raises.
+    """
+    if runtime.get("last_dispatched_nonce") is not None:
+        return False
+    if runtime.get("authorized_dispatch") is not None:
+        return False
+    # Any retired identity proves a MESSAGE_ID was once issued to an Executor.
+    if runtime.get("retired_message_ids"):
+        return False
+    # No live candidate inbox and no raw completion hint.
+    if m.TO_ZCODE.exists() or m.ZCODE_DONE.exists():
+        return False
+    # No authorized current task in the authoritative project state.
+    if m.read_project_state().get("current_task") is not None:
+        return False
+    # No active Executor claim.
+    claims_root = m.ROOT / "handoff" / "executor_claims"
+    if claims_root.exists() and any(path.is_dir() for path in claims_root.iterdir()):
+        return False
+    # No staged or unconsumed completion ledger entry.
+    completion = _load_completion_helper()
+    ledger = completion.ledger_dir(m.ROOT)
+    if ledger.is_dir():
+        staged = ledger / "staged"
+        if staged.is_dir() and any(staged.iterdir()):
+            return False
+        for path in ledger.glob("completion-*.json"):
+            entry = completion.load_entry_file(path)
+            if entry is None:
+                continue
+            if entry.get("STATUS") not in (completion.STATUS_CONSUMED,
+                                           completion.STATUS_SEALED):
+                return False
+    # A derived processed pointer is tolerated pre-dispatch only when it agrees
+    # with the compatibility consumed pointer; absence is fine (nothing was ever
+    # published, so nothing had to be processed).
+    if m.ZCODE_LAST_PROCESSED.is_file():
+        if _read_last_processed(m.ZCODE_LAST_PROCESSED).get("MESSAGE_ID") != runtime.get(
+                "last_consumed_message_id"):
+            return False
+    return True
+
+
+def _retirement_authority_reasons() -> set:
+    """Retirement reasons that can close a dispatch without Executor work.
+
+    SUPERSEDED is deliberately absent: a superseded dispatch had a successor
+    published after it, so `last_dispatched_message_id` pointing at it would
+    mean a rewound or contradictory Runtime pointer, never a legal shape.
+    """
+    return {
+        "PAUSE_BEFORE_CLAIM",
+        "PAUSE_INTERRUPT",
+        "HUMAN_INTERVENTION_BEFORE_CLAIM",
+        "HUMAN_INTERVENTION_INTERRUPT",
+        "EXECUTOR_TIMEOUT",
+    }
+
+
+def _retirement_records_for(runtime: dict, message_id: int, nonce: str) -> list:
+    """Identity-bound retirement records for one dispatched identity."""
+    return [
+        entry for entry in (runtime.get("executor_retirements") or [])
+        if isinstance(entry, dict)
+        and entry.get("MESSAGE_ID") == message_id
+        and entry.get("NONCE") == nonce
+    ]
+
+
+def _verify_retired_authorization_chain(m, runtime: dict, dispatched: int,
+                                        dispatched_nonce: str) -> bool:
+    """Shared retired-dispatch proof: authorization integrity and closed window.
+
+    Returns True only when the authorized_dispatch is identity-bound to the
+    retired identity, its archived dispatch documents verify byte-exactly
+    against the authorized inbox hash, and the authorization window is provably
+    closed: expired in the authoritative record, or the retirement provably
+    removed the live inbox into quarantine with the exact dispatch hash.
+    """
+    authorization = runtime.get("authorized_dispatch")
+    if not isinstance(authorization, dict):
+        return False
+    if authorization.get("MESSAGE_ID") != dispatched \
+            or authorization.get("NONCE") != dispatched_nonce:
+        return False
+    expected_inbox_hash = authorization.get("TO_ZCODE_SHA256")
+    if not isinstance(expected_inbox_hash, str) \
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_inbox_hash):
+        return False
+    archive_meta = authorization.get("SUPERVISOR_DISPATCH_ARCHIVE")
+    if not isinstance(archive_meta, dict) \
+            or archive_meta.get("dispatch_sha256") != expected_inbox_hash:
+        return False
+    archive_documents = {}
+    for key in ("metadata_file", "archive_file", "authorization_file"):
+        relative = archive_meta.get(key)
+        if not isinstance(relative, str) or not relative:
+            return False
+        path = m.ROOT / relative
+        if not path.is_file():
+            return False
+        archive_documents[key] = path
+    try:
+        authorization_archive = json.loads(
+            archive_documents["authorization_file"].read_text(encoding="utf-8-sig"))
+        metadata_archive = json.loads(
+            archive_documents["metadata_file"].read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False
+    if not isinstance(authorization_archive, dict) or not isinstance(metadata_archive, dict):
+        return False
+    # The archived documents bind the identity, and the archived dispatch
+    # brief itself must be the exact retired inbox bytes (dispatch_sha256 ==
+    # TO_ZCODE_SHA256 == sha256(archive_file)).
+    if authorization_archive.get("MESSAGE_ID") != dispatched \
+            or authorization_archive.get("NONCE") != dispatched_nonce:
+        return False
+    if metadata_archive.get("MESSAGE_ID") != dispatched:
+        return False
+    for document in (authorization_archive, metadata_archive):
+        archived_hash = document.get("dispatch_sha256")
+        if archived_hash is None:
+            archived_hash = document.get("TO_ZCODE_SHA256")
+        if archived_hash != expected_inbox_hash:
+            return False
+    try:
+        if m.sha256(archive_documents["archive_file"]) != expected_inbox_hash:
+            return False
+    except OSError:
+        return False
+
+    authorization_expired = False
+    expires_at = authorization.get("EXPIRES_AT")
+    if isinstance(expires_at, str):
+        try:
+            deadline = m.parse_time(expires_at)
+        except (ValueError, TypeError):
+            deadline = None
+        authorization_expired = deadline is not None and m.utc_now() >= deadline
+    quarantine_hash = None
+    quarantine_root = m.ROOT / "handoff" / "quarantine"
+    if quarantine_root.is_dir():
+        quarantine_hashes = set()
+        for path in quarantine_root.glob(f"to-zcode-{dispatched}-*"):
+            try:
+                quarantine_hashes.add(m.sha256(path))
+            except OSError:
+                return False
+        if len(quarantine_hashes) > 1 or \
+                quarantine_hashes - {expected_inbox_hash}:
+            return False
+        if quarantine_hashes:
+            quarantine_hash = expected_inbox_hash
+    if quarantine_hash is None and not authorization_expired:
+        return False
+    return True
+
+
+def _assert_retired_unclaimed_quiescent(m, runtime: dict) -> bool:
+    """Mechanical proof that the last dispatch was retired with no live work.
+
+    HUMAN_REVIEW quiescence has three legal shapes: post-task (the previous
+    task was dispatched AND fully consumed/sealed), pre-dispatch (no task was
+    ever published), and retired-unclaimed (the last dispatch was authoritatively
+    retired — pause/intervention/timeout — before any claimable Executor work,
+    so it can never be consumed). This proof establishes the third shape from
+    every observable surface: the dispatched identity must carry a full
+    identity-bound retirement record, its authorization must be verifiable
+    against its dispatch archive with a closed authorization window, no claim,
+    attempt workspace, completion staging, ledger entry, or raw completion hint
+    may exist for it or for any identity beyond the consumed chain, and the
+    consumed chain below it must still verify. Any counter-evidence returns
+    False so the caller falls through to the strict post-task checks and fails
+    closed; a bare `retired_message_ids` entry or a `dispatched != consumed`
+    inequality alone is never sufficient.
+    """
+    dispatched = runtime.get("last_dispatched_message_id")
+    consumed = runtime.get("last_consumed_message_id")
+    if isinstance(dispatched, bool) or not isinstance(dispatched, int):
+        return False
+    if isinstance(consumed, bool) or not isinstance(consumed, int):
+        return False
+    if dispatched <= consumed:
+        return False
+    dispatched_nonce = runtime.get("last_dispatched_nonce")
+    consumed_nonce = runtime.get("last_consumed_nonce")
+    if not isinstance(dispatched_nonce, str) or not dispatched_nonce:
+        return False
+    if not isinstance(consumed_nonce, str) or not consumed_nonce:
+        return False
+    try:
+        state = m.read_project_state()
+    except Exception:
+        return False
+    if state.get("status") != "HUMAN_REVIEW" or state.get("current_task") is not None:
+        return False
+
+    # 1. The dispatched identity must be authoritatively retired with exactly
+    #    one full identity-bound retirement record.
+    retired = runtime.get("retired_message_ids")
+    if not isinstance(retired, list) or dispatched not in retired:
+        return False
+    retirements = _retirement_records_for(runtime, dispatched, dispatched_nonce)
+    if len(retirements) != 1:
+        return False
+    if retirements[0].get("REASON") not in _retirement_authority_reasons():
+        return False
+
+    # 2-3. The authorization must be intact, identity-bound, verifiable
+    #    against its archived dispatch documents, and its window provably
+    #    closed (shared with the claimed-timeout reconciliation proof).
+    if not _verify_retired_authorization_chain(m, runtime, dispatched, dispatched_nonce):
+        return False
+
+    # 4. No live inbox and no raw completion hint.
+    if m.TO_ZCODE.exists() or m.ZCODE_DONE.exists():
+        return False
+
+    # 5. No Executor claim at or beyond the consumed chain — the retired
+    #    dispatch itself included (a claim would mean claimed-but-unconsumed).
+    claims_root = m.ROOT / "handoff" / "executor_claims"
+    if claims_root.exists():
+        for path in claims_root.iterdir():
+            if not path.is_dir():
+                continue
+            match = re.match(r"^(\d+)-", path.name)
+            if not match or int(match.group(1)) > consumed:
+                return False
+
+    # 6. No attempt workspace at or beyond the consumed chain.
+    try:
+        active = m.read_json(m.ACTIVE_PROJECT_FILE)
+        project_root = m.ROOT / str(active.get("project_root") or "")
+    except Exception:
+        return False
+    if not project_root.is_dir():
+        return False
+    workspaces = project_root / "attempt_workspaces"
+    if workspaces.is_dir():
+        for path in workspaces.iterdir():
+            match = re.match(r"^(\d+)-", path.name) if path.is_dir() else None
+            if match is None or int(match.group(1)) > consumed:
+                return False
+
+    # 7. No completion staging bound to the retired dispatch.
+    staging_root = project_root / "completion_staging"
+    if staging_root.is_dir():
+        for path in staging_root.iterdir():
+            if path.name.startswith(f"{dispatched}-"):
+                return False
+            staging_document = m.read_json(path / "staging.json", default=None) \
+                if (path / "staging.json").is_file() else None
+            if isinstance(staging_document, dict) \
+                    and staging_document.get("MESSAGE_ID") == dispatched:
+                return False
+
+    # 8. No completion ledger entry, staged result, finish, or publication for
+    #    the retired dispatch; nothing unconsumed or staged anywhere.
+    completion = _load_completion_helper()
+    ledger = completion.ledger_dir(m.ROOT)
+    if ledger.is_dir():
+        staged = ledger / "staged"
+        if staged.is_dir():
+            for path in staged.iterdir():
+                match = re.match(r"^completion-(\d+)-", path.name)
+                if not match:
+                    return False
+                staged_id = int(match.group(1))
+                if staged_id == dispatched:
+                    return False
+                # A staged copy of an identity the authoritative ledger already
+                # sealed or consumed is a historical archive, not live work.
+                sealed = [
+                    entry for entry in completion.lookup_entries(m.ROOT, staged_id)
+                    if entry.get("STATUS") in (completion.STATUS_CONSUMED,
+                                               completion.STATUS_SEALED)
+                ]
+                if not sealed:
+                    return False
+        for path in ledger.glob("completion-*.json"):
+            entry = completion.load_entry_file(path)
+            if entry is None:
+                continue
+            if entry.get("MESSAGE_ID") == dispatched:
+                return False
+            if entry.get("STATUS") not in (completion.STATUS_CONSUMED,
+                                           completion.STATUS_SEALED):
+                return False
+    for name in ("executor_finishes", "executor_publications"):
+        directory = m.ROOT / "handoff" / name
+        if directory.is_dir() and any(directory.glob(f"completion-{dispatched}-*")):
+            return False
+
+    # 9. The consumed chain below the retired dispatch must still verify.
+    try:
+        last_processed = _read_last_processed(m.ZCODE_LAST_PROCESSED)
+        if last_processed.get("MESSAGE_ID") != consumed:
+            return False
+        if "NONCE" in last_processed and last_processed.get("NONCE") != consumed_nonce:
+            return False
+        _validate_consumed_archive(m, runtime, consumed)
+        _validate_last_claim(m, runtime, consumed)
+        _validate_no_incomplete_claims(m, consumed)
+    except ResumeError:
+        return False
+    return True
+
+
+CLAIMED_TIMEOUT_RECONCILIATION_SCHEMA_VERSION = 1
+
+
+def _claimed_timeout_reconciliations(runtime: dict) -> list:
+    records = runtime.get("claimed_timeout_reconciliations")
+    if not isinstance(records, list):
+        return []
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _assert_claimed_timeout_reconciled(m, runtime: dict, *,
+                                       require_record: bool) -> bool:
+    """CLAIMED-TIMEOUT-RECONCILIATION-V1: mechanical proof that the last
+    dispatched identity is a Runtime-retired claimed timeout with zero
+    committed completion, reconciled into a quiescent historical state.
+
+    HUMAN_REVIEW quiescence has a fourth legal shape beyond post-task,
+    pre-dispatch, and retired-unclaimed: the last dispatch was claimed by an
+    Executor, its claimed execution budget expired, and the Runtime retired it
+    (EXECUTOR_TIMEOUT) with no completion ever committed. That identity can
+    never be consumed, so the strict `dispatched == consumed` chain can never
+    close; instead the Runtime owns an explicit reconciliation record after
+    proving, from authoritative state only, that the attempt's execution
+    ownership is dead. With `require_record` the proof also re-verifies the
+    record and its evidence bindings (claim hash, workspace presence, reason,
+    retirement identity) fresh from disk, so Apply accepts the shape only when
+    Runtime-owned evidence proves the reconciliation. Any counter-evidence —
+    an unretired or ambiguous claim, a live or staged completion, an
+    unconsumed ledger entry anywhere, an open authorization window, a
+    tampered claim — returns False so the caller fails closed; nothing here
+    ages out, rewrites history, or derives from filenames or model judgment.
+    """
+    dispatched = runtime.get("last_dispatched_message_id")
+    consumed = runtime.get("last_consumed_message_id")
+    if isinstance(dispatched, bool) or not isinstance(dispatched, int):
+        return False
+    if isinstance(consumed, bool) or not isinstance(consumed, int):
+        return False
+    if dispatched <= consumed:
+        return False
+    dispatched_nonce = runtime.get("last_dispatched_nonce")
+    if not isinstance(dispatched_nonce, str) or not dispatched_nonce:
+        return False
+    try:
+        state = m.read_project_state()
+    except Exception:
+        return False
+    if state.get("status") != "HUMAN_REVIEW" or state.get("current_task") is not None:
+        return False
+
+    # 1. Authoritative identity-bound retirement of the claimed attempt, and
+    #    the Runtime-armed claimed execution timeout for exactly this nonce:
+    #    the claimed-timeout signature, not an unrelated pause or supersession.
+    retired = runtime.get("retired_message_ids")
+    if not isinstance(retired, list) or dispatched not in retired:
+        return False
+    retirements = _retirement_records_for(runtime, dispatched, dispatched_nonce)
+    if len(retirements) != 1:
+        return False
+    retirement = retirements[0]
+    if retirement.get("REASON") not in _retirement_authority_reasons():
+        return False
+    if runtime.get("timeout_notified_for_nonce") != dispatched_nonce:
+        return False
+
+    # 2-3. Authorization integrity and a provably closed window (shared proof).
+    if not _verify_retired_authorization_chain(m, runtime, dispatched, dispatched_nonce):
+        return False
+
+    # 4. No raw completion hint anywhere. The historical dispatch inbox may
+    #    remain (a claimed timeout is fenced by the retirement record, the
+    #    armed timeout nonce, and the closed window — not by removing the
+    #    document), but a live inbox must still be the exact retired bytes.
+    if m.ZCODE_DONE.exists():
+        return False
+    authorization = runtime.get("authorized_dispatch")
+    if m.TO_ZCODE.exists():
+        try:
+            if m.sha256(m.TO_ZCODE) != authorization.get("TO_ZCODE_SHA256"):
+                return False
+        except OSError:
+            return False
+
+    # 5. Zero committed completion for the retired identity: completion and
+    #    consumption semantics stay authoritative (class D refuses here).
+    completion = _load_completion_helper()
+    if completion.lookup_entries(m.ROOT, dispatched):
+        return False
+
+    try:
+        active = m.read_json(m.ACTIVE_PROJECT_FILE)
+        project_root = m.ROOT / str(active.get("project_root") or "")
+    except Exception:
+        return False
+    if not project_root.is_dir():
+        return False
+
+    # 6. No completion staging bound to the retired dispatch.
+    staging_root = project_root / "completion_staging"
+    if staging_root.is_dir():
+        for path in staging_root.iterdir():
+            if path.name.startswith(f"{dispatched}-"):
+                return False
+            staging_document = m.read_json(path / "staging.json", default=None) \
+                if (path / "staging.json").is_file() else None
+            if isinstance(staging_document, dict) \
+                    and staging_document.get("MESSAGE_ID") == dispatched:
+                return False
+
+    # 7. No finish or publication artifacts for the retired dispatch.
+    for name in ("executor_finishes", "executor_publications"):
+        directory = m.ROOT / "handoff" / name
+        if directory.is_dir() and any(directory.glob(f"completion-{dispatched}-*")):
+            return False
+
+    # 8. The completion ledger holds no unconsumed work anywhere.
+    ledger = completion.ledger_dir(m.ROOT)
+    if ledger.is_dir():
+        staged = ledger / "staged"
+        if staged.is_dir():
+            for path in staged.iterdir():
+                match = re.match(r"^completion-(\d+)-", path.name)
+                if not match:
+                    return False
+                staged_id = int(match.group(1))
+                if staged_id == dispatched:
+                    return False
+                sealed = [
+                    entry for entry in completion.lookup_entries(m.ROOT, staged_id)
+                    if entry.get("STATUS") in (completion.STATUS_CONSUMED,
+                                               completion.STATUS_SEALED)
+                ]
+                if not sealed:
+                    return False
+        for path in ledger.glob("completion-*.json"):
+            entry = completion.load_entry_file(path)
+            if entry is None:
+                continue
+            if entry.get("STATUS") not in (completion.STATUS_CONSUMED,
+                                           completion.STATUS_SEALED):
+                return False
+
+    # 9. Exactly one claim beyond the consumed chain: the identity-bound claim
+    #    of the reconciled attempt itself, at the canonical claim layout, with
+    #    a claim record that binds the retired identity. It is preserved
+    #    provenance, never re-armed authority.
+    claim_helper = _load_claim_helper()
+    expected_claim_dir = claim_helper.claim_dir(m.ROOT, dispatched, dispatched_nonce)
+    dispatched_claim_dirs = []
+    claims_root = m.ROOT / "handoff" / "executor_claims"
+    if claims_root.exists():
+        for path in claims_root.iterdir():
+            if not path.is_dir():
+                continue
+            match = re.match(r"^(\d+)-", path.name)
+            if not match:
+                return False
+            message_id = int(match.group(1))
+            if message_id <= consumed:
+                continue
+            if message_id != dispatched:
+                return False
+            dispatched_claim_dirs.append(path)
+    if len(dispatched_claim_dirs) != 1 \
+            or dispatched_claim_dirs[0] != expected_claim_dir:
+        return False
+    claim_document = m.read_json(expected_claim_dir / "claim.json", default=None)
+    if not isinstance(claim_document, dict) \
+            or claim_document.get("MESSAGE_ID") != dispatched \
+            or claim_document.get("NONCE") != dispatched_nonce:
+        return False
+
+    # 10. Attempt workspaces beyond the consumed chain: at most the retired
+    #     attempt's own preserved workspace.
+    workspaces = project_root / "attempt_workspaces"
+    workspace_path = workspaces / expected_claim_dir.stem
+    if workspaces.is_dir():
+        for path in workspaces.iterdir():
+            match = re.match(r"^(\d+)-", path.name) if path.is_dir() else None
+            if match is None or int(match.group(1)) > consumed:
+                if path != workspace_path:
+                    return False
+
+    # 11. Consumed-chain consistency below the reconciled identity, verified
+    #     as far as the authoritative record reaches. A legacy migrated chain
+    #     carries no nonce/brief binding; those bindings are checked whenever
+    #     the Runtime state actually carries them.
+    try:
+        if m.ZCODE_LAST_PROCESSED.is_file():
+            last_processed = _read_last_processed(m.ZCODE_LAST_PROCESSED)
+            if last_processed.get("MESSAGE_ID") != consumed:
+                return False
+            if "NONCE" in last_processed \
+                    and runtime.get("last_consumed_nonce") is not None \
+                    and last_processed.get("NONCE") != runtime.get("last_consumed_nonce"):
+                return False
+        _validate_last_claim(m, runtime, consumed)
+        brief_hash = runtime.get("last_consumed_brief_sha256")
+        if isinstance(brief_hash, str) and re.fullmatch(r"[0-9a-f]{64}", brief_hash):
+            _validate_consumed_archive(m, runtime, consumed)
+    except ResumeError:
+        return False
+
+    # 12. The Runtime-owned reconciliation record: exactly one, schema-bound,
+    #     with its evidence bindings still true on disk right now.
+    if not require_record:
+        return True
+    records = _claimed_timeout_reconciliations(runtime)
+    matching = [
+        record for record in records
+        if record.get("MESSAGE_ID") == dispatched
+        and record.get("NONCE") == dispatched_nonce
+    ]
+    if len(matching) != 1:
+        return False
+    record = matching[0]
+    if record.get("schema_version") != CLAIMED_TIMEOUT_RECONCILIATION_SCHEMA_VERSION:
+        return False
+    if record.get("REASON") != retirement.get("REASON") \
+            or record.get("RETIRED_AT") != retirement.get("RETIRED_AT"):
+        return False
+    if record.get("CLAIM_DIR") != expected_claim_dir.relative_to(m.ROOT).as_posix():
+        return False
+    try:
+        claim_bytes = (expected_claim_dir / "claim.json").read_bytes()
+    except OSError:
+        return False
+    if record.get("CLAIM_JSON_SHA256") != hashlib.sha256(claim_bytes).hexdigest():
+        return False
+    expected_workspace = (
+        f"attempt_workspaces/{workspace_path.name}" if workspace_path.is_dir() else None
+    )
+    if record.get("ATTEMPT_WORKSPACE") != expected_workspace:
+        return False
+    if not isinstance(record.get("RECONCILED_AT"), str) or not record["RECONCILED_AT"]:
+        return False
+    return True
+
+
+def reconcile_claimed_timeout(m, *, project_id: str | None = None) -> dict:
+    """CLAIMED-TIMEOUT-RECONCILIATION-V1: reconcile a retired claimed timeout
+    with zero committed completion into a quiescent, reviewable historical
+    state so the prepared Human Decision becomes legally applicable.
+
+    This control-plane transaction is read-only except for two Runtime-owned
+    writes: the append-only `claimed_timeout_reconciliations` record in the
+    authoritative orchestrator runtime state, and the completion audit event.
+    It never touches project_state.json, the HUMAN_REVIEW flag, the dispatch
+    inbox, the claim directory, or the attempt workspace, so a prepared
+    receipt's exact-state binding stays intact. Reconciliation removes
+    obsolete execution ownership; it does not rewrite history, fabricate a
+    completion, or consume anything.
+    """
+    _acquire_resume_lock(m)
+    try:
+        active, state = _activate_isolated_project(m, project_id)
+        if state.get("status") != "HUMAN_REVIEW":
+            raise ResumeError(
+                EXIT_CONFLICT,
+                "project status must be HUMAN_REVIEW for claimed-timeout "
+                f"reconciliation, got {state.get('status')!r}",
+            )
+        if state.get("current_task") is not None:
+            raise ResumeError(
+                EXIT_CONFLICT,
+                "current_task must be exactly null for claimed-timeout reconciliation",
+            )
+        if m.STOP_FLAG.exists():
+            raise ResumeError(
+                EXIT_CONFLICT,
+                "control/STOP exists; claimed-timeout reconciliation is forbidden",
+            )
+        runtime = read_json_strict(m.RUNTIME_STATE, "orchestrator runtime")
+        if runtime.get("status") != "HUMAN_REVIEW":
+            raise ResumeError(
+                EXIT_CONFLICT,
+                "orchestrator runtime status must be HUMAN_REVIEW, got "
+                f"{runtime.get('status')!r}",
+            )
+        if not _assert_claimed_timeout_reconciled(m, runtime, require_record=False):
+            raise ResumeError(
+                EXIT_CONFLICT,
+                "claimed timeout is not mechanically reconcilable from "
+                "authoritative Runtime state; refusing fail-closed",
+            )
+        dispatched = runtime["last_dispatched_message_id"]
+        dispatched_nonce = runtime["last_dispatched_nonce"]
+        existing = [
+            record for record in _claimed_timeout_reconciliations(runtime)
+            if record.get("MESSAGE_ID") == dispatched
+            and record.get("NONCE") == dispatched_nonce
+        ]
+        if existing:
+            return {
+                "event": "CLAIMED_TIMEOUT_ALREADY_RECONCILED",
+                "project_id": active["project_id"],
+                "message_id": dispatched,
+                "reconciliation_id": existing[0].get("RECONCILIATION_ID"),
+                "duplicate": True,
+            }
+        retirement = _retirement_records_for(runtime, dispatched, dispatched_nonce)[0]
+        claim_helper = _load_claim_helper()
+        claim_dir_path = claim_helper.claim_dir(m.ROOT, dispatched, dispatched_nonce)
+        claim_bytes = (claim_dir_path / "claim.json").read_bytes()
+        project_root = active["project_root"]
+        workspace_path = (
+            project_root / "attempt_workspaces" / claim_dir_path.stem
+        )
+        record = {
+            "schema_version": CLAIMED_TIMEOUT_RECONCILIATION_SCHEMA_VERSION,
+            "RECONCILIATION_ID": (
+                f"claimed-timeout-reconcile-{dispatched}-"
+                f"{hashlib.sha256(dispatched_nonce.encode('utf-8')).hexdigest()[:12]}"
+            ),
+            "MESSAGE_ID": dispatched,
+            "TASK_ID": retirement.get("TASK_ID"),
+            "STAGE_ID": retirement.get("STAGE_ID"),
+            "ATTEMPT": retirement.get("ATTEMPT"),
+            "NONCE": dispatched_nonce,
+            "REASON": retirement.get("REASON"),
+            "RETIRED_AT": retirement.get("RETIRED_AT"),
+            "CLAIM_DIR": claim_dir_path.relative_to(m.ROOT).as_posix(),
+            "CLAIM_JSON_SHA256": hashlib.sha256(claim_bytes).hexdigest(),
+            "CLAIM_TOKEN_SHA256": claim_document_token(claim_dir_path),
+            "ATTEMPT_WORKSPACE": (
+                workspace_path.relative_to(project_root).as_posix()
+                if workspace_path.is_dir() else None
+            ),
+            "COMMITTED_COMPLETIONS": 0,
+            "PROJECT_ID": active["project_id"],
+            "RECONCILED_AT": m.stamp(),
+        }
+        runtime.setdefault("claimed_timeout_reconciliations", []).append(record)
+        m.save_runtime(runtime)
+        completion = _load_completion_helper()
+        completion.append_audit(m.ROOT, {
+            "at": completion.now_iso(),
+            "event": "CLAIMED_TIMEOUT_RECONCILED",
+            "actor": "human_review_resume",
+            "MESSAGE_ID": dispatched,
+            "NONCE": dispatched_nonce,
+            "REASON": retirement.get("REASON"),
+            "CLAIM_DIR": record["CLAIM_DIR"],
+            "RECONCILIATION_ID": record["RECONCILIATION_ID"],
+        })
+        reread = read_json_strict(m.RUNTIME_STATE, "orchestrator runtime")
+        if not _assert_claimed_timeout_reconciled(m, reread, require_record=True):
+            raise ResumeError(
+                EXIT_INTERNAL,
+                "reconciliation read-back did not commit a verifiable record",
+            )
+        return {
+            "event": "CLAIMED_TIMEOUT_RECONCILED",
+            "project_id": active["project_id"],
+            "message_id": dispatched,
+            "reconciliation_id": record["RECONCILIATION_ID"],
+            "claim_dir": record["CLAIM_DIR"],
+            "duplicate": False,
+        }
+    finally:
+        m.release_lock()
+
+
+def claim_document_token(claim_dir_path: Path) -> str | None:
+    """The preserved claim token binding, copied for provenance only."""
+    document = read_json_strict(claim_dir_path / "claim.json", "executor claim record") \
+        if (claim_dir_path / "claim.json").is_file() else None
+    if isinstance(document, dict):
+        token = document.get("CLAIM_TOKEN_SHA256")
+        if isinstance(token, str):
+            return token
+    return None
+
+
 def validate_runtime_quiescent(m, runtime: dict) -> None:
     if runtime.get("status") != "HUMAN_REVIEW":
         raise ResumeError(
@@ -445,6 +1136,24 @@ def validate_runtime_quiescent(m, runtime: dict) -> None:
 
     dispatched = runtime.get("last_dispatched_message_id")
     consumed = runtime.get("last_consumed_message_id")
+    if dispatched is None and _assert_pre_dispatch_quiescent(m, runtime):
+        # HUMAN_REVIEW that predates the first dispatch: the never-dispatched
+        # proof above is complete, so there is no in-flight Executor work and
+        # the bootstrap compatibility consumed pointer needs no task chain.
+        return
+    if _assert_retired_unclaimed_quiescent(m, runtime):
+        # HUMAN_REVIEW whose last dispatch was retired before any claimable
+        # Executor work (pause/intervention/timeout): the proof above is
+        # complete, so the retired dispatch needs no consumed chain of its own.
+        return
+    if _assert_claimed_timeout_reconciled(m, runtime, require_record=True):
+        # CLAIMED-TIMEOUT-RECONCILIATION-V1: HUMAN_REVIEW whose last dispatch
+        # was claimed, timed out, and was retired with zero committed
+        # completion, and whose execution ownership the Runtime has provably
+        # reconciled into a quiescent historical record. The preserved claim
+        # and attempt workspace are provenance only; a late commit stays
+        # fenced by the retirement/timeout bindings in the completion path.
+        return
     if (
         isinstance(dispatched, bool)
         or not isinstance(dispatched, int)
@@ -481,12 +1190,17 @@ def validate_runtime_quiescent(m, runtime: dict) -> None:
                     "ZCODE_LAST_PROCESSED identity does not match the consumed "
                     f"authorization: {key}",
                 )
+    # F-005: when the last task is fully consumed and sealed, a MISSING live
+    # inbox is a legitimate finalize artifact (for example, exhausting the
+    # Supervisor decision budget finalizes HUMAN_REVIEW and removes the stale
+    # inbox), not a tamper signal. The archived dispatch bytes remain the
+    # authoritative binding and are proven by _validate_consumed_archive
+    # below; only a present-but-mismatched inbox is still rejected.
     expected_inbox_hash = authorization.get("TO_ZCODE_SHA256")
     if (
         not isinstance(expected_inbox_hash, str)
         or not re.fullmatch(r"[0-9a-f]{64}", expected_inbox_hash)
-        or not m.TO_ZCODE.is_file()
-        or m.sha256(m.TO_ZCODE) != expected_inbox_hash
+        or (m.TO_ZCODE.is_file() and m.sha256(m.TO_ZCODE) != expected_inbox_hash)
     ):
         raise ResumeError(EXIT_CONFLICT, "last authorized TO_ZCODE.md is missing or hash-mismatched")
     _validate_consumed_archive(m, runtime, consumed)
@@ -623,6 +1337,19 @@ def apply_receipt(m, *, receipt_path: Path) -> dict:
         new_runtime["last_human_decision_receipt_id"] = receipt["receipt_id"]
         new_runtime["last_human_decision_receipt_sha256"] = receipt["receipt_sha256"]
         new_runtime["last_human_review_resume_at"] = resumed_at
+        # Re-arm the durable Supervisor event: the verified receipt is the
+        # human-authorized successor of any stale or exhausted event, and the
+        # scheduler services the owned durable event before any new invocation.
+        resume_event = m.human_decision_resume_event(new_state)
+        if resume_event is not None:
+            new_runtime["pending_supervisor_event"] = {
+                "reason": "HUMAN_DECISION_RESUME",
+                "event": resume_event,
+                "recorded_at": resumed_at,
+                "decision_attempts": 0,
+                "retry_exhausted": False,
+                "rearmed_by_receipt": receipt["receipt_id"],
+            }
         m.save_runtime(new_runtime)
 
         if inbox_hash != (m.sha256(m.TO_ZCODE) if m.TO_ZCODE.exists() else None):
@@ -657,6 +1384,12 @@ def main() -> int:
     apply = sub.add_parser("apply", help="Validate and commit HUMAN_REVIEW -> SUPERVISOR_TURN")
     apply.add_argument("--receipt", required=True)
 
+    reconcile = sub.add_parser(
+        "reconcile-claimed-timeout",
+        help="Reconcile a retired claimed timeout with no committed completion",
+    )
+    reconcile.add_argument("--project-id", default=None)
+
     args = parser.parse_args()
     root = Path(args.root).resolve()
     try:
@@ -680,6 +1413,8 @@ def main() -> int:
                 "receipt_path": str(Path(args.receipt_out).resolve()),
                 "project_status_changed": False,
             }
+        elif args.command == "reconcile-claimed-timeout":
+            event = reconcile_claimed_timeout(m, project_id=args.project_id)
         else:
             event = apply_receipt(m, receipt_path=Path(args.receipt).resolve())
         print(json.dumps(event, ensure_ascii=False, indent=2))

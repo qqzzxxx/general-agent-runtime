@@ -1,5 +1,20 @@
 # ARCHITECTURE
 
+The [Phase 8 Supervisor](v1.4-supervisor-v2.md) owns outcomes and acceptance.
+`scripts/supervisor_context.py` delivers the full Goal, current decision records,
+new events/steering, unresolved assessments and untrusted receipt semantics, with
+full-record references. History and duplicate protocol material are not repeatedly
+injected. Optional `outcome_context` passes through the existing sealed dispatch
+into Executor V2; it creates no authority. Special FV/Human Decision output formats
+remain in `control/SUPERVISOR_PROTOCOL_REFERENCE.md` for targeted inspection.
+
+The v1.4 development path now uses `executor_entry.py` for discovery, claim and
+preparation, then `executor_finish.py` for semantic result submission. Finish owns
+hashes, publication calls, staging and receipt construction; the existing fence
+and commit/consume/seal ledger still enforce authority. The low-level helper
+references below describe the retained compatibility mechanisms. See
+[v1.4 Phase 3](v1.4-runtime-owned-completion.md) for the implemented boundary.
+
 ## Components
 
 ```
@@ -23,9 +38,10 @@
   work. It validates every handoff mechanically, owns the global runtime state
   (`control/orchestrator_runtime.json`), the dispatch authorization records, the Final
   Verification gate, budget ceilings, and human notifications.
-- **Supervisor** receives a compressed context prompt (runtime contract, project memory,
-  current state) and returns exactly one machine-readable decision: dispatch a new
-  Executor stage, revise, redirect, request human review, or terminate.
+- **Supervisor** receives the user's full Goal, current decision records, changed inputs,
+  unresolved assessments and evidence with full-record references. It owns the outcome,
+  quality and next valuable work, returning one semantic decision and an ordinary outcome
+  proposal when appropriate. Runtime constructs the physical task.
 - **Executor** receives one stage at a time as a JSON task embedded in `TO_ZCODE.md`,
   executes it fully inside the active project, and publishes a single-fenced-JSON
   receipt.
@@ -135,6 +151,28 @@ See [Stale worker fencing](STALE_WORKER_FENCING.md) for the contract and boundar
 publication is per file; arbitrary direct writes by the independently running
 same-user ZCode process are not intercepted. Hard isolation requires an OS sandbox
 or tool write broker. Update the installed prompt and stop legacy workers at rollout.
+
+## V2 host-native execution (Phase 6)
+
+The Executor owns the outcome and method in its ZCode agent environment. Entry
+returns the attempt work location and scoped read-only project inputs. Native
+shell, web/network, browser, vision, GUI and other session tools are permitted by
+default, with honest session-dependent availability and cooperative enforcement.
+Explicit category/path/URL/task restrictions still apply across tools. Native
+work checkpoints use the retained session; publication/completion always recheck
+Runtime authority. Native effects are not automatically fenced or cancelled.
+Final Verification preserves live deliverables and may publish only new evidence
+and reports in its own verification namespace. See
+[Host-native Executor](v1.4-host-native-executor.md).
+
+The optional utility policy supplies scoped HTTPS GET and static HTML
+rendering through `executor_work.py`. Runtime snapshots inputs under the existing
+mutex, releases it for bounded observation, then rechecks live authority and source
+freshness before returning results or saving screenshot candidates. HTTPS URL/method,
+destination, TLS and response limits are enforced by Runtime; pixels and rendered
+geometry rely on the trusted local Chromium provider. No direct ZCode tool or
+host claim becomes Runtime task authority. The historical
+[Capability realization](v1.4-capability-realization.md) describes these utilities.
 
 ## Completion lifecycle (COMPLETION-SEAL-V1)
 

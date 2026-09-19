@@ -221,6 +221,23 @@ def verify_authorized_dispatch(
     for key in IDENTITY_KEYS:
         if task.get(key) != requested[key]:
             return False, f"inbox_{key.lower()}_mismatch"
+
+    # PICKUP-EXECUTION-LIFECYCLE: a new acquisition is legal only inside the
+    # bounded pickup authorization. An existing claim keeps its execution
+    # authority (CLAIMED_AT + MAX_TIME); this gate closes the wake race where a
+    # stale worker claims after EXPIRES_AT but before the watchdog polls. A
+    # missing EXPIRES_AT is a legacy pre-lifecycle authorization and keeps the
+    # historical unbounded behavior; a present but unreadable one fails closed.
+    if not claim_dir(root, message_id, nonce).exists():
+        raw = authorization.get("EXPIRES_AT")
+        if raw is not None:
+            try:
+                expires = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                valid = expires.tzinfo is not None
+            except (TypeError, ValueError, AttributeError):
+                valid = False
+            if not valid or datetime.now(timezone.utc) >= expires:
+                return False, "pickup_window_expired"
     return True, "OK"
 
 
@@ -239,6 +256,23 @@ def acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: i
 
 
 def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str, *, fence) -> int:
+    result = acquire_locked(root, message_id, task_id, stage_id, attempt, nonce, fence=fence)
+    suffix = f" claim_token={result.claim_token}" if result.claim_token else ""
+    print(result.message + suffix, file=sys.stderr if result.code == EXIT_ERROR else sys.stdout)
+    return result.code
+
+
+class ClaimResult:
+    """Structured result; default object repr deliberately omits the secret."""
+    __slots__ = ("code", "message", "claim_token")
+
+    def __init__(self, code: int, message: str, claim_token: str | None = None):
+        self.code = code
+        self.message = message
+        self.claim_token = claim_token
+
+
+def acquire_locked(root: Path, message_id: int, task_id: str, stage_id: str, attempt: int, nonce: str, *, fence) -> ClaimResult:
     """Caller holds the fence mutex through authorization, metadata and success."""
     root = root.resolve()
     scripts_dir = str(Path(__file__).resolve().parent)
@@ -249,25 +283,20 @@ def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: 
     try:
         last = read_last_processed(root)["MESSAGE_ID"]
     except LastProcessedFormatError as exc:
-        print(
-            f"CLAIM_ERROR message_id={message_id} error=malformed ZCODE_LAST_PROCESSED.txt: {exc}",
-            file=sys.stderr,
-        )
-        return EXIT_ERROR
+        return ClaimResult(EXIT_ERROR, f"CLAIM_ERROR message_id={message_id} error=malformed ZCODE_LAST_PROCESSED.txt: {exc}")
     if message_id <= last:
-        print(f"ALREADY_PROCESSED message_id={message_id} last_processed={last}")
-        return EXIT_ALREADY_PROCESSED
+        return ClaimResult(EXIT_ALREADY_PROCESSED, f"ALREADY_PROCESSED message_id={message_id} last_processed={last}")
 
     authorized, reason = verify_authorized_dispatch(
         root, message_id, task_id, stage_id, attempt, nonce
     )
     if not authorized:
-        return authorization_error(message_id, reason)
+        return ClaimResult(EXIT_ERROR, f"CLAIM_NOT_AUTHORIZED message_id={message_id} reason={reason}")
 
     token = None
     runtime = fence.completion_module().read_runtime_state(root)
     if runtime is None:
-        return authorization_error(message_id, "runtime_state_unavailable")
+        return ClaimResult(EXIT_ERROR, f"CLAIM_NOT_AUTHORIZED message_id={message_id} reason=runtime_state_unavailable")
     auth = runtime.get("authorized_dispatch")
     if isinstance(auth, dict) and "FENCE_VERSION" in auth:
         identity = dict(zip(IDENTITY_KEYS, (message_id, task_id, stage_id, attempt, nonce)))
@@ -282,18 +311,15 @@ def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: 
     except Exception as exc:
         # FIX-F16: unusable claims directory must yield the documented EXIT_ERROR,
         # not an unhandled traceback (executor still fails closed either way).
-        print(f"CLAIM_ERROR message_id={message_id} error={exc!r}", file=sys.stderr)
-        return EXIT_ERROR
+        return ClaimResult(EXIT_ERROR, f"CLAIM_ERROR message_id={message_id} error={exc!r}")
 
     try:
         # os.mkdir is the atomic compare-and-set: only one overlapping instance can win.
         os.mkdir(path)
     except FileExistsError:
-        print(f"CLAIM_EXISTS message_id={message_id} claim={path}")
-        return EXIT_CLAIM_EXISTS
+        return ClaimResult(EXIT_CLAIM_EXISTS, f"CLAIM_EXISTS message_id={message_id} claim={path}")
     except Exception as exc:
-        print(f"CLAIM_ERROR message_id={message_id} error={exc!r}", file=sys.stderr)
-        return EXIT_ERROR
+        return ClaimResult(EXIT_ERROR, f"CLAIM_ERROR message_id={message_id} error={exc!r}")
 
     claim = {
         "CLAIM_PROTOCOL_VERSION": 1,
@@ -314,12 +340,9 @@ def _acquire(root: Path, message_id: int, task_id: str, stage_id: str, attempt: 
         os.replace(tmp, path / "claim.json")
     except Exception as exc:
         # Fail closed: leave the claim directory in place so no duplicate owner can appear.
-        print(f"CLAIM_METADATA_ERROR message_id={message_id} claim={path} error={exc!r}", file=sys.stderr)
-        return EXIT_ERROR
+        return ClaimResult(EXIT_ERROR, f"CLAIM_METADATA_ERROR message_id={message_id} claim={path} error={exc!r}")
 
-    suffix = f" claim_token={token}" if token is not None else ""
-    print(f"CLAIM_ACQUIRED message_id={message_id} claim={path}{suffix}")
-    return EXIT_ACQUIRED
+    return ClaimResult(EXIT_ACQUIRED, f"CLAIM_ACQUIRED message_id={message_id} claim={path}", token)
 
 
 def selftest() -> int:

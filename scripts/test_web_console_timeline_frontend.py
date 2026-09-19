@@ -60,7 +60,7 @@ class FrontendSourceTests(unittest.TestCase):
         self.assertTrue(self.text.lstrip().startswith("<!DOCTYPE html>"))
         self.assertIn('<meta charset="utf-8">', self.text)
         self.assertIn('name="viewport"', self.text)
-        self.assertIn("<title>General Agent Runtime v1.3", self.text)
+        self.assertIn("<title>General Agent Runtime v1.4 Dev", self.text)
         self.assertIn("/api/health", self.text)
         self.assertIn("/api/status", self.text)
 

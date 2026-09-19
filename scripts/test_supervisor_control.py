@@ -169,8 +169,12 @@ class SupervisorControlTests(unittest.TestCase):
         return sc._read_json(sc.candidate_origin_path(self.root), None)
 
     def authorize_fixture(self, *, claimed=False):
-        data = wire(self.task)
         origin_record = self.commit_decision()
+        # FV-PROTOCOL-STAMP-V1: the decision transaction re-stamps the
+        # Runtime-owned EXECUTOR_PROTOCOL text, so the authoritative bytes are
+        # whatever the transaction materialized in the inbox — read them back
+        # instead of hashing the pre-stamp candidate.
+        data = (self.root / "TO_ZCODE.md").read_bytes()
         binding = sc.archive_dispatch(self.root, self.PROJECT, self.task, data, origin={
             key: origin_record[key] for key in (
                 "originating_control_revision", "supervisor_turn_id", "decision_receipt_sha256"
@@ -462,9 +466,38 @@ class SupervisorControlTests(unittest.TestCase):
         self.assertEqual(resumed["current"]["status"], "RUNNING")
         self.assertFalse((self.control / "STOP").exists())
 
-    def test_pause_unclaimed_retires_before_execution(self):
+    def test_pause_unclaimed_parks_before_execution(self):
+        # QUOTA-PAUSE-PARK-V1: a plain scheduling pause parks a dispatched
+        # but unclaimed task. Not a retirement, not a method failure, and no
+        # retry budget is consumed; the inbox is quarantined so nothing can
+        # be claimed while paused.
         self.authorize_fixture()
         result = sc.set_pause(self.root)
+        self.assertEqual(result["disposition"], "PAUSED_UNCLAIMED_PARKED")
+        self.assertEqual(result["status"], "PAUSED")
+        runtime = self.read_runtime()
+        self.assertNotIn(700120, runtime["retired_message_ids"])
+        self.assertIn(700120, runtime["parked_message_ids"])
+        state = self.read_state()
+        self.assertEqual(state["status"], "WAITING_EXECUTOR")
+        self.assertTrue(sc._same_identity(state["current_task"],
+                                          runtime["authorized_dispatch"]))
+        self.assertFalse((self.root / "TO_ZCODE.md").exists())
+        pause = sc.load_control(self.root)["pause"]
+        self.assertEqual(pause["parked_dispatch"]["MESSAGE_ID"], 700120)
+        self.assertIsNotNone(pause["parked_dispatch"]["QUARANTINE"])
+        status = sc.current_status(self.root)
+        self.assertTrue(status["active_task_parked"])
+        self.assertEqual(status["parked_dispatch"]["MESSAGE_ID"], 700120)
+        # A repeated pause request stays parked and does not duplicate facts.
+        again = sc.set_pause(self.root)
+        self.assertEqual(again["disposition"], "PAUSED_UNCLAIMED_PARKED")
+        self.assertEqual(self.read_runtime()["parked_message_ids"].count(700120), 1)
+
+    def test_pause_interrupt_unclaimed_still_retires(self):
+        # Explicit high-risk interrupt keeps the fail-closed retire semantics.
+        self.authorize_fixture()
+        result = sc.set_pause(self.root, interrupt_current=True)
         self.assertEqual(result["disposition"], "PAUSED_UNCLAIMED_RETIRED")
         self.assertIn(700120, self.read_runtime()["retired_message_ids"])
         self.assertEqual(self.read_state()["status"], "SUPERVISOR_TURN")
@@ -579,7 +612,12 @@ class SupervisorControlTests(unittest.TestCase):
             self.root, *[self.task[k] for k in sc.IDENTITY_KEYS])
         self.assertFalse(ok)
         self.assertIn(reason, {"runtime_paused", "message_id_retired"})
-        self.assertIn(self.task["MESSAGE_ID"], self.read_runtime()["retired_message_ids"])
+        # QUOTA-PAUSE-PARK-V1: the committed pause parks the unclaimed task
+        # instead of retiring it; the claim above is refused while paused.
+        runtime = self.read_runtime()
+        self.assertNotIn(self.task["MESSAGE_ID"], runtime["retired_message_ids"])
+        self.assertIn(self.task["MESSAGE_ID"], runtime["parked_message_ids"])
+        self.assertEqual(self.read_state()["status"], "WAITING_EXECUTOR")
         o = self.configured_orchestrator()
         with self.assertRaisesRegex(RuntimeError, "paused"):
             o.register_dispatched_task(self.read_runtime(), self.read_state(),

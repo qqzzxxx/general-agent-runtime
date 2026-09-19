@@ -111,7 +111,8 @@ class G2ProfileContractTests(unittest.TestCase):
         self.assertIn("=== PROJECT PROFILE ===", text)
         self.assertIn(f"Profile: {profile_id}", text)
         self.assertIn(sup_marker, text)
-        self.assertIn(exe_marker, text)
+        self.assertNotIn(exe_marker, text)
+        self.assertIn(f"profiles/{profile_id}/EXECUTOR_GUIDANCE.md", text)
         self.assertIn("=== END PROJECT PROFILE ===", text)
         return prof
 

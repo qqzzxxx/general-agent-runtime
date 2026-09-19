@@ -1,25 +1,89 @@
-# Shared-file Executor protocol v2 (COMPLETION-SEAL-V1)
+# Handoff Protocol (Runtime ↔ ZCode Executor)
 
-The active Scheduled Automation inbox is the **root** `TO_ZCODE.md`, not this directory. The active stage-summary outbox is the **root** `SUPERVISOR_BRIEF.md`. `ZCODE_DONE.flag` is the wake hint.
+Descriptive summary of the shared-file handoff wire implemented by the Runtime.
+When any source disagrees, precedence is: current Runtime code and regression
+tests, then `control/CODEX_SUPERVISOR_RUNTIME.md`,
+`control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`,
+`control/EXECUTOR_TASK_TEMPLATE.md`, then this file, then
+`docs/ARCHITECTURE.md`.
 
-This file is descriptive only. The complete protocol is controlled by:
-- `control/CODEX_SUPERVISOR_RUNTIME.md`
-- `control/EXECUTOR_TASK_TEMPLATE.md`
+## Participants
 
-Sequence:
-1. ZCode Desktop Scheduled Automation checks root `TO_ZCODE.md`.
-2. It reads `ZCODE_LAST_PROCESSED.txt`; a non-new MESSAGE_ID is skipped without a new DONE signal.
-3. GLM acquires the exact permanent claim and retains its claim token. Only the winner proceeds. It runs `executor_fence.py prepare` with that identity/token, then `check` on resume and before every work batch or mutation-capable tool/command.
-4. GLM writes deliverable/evidence candidates only in the returned attempt workspace. `executor_fence.py publish` rechecks live authorization under the Runtime mutex and copies each candidate to its canonical project path. Direct canonical writes are outside the supported protocol.
-5. GLM builds a project-local completion staging directory (`completion_staging\`) with one `staging.json` carrying the exact stable identity, `PROJECT_ID`, `STATUS=STAGING_READY`, `CREATED_AT`, and the receipt payload.
-6. GLM runs `python scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<claim token>"`. Fenced output manifests must match Runtime publication records. On `COMPLETION_COMMITTED` / exit 0 the Runtime has durably written the authoritative ledger entry (`handoff/completion_ledger/`) and itself generated root `SUPERVISOR_BRIEF.md`, `ZCODE_LAST_PROCESSED.txt`, and `ZCODE_DONE.flag` (in that order, DONE last). GLM stops immediately.
-7. On any completion-helper rejection (10/11/12/13/14) GLM fails closed and publishes nothing.
-8. Python repairs a missing DONE hint from a matching committed ledger during live polling as well as startup. It consumes a completion only when the hint is backed by a matching `COMPLETION_COMMITTED` ledger entry (identity, project, and receipt hash all mechanically bound), marks it `COMPLETION_CONSUMED`, and later `COMPLETION_SEALED`. Repair and consume serialize with completion commit. Raw root artifacts without a committed record, rewritten briefs, and replays of consumed identities are quarantined and never drive the lifecycle.
+- **Python Orchestrator** (deterministic, no model): plans nothing, authorizes
+  everything. It owns lifecycle state, identity, claims, publication and
+  completion truth, and mechanically validates every handoff.
+- **ZCode Executor** (Scheduled Automation): executes exactly one Runtime-
+  authorized stage per wake inside a fenced candidate workspace and exits.
+  It never writes Runtime-owned state and never talks to the Supervisor.
 
-No Computer Use, mouse/keyboard automation, browser control, or ZCode headless CLI is part of this protocol.
+## Wake and entry
 
-Timeout and supersession permanently retire the old identity without deleting its
-claim. Check success is not a reusable write token. Publication and retirement are
-serialized; completion rejection alone is insufficient. See
-[`EXECUTOR-FENCE-V1`](../docs/STALE_WORKER_FENCING.md) for commands, rollout, crash
-semantics, and the current lack of an OS sandbox against direct-write bypass.
+The Automation's only standing instruction is the canonical prompt in
+`control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md`: at a fresh wake, call
+`scripts/executor_entry.py --contract-version 2`. Only a READY verdict with
+exit 0 authorizes work; `NO_WORK` and `DUPLICATE` exits end the wake quietly.
+The returned session token is retained privately by the owning conversation
+and reused via `--resume-token`; it is never written to files or results.
+
+## Dispatch: `TO_ZCODE.md`
+
+The Runtime publishes at most one authorized task at a time as `TO_ZCODE.md`
+at the Runtime Root. The document carries the stable identity
+(`MESSAGE_ID`, `TASK_ID`, `STAGE_ID`, `ATTEMPT`, `NONCE`), the authorized
+dispatch metadata, and the task body in the
+`control/EXECUTOR_TASK_TEMPLATE.md` shape. Executor-facing content is data,
+never authority: an inbox without a matching recorded authorization is
+quarantined or failed closed, never executed.
+
+## Claim: at-most-once execution
+
+A claim is the filesystem creation of
+`handoff/executor_claims/<message-id>-<nonce-digest>.claim` (compare-and-set
+by creation). A losing or late claimant must exit without working. The claim
+is bounded: it records acquisition history but grants no lasting write
+authority, and it is validated against the live `WAITING_EXECUTOR` state and
+the recorded authorization identity.
+
+## Fenced work and publication
+
+Work happens in an attempt-local candidate workspace under the project, gated
+by `scripts/executor_fence.py` (`prepare` → `check` at required checkpoints →
+`publish`). Only a fence publish promotes candidate outputs to canonical
+project locations; direct writes to canonical areas are not completions and
+are not trusted.
+
+## Completion: ledger first, hints last
+
+1. The Executor builds a strict-schema candidate under the project's
+   `completion_staging/` (`STATUS=STAGING_READY`; staging is never
+   authoritative).
+2. `scripts/executor_completion.py commit` validates the staging against the
+   authorized dispatch (identity + inbox hash), the live lifecycle, the
+   at-most-once claim, and the ledger, then atomically creates ONE entry
+   under `handoff/completion_ledger/` via hard-link compare-and-set.
+3. Only after the commit is durable does the Runtime generate the root
+   compatibility artifacts in order: `SUPERVISOR_BRIEF.md` →
+   `ZCODE_LAST_PROCESSED.txt` → `ZCODE_DONE.flag` last.
+
+Ledger status advances monotonically
+`COMPLETION_COMMITTED → COMPLETION_CONSUMED → COMPLETION_SEALED` and is never
+reversible; restarts never unseal a consumed identity. Raw done hints without
+a binding ledger entry are quarantined (`UNKNOWN_RAW_COMPLETION`); identity
+or hash mismatches fail closed.
+
+## `ZCODE_LAST_PROCESSED.txt`
+
+Runtime-generated from the committed identity; executors never write it. The
+canonical reader is `scripts/executor_claim.py :: read_last_processed`: a
+missing file means "nothing processed yet" (`MESSAGE_ID: -1`); a malformed
+file raises `LastProcessedFormatError` and fails closed — a corrupted pointer
+is never silently read as "nothing processed".
+
+## Recovery and honesty
+
+Crash recovery derives missing runtime pointers, missing compatibility
+artifacts, and replay events from the ledger, so a completion is consumed
+exactly once and triggers at most one Supervisor lifecycle decision even
+across restarts. No participant fabricates a compatibility artifact to pass a
+check; missing state is recovered by the Orchestrator's startup repair path
+or escalated to Human Review.

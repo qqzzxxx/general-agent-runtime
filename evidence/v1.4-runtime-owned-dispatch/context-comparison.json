@@ -1,0 +1,515 @@
+{
+  "schema": "RUNTIME-OWNED-DISPATCH-OFFLINE-V1",
+  "measurement": "LF-normalized Unicode characters / UTF-8 bytes; synthetic, not live model output",
+  "baseline": "evidence/v1.4-intelligence-overhead-audit/context-census.json",
+  "supervisor_context": {
+    "bootstrap": {
+      "before_characters": 22527,
+      "after_characters": 19183,
+      "reduction_characters": 3344,
+      "reduction_percent": 14.84,
+      "before_sections": {
+        "runtime_contract": {
+          "characters": 14049,
+          "utf8_bytes": 14059,
+          "sha256": "e6e1fa9223db2bd550f23653c9f56833ee685eefe3be4ba70e6f42fd3af6179d"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 33,
+          "utf8_bytes": 33,
+          "sha256": "9e2efe03b7914fac36db4d8d72b53143062f402e18e87dfa7d8b374a0e3370be"
+        },
+        "wrapper_and_conditional": {
+          "characters": 3992,
+          "utf8_bytes": 3994
+        }
+      },
+      "after_sections": {
+        "runtime_contract": {
+          "characters": 10687,
+          "utf8_bytes": 10695,
+          "sha256": "7b1aa76a36d5597c2501c21b0fbecc6e01aa9f84d7e56d46d6913e986106b131"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 33,
+          "utf8_bytes": 33,
+          "sha256": "9e2efe03b7914fac36db4d8d72b53143062f402e18e87dfa7d8b374a0e3370be"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4010,
+          "utf8_bytes": 4012
+        }
+      }
+    },
+    "result": {
+      "before_characters": 22621,
+      "after_characters": 19277,
+      "reduction_characters": 3344,
+      "reduction_percent": 14.78,
+      "before_sections": {
+        "runtime_contract": {
+          "characters": 14049,
+          "utf8_bytes": 14059,
+          "sha256": "e6e1fa9223db2bd550f23653c9f56833ee685eefe3be4ba70e6f42fd3af6179d"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4048,
+          "utf8_bytes": 4050
+        }
+      },
+      "after_sections": {
+        "runtime_contract": {
+          "characters": 10687,
+          "utf8_bytes": 10695,
+          "sha256": "7b1aa76a36d5597c2501c21b0fbecc6e01aa9f84d7e56d46d6913e986106b131"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4066,
+          "utf8_bytes": 4068
+        }
+      }
+    },
+    "steer": {
+      "before_characters": 23476,
+      "after_characters": 20132,
+      "reduction_characters": 3344,
+      "reduction_percent": 14.24,
+      "before_sections": {
+        "runtime_contract": {
+          "characters": 14049,
+          "utf8_bytes": 14059,
+          "sha256": "e6e1fa9223db2bd550f23653c9f56833ee685eefe3be4ba70e6f42fd3af6179d"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4903,
+          "utf8_bytes": 4905
+        }
+      },
+      "after_sections": {
+        "runtime_contract": {
+          "characters": 10687,
+          "utf8_bytes": 10695,
+          "sha256": "7b1aa76a36d5597c2501c21b0fbecc6e01aa9f84d7e56d46d6913e986106b131"
+        },
+        "project_state": {
+          "characters": 701,
+          "utf8_bytes": 701,
+          "sha256": "47aed64177aa292d0efe54513fdefeffbe70723d6ed40a94768872458a7bb773"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4921,
+          "utf8_bytes": 4923
+        }
+      }
+    },
+    "history_tail": {
+      "before_characters": 39970,
+      "after_characters": 36626,
+      "reduction_characters": 3344,
+      "reduction_percent": 8.37,
+      "before_sections": {
+        "runtime_contract": {
+          "characters": 14049,
+          "utf8_bytes": 14059,
+          "sha256": "e6e1fa9223db2bd550f23653c9f56833ee685eefe3be4ba70e6f42fd3af6179d"
+        },
+        "project_state": {
+          "characters": 18050,
+          "utf8_bytes": 18050,
+          "sha256": "197049065f58faebb7c6b7d920a08ba4c17b461121f1f16de328f49754f9a8e4"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4048,
+          "utf8_bytes": 4050
+        }
+      },
+      "after_sections": {
+        "runtime_contract": {
+          "characters": 10687,
+          "utf8_bytes": 10695,
+          "sha256": "7b1aa76a36d5597c2501c21b0fbecc6e01aa9f84d7e56d46d6913e986106b131"
+        },
+        "project_state": {
+          "characters": 18050,
+          "utf8_bytes": 18050,
+          "sha256": "197049065f58faebb7c6b7d920a08ba4c17b461121f1f16de328f49754f9a8e4"
+        },
+        "memory": {
+          "characters": 28,
+          "utf8_bytes": 28,
+          "sha256": "747bd0520859339ae062f92c72fd2a288820b4c9305ce12677693ebceb544842"
+        },
+        "goal": {
+          "characters": 60,
+          "utf8_bytes": 60,
+          "sha256": "edaa8a1fd1982cbe203540fe902a0909dc0e8bf31c4efa2b7cae03667dbdd928"
+        },
+        "goal_anchor": {
+          "characters": 1555,
+          "utf8_bytes": 1557,
+          "sha256": "844b1bcd25a43f46c8cf08389027eb3354e7e5456434a28c08b0e875127016a2"
+        },
+        "profile": {
+          "characters": 1776,
+          "utf8_bytes": 1784,
+          "sha256": "5b39603bd2804615fbf5aae804a74ebff5d502ebbcc1ce68cec7dfe01589372c"
+        },
+        "scope": {
+          "characters": 333,
+          "utf8_bytes": 333,
+          "sha256": "cd9dfcd42f8779af5ab8ee2b5d0933a25bdc6f32e2f31184eaf7ed4d9a1e8848"
+        },
+        "brief": {
+          "characters": 71,
+          "utf8_bytes": 71,
+          "sha256": "a768215813db20183a634557baa4c81df937b21593d17fd970b452629c9a5457"
+        },
+        "wrapper_and_conditional": {
+          "characters": 4066,
+          "utf8_bytes": 4068
+        }
+      }
+    }
+  },
+  "authored_dispatch_surface": {
+    "before": {
+      "characters": 4359,
+      "utf8_bytes": 4359,
+      "sha256": "0a1e6ec689552afb26906b11fe4c8bd4d1be60be9cb2976510fda67ccec53d00"
+    },
+    "after": {
+      "characters": 442,
+      "utf8_bytes": 442,
+      "sha256": "85197f1345c8673d117b939a647ea4545727d178073df15743ff9e65ca589996"
+    },
+    "reduction_characters": 3917,
+    "reduction_percent": 89.86,
+    "before_fixture": {
+      "executor_task": {
+        "PROTOCOL_VERSION": 2,
+        "CLAIM_PROTOCOL_VERSION": 1,
+        "MESSAGE_ID": 700100,
+        "TASK_ID": "summary",
+        "STAGE_ID": "check-evidence",
+        "ATTEMPT": 1,
+        "NONCE": "000000000000000000000000000000000000000000000000",
+        "ISSUED_AT": "2026-09-14T00:00:00+00:00",
+        "EXECUTOR_MODEL_FAMILY": "GLM-5.3",
+        "OBJECTIVE": "Produce a checked summary of the supplied evidence.",
+        "INPUTS": [
+          "evidence/source.txt"
+        ],
+        "OUTPUTS": [
+          "reports/summary.md"
+        ],
+        "ACCEPTANCE_CRITERIA": [
+          "Every finding cites supporting evidence."
+        ],
+        "MAX_TIME": 900,
+        "MAX_RETRIES": 2,
+        "SCHEDULER_GRACE_SECONDS": 3600,
+        "SUPERVISOR_REVIEW_EFFORT": "high",
+        "FORBIDDEN_ACTIONS": [
+          "Do not bypass authentication, CAPTCHA, access control, or anti-automation restrictions.",
+          "Do not invent missing data or credentials.",
+          "Do not choose the next stage.",
+          "Do not modify the source evidence."
+        ],
+        "STOP_CONDITIONS": [
+          "Stop if the supplied evidence is unreadable."
+        ],
+        "EXECUTOR_PROTOCOL": [
+          "Work only inside the active Runtime Root and the active Project Root supplied by the Supervisor.",
+          "Before any stage work, run: python scripts/executor_claim.py acquire --message-id <MESSAGE_ID> --task-id <TASK_ID> --stage-id <STAGE_ID> --attempt <ATTEMPT> --nonce <NONCE>.",
+          "Proceed only on CLAIM_ACQUIRED / exit code 0. On CLAIM_EXISTS / exit code 10 or ALREADY_PROCESSED / exit code 11, stop this run immediately and silently: do not touch deliverables, build completion staging, call the completion helper, or create any root completion artifact.",
+          "On any other claim-helper failure, fail closed and stop without touching stage outputs; watchdog/Supervisor owns recovery.",
+          "Never delete the claim. A retry must use a fresh MESSAGE_ID and NONCE.",
+          "Complete the whole stage internally before returning to the Supervisor.",
+          "Retain the claim_token returned only to the successful claim owner. It is required by fencing and completion helpers; never put it in deliverables or receipts.",
+          "Run python scripts/executor_fence.py prepare with the original five identity arguments and --claim-token <token>. All stage writes and subprocess output belong in its returned attempt_workspace; canonical files are read-only inputs.",
+          "Run python scripts/executor_fence.py check with the original identity and token after claim, on every resume, before each work batch or mutation-capable command, and before publication/completion. Only ATTEMPT_AUTHORIZED / exit 0 permits candidate work; otherwise stop. Never switch to a newer inbox identity.",
+          "Publish candidates only with python scripts/executor_fence.py publish using the original identity/token, --path <project-relative path> and --sha256 <candidate hash>. Supported outputs are workspace/, evidence/, reports/ files (excluding reports/USER_STATUS.md), at most 64 MiB each. Only PUBLICATION_COMMITTED / exit 0 means canonical publication; otherwise stop.",
+          "Never directly write canonical outputs, RESEARCH_STATE.md, or publication records. Suggest memory updates in the receipt. See docs/STALE_WORKER_FENCING.md.",
+          "Build a completion staging directory under the active Project Root's completion_staging\\ folder: one staging.json (COMPLETION_STAGING_SCHEMA_VERSION 1) containing the exact MESSAGE_ID, TASK_ID, STAGE_ID, ATTEMPT, NONCE, PROJECT_ID, STATUS=STAGING_READY, a timezone-aware CREATED_AT, and the full receipt payload as RECEIPT (identity fields must match the staging identity exactly).",
+          "Then run: python scripts/executor_completion.py commit --staging-dir \"<staging dir>\" --claim-token \"<token>\".",
+          "Proceed only on COMPLETION_COMMITTED / exit code 0: the Runtime then generates SUPERVISOR_BRIEF.md, ZCODE_LAST_PROCESSED.txt, and ZCODE_DONE.flag itself. Stop immediately; never create, edit, repair, or republish those root files.",
+          "On completion-helper exit codes 10/11/12/13/14 (ALREADY_COMMITTED / COMPLETION_SEALED / COMPLETION_NOT_AUTHORIZED / COMPLETION_CLAIM_MISMATCH / INVALID_COMPLETION_STAGING), fail closed and stop without publishing anything.",
+          "Stop after the stage; never create the next TO_ZCODE task."
+        ]
+      },
+      "current_task": {
+        "MESSAGE_ID": 700100,
+        "TASK_ID": "summary",
+        "STAGE_ID": "check-evidence",
+        "ATTEMPT": 1,
+        "NONCE": "000000000000000000000000000000000000000000000000",
+        "ISSUED_AT": "2026-09-14T00:00:00+00:00",
+        "MAX_TIME": 900,
+        "SCHEDULER_GRACE_SECONDS": 3600,
+        "SUPERVISOR_REVIEW_EFFORT": "high"
+      },
+      "next_message_id": 700101,
+      "decision_identity": {
+        "message_id": 700100,
+        "task_id": "summary",
+        "stage_id": "check-evidence"
+      }
+    },
+    "after_fixture": {
+      "ordinary_task_proposal": {
+        "logical_task": "summary",
+        "logical_stage": "check-evidence",
+        "objective": "Produce a checked summary of the supplied evidence.",
+        "inputs": [
+          "evidence/source.txt"
+        ],
+        "outputs": [
+          "reports/summary.md"
+        ],
+        "acceptance_criteria": [
+          "Every finding cites supporting evidence."
+        ],
+        "forbidden_actions": [
+          "Do not modify the source evidence."
+        ],
+        "stop_conditions": [
+          "Stop if the supplied evidence is unreadable."
+        ],
+        "max_time": 900,
+        "max_retries": 2
+      }
+    }
+  },
+  "limitations": [
+    "Output fixture includes one decision identity projection; identical decision rationale/history/memory excluded.",
+    "No production workload distribution, provider/system prompts, tools or later turns measured.",
+    "Executor protocol remains present in generated dispatches; no Executor context reduction claimed."
+  ],
+  "provider_token_savings": null,
+  "latency_savings_seconds": null
+}

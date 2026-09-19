@@ -1,0 +1,112 @@
+{
+  "schema": "EXECUTOR-ENTRY-OFFLINE-V1",
+  "baseline": "evidence/v1.4-intelligence-overhead-audit/context-census.json",
+  "measurement": "BOM-stripped, LF-normalized Unicode characters; no token conversion",
+  "permanent_template_characters": {
+    "before": 16053,
+    "after": 14609,
+    "reduction": 1444,
+    "reduction_percent": 9.0
+  },
+  "bound_permanent_prompt_characters": {
+    "before": 16089,
+    "after": 14657,
+    "reduction": 1432,
+    "reduction_percent": 8.9
+  },
+  "required_fencing_reference_characters": {
+    "before": 11980,
+    "after": 0,
+    "reduction": 11980,
+    "reduction_percent": 100.0
+  },
+  "static_reading_surface_characters": {
+    "before": 28069,
+    "after": 14657,
+    "reduction": 13412,
+    "reduction_percent": 47.78
+  },
+  "synthetic_task_payload_characters": {
+    "before": 3730,
+    "after": 336,
+    "reduction": 3394,
+    "reduction_percent": 90.99
+  },
+  "synthetic_task_protocol_entries": {
+    "before": 16,
+    "after": 0,
+    "reduction": 16,
+    "reduction_percent": 100.0
+  },
+  "sources_after": {
+    "control/ZCODE_SCHEDULED_AUTOMATION_PROMPT.md": {
+      "characters": 14609,
+      "utf8_bytes": 14617,
+      "sha256": "56885fcf9fe96a2e1619cccaa1c7edf18b11c7b6ef0c1c240f70c99debeb8dbc"
+    },
+    "bound_prompt": {
+      "characters": 14657,
+      "utf8_bytes": 14665,
+      "sha256": "fa987a27875d08eac49458b8cc19c1108ad92c235805fc2e2b10aab131fcb3de"
+    }
+  },
+  "task_view_fixture": {
+    "OBJECTIVE": "One complete stage objective.",
+    "INPUTS": [],
+    "OUTPUTS": [],
+    "ACCEPTANCE_CRITERIA": [],
+    "MAX_TIME": 900,
+    "MAX_RETRIES": 2,
+    "FORBIDDEN_ACTIONS": [
+      "Do not bypass authentication, CAPTCHA, access control, or anti-automation restrictions.",
+      "Do not invent missing data or credentials.",
+      "Do not choose the next stage."
+    ],
+    "STOP_CONDITIONS": []
+  },
+  "executor_required_operations": {
+    "startup_helper_executions": {
+      "before": 3,
+      "after": 1,
+      "reduction": 2,
+      "reduction_percent": 66.67
+    },
+    "startup_protocol_file_reads": {
+      "before": 3,
+      "after": 0,
+      "reduction": 3,
+      "reduction_percent": 100.0
+    },
+    "startup_identity_arguments_authored": {
+      "before": 15,
+      "after": 0,
+      "reduction": 15,
+      "reduction_percent": 100.0
+    },
+    "before_startup": [
+      "read inbox and extract identity",
+      "acquire",
+      "read active project",
+      "prepare",
+      "initial check",
+      "read fencing reference"
+    ],
+    "after_startup": [
+      "executor_entry.py; READY/0 or stop"
+    ],
+    "whole_stage_before": "N + C + 3",
+    "whole_stage_after": "N + C + 1",
+    "variables": "N published files; C baseline explicit checks including the initial check; C >= 1.",
+    "unchanged": "N publications, C-1 later checkpoints (check or resume entry), hashes, staging and one completion commit."
+  },
+  "limitations": [
+    "Counts expected repository source-reading surface, not captured ZCode input.",
+    "Task view excludes the attempt credential/path/capability result envelope; no total tool-output saving claimed.",
+    "Runtime still reads immutable wire/archive and active project internally. Old wire protocol stays for compatibility.",
+    "Only exact canonical protocol strings are removed; custom instructions and FV fields remain untruncated.",
+    "Helper executions can share a shell call; they are not model turns. No-work still wakes the existing automation.",
+    "Publication/completion instructions remain in the permanent prompt; no Phase 3 packaging change."
+  ],
+  "provider_token_savings": null,
+  "latency_savings_seconds": null
+}

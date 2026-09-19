@@ -1,5 +1,0 @@
-{
-  "scripts/executor_fence.py": true,
-  "scripts/executor_completion.py": true,
-  "scripts/supervisor_control.py": true
-}

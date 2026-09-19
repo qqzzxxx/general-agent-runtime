@@ -10,6 +10,8 @@ is parsed as text; nothing is executed and no browser is launched.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -58,15 +60,59 @@ class SetupWizardStructureTests(unittest.TestCase):
                        "setup-inputs-none", "setup-input-inventory"):
             self.assertIn(marker, self.text, marker)
         self.assertIn("absolute path", self.text)
+        # Unified, non-misleading input copy (2026-09-16 wizard UX cleanup).
+        self.assertRegex(self.text, r'Register\s+Project\s+Inputs')
+        self.assertRegex(self.text, r'No\s+Additional\s+Inputs')
+        # Honesty: register existing material only; empty is a valid answer.
+        self.assertIn("never\n          invent inputs for completeness",
+                      self.text)
+
+    def test_goal_workshop_folds_and_is_marked_optional(self):
+        # The Workshop is a collapsible optional helper: visible while no
+        # Goal is validated, collapsed by default afterwards. The fold is
+        # driven by updateWorkshopMode; the summary always carries the
+        # Optional badge so the tool is never mistaken for a requirement.
+        for marker in ("setup-workshop-details", "setup-workshop-mode-note",
+                       "updateWorkshopMode", 'class="setup-badge optional"'):
+            self.assertIn(marker, self.text, marker)
+        self.assertIn("Optional", self.text)
+
+    def test_step_status_rows_exist_for_all_steps(self):
+        for marker in ("setup-status-step-1", "setup-status-step-2",
+                       "setup-status-step-3", "setup-status-step-4",
+                       "setup-badge", "renderSetupStepStatuses"):
+            self.assertIn(marker, self.text, marker)
+
+    def test_step2_distinguishes_draft_from_actual_baseline(self):
+        for marker in ("setup-sup-baseline", "setup-sup-baseline-note",
+                       "loadSetupSupervisorBaseline"):
+            self.assertIn(marker, self.text, marker)
+        self.assertIn("Current Runtime baseline (read-only)", self.text)
+        # The baseline read goes through the existing read-only config view.
+        self.assertRegex(
+            self.text,
+            r'supervisor/config"\);[\s\S]{0,900}fixed_policy')
 
     def test_step2_supervisor_controls_and_honesty(self):
         for marker in ("setup-sup-model", "setup-sup-effort",
                        "setup-sup-mode", "setup-sup-save",
                        "setup-sup-note"):
             self.assertIn(marker, self.text, marker)
-        for effort in ("LOW", "MEDIUM", "HIGH", "EXTRA_HIGH", "HIGHEST",
-                       "ULTRA"):
-            self.assertIn(f'value="{effort}"', self.text, effort)
+        # The step-2 model and effort pickers are populated by the shared
+        # fixed product menu helper; the old free-suggestion effort option
+        # list must be gone.
+        self.assertNotIn('value="EXTRA_HIGH"', self.text)
+        self.assertNotIn('value="HIGHEST"', self.text)
+        self.assertNotIn('value="ULTRA"', self.text)
+        self.assertRegex(
+            self.text,
+            r'fillSupervisorModelSelect\(document\.getElementById'
+            r'\("setup-sup-model"\)')
+        self.assertRegex(
+            self.text,
+            r'fillSupervisorEffortSelect\(document\.getElementById'
+            r'\("setup-sup-effort"\)')
+        self.assertIn("Not chosen yet", self.text)
         for mode in ("MINIMAL", "COMPACT", "DETAILED_ON_DEMAND"):
             self.assertIn(f'value="{mode}"', self.text, mode)
         self.assertIn("Compact", self.text)
@@ -147,6 +193,99 @@ class SetupWizardSafetyTests(unittest.TestCase):
 
     def test_goal_size_guidance_is_shown(self):
         self.assertIn("256 KiB", self.text)
+
+
+class WizardBehaviorTests(unittest.TestCase):
+    """Behavior checks for the wizard fold/status logic, run in Node against
+    the real functions extracted from index.html (same harness precedent as
+    the human-control rendering tests)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = index_text()
+        cls.node = shutil.which("node")
+
+    def harness(self) -> str:
+        state = self.text.split("let setupGoalValidated = false;", 1)[1]
+        functions = state.split("function setSetupStatus", 1)[0]
+        return r'''
+const assert = require('node:assert/strict');
+class Element {
+  constructor(tag) { this.tag = tag; this.children = []; this._text = '';
+    this.open = false; this.className = ''; }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
+  append(...children) { this.children.push(...children); }
+}
+const nodes = new Map();
+const document = {
+  getElementById(id) { if (!nodes.has(id)) nodes.set(id, new Element('div')); return nodes.get(id); },
+  createElement(tag) { return new Element(tag); },
+  createTextNode(text) { const n = new Element('#text'); n._text = String(text); return n; },
+};
+function clear(n) { n.textContent = ''; }
+let uiLanguage = 'zh-CN';
+function productCopy(zh, en) { return uiLanguage === 'en' ? en : zh; }
+let setupGoalValidated = false;
+''' + functions
+
+    @unittest.skipUnless(shutil.which("node"), "Node is required for behavior tests")
+    def test_workshop_open_without_goal_collapsed_after_validation(self):
+        harness = self.harness() + r'''
+const details = document.getElementById('setup-workshop-details');
+const note = document.getElementById('setup-workshop-mode-note');
+// No validated Goal: the optional helper stays visible for drafting.
+updateWorkshopMode(false);
+assert.equal(details.open, true);
+assert.ok(note.textContent.includes('可选辅助'), note.textContent);
+// Validated Goal: collapsed by default and explicitly re-draft-only.
+updateWorkshopMode(true);
+assert.equal(details.open, false);
+assert.ok(note.textContent.includes('默认收起'), note.textContent);
+assert.ok(note.textContent.includes('重新起草'), note.textContent);
+uiLanguage = 'en';
+updateWorkshopMode(true);
+assert.ok(note.textContent.includes('stays collapsed by default'), note.textContent);
+'''
+        result = subprocess.run(["node"], input=harness, text=True,
+                                encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is required for behavior tests")
+    def test_step_status_labels_track_real_wizard_state(self):
+        harness = self.harness() + r'''
+renderSetupStepStatuses();
+const s1 = document.getElementById('setup-status-step-1').textContent;
+assert.ok(s1.includes('必需') && s1.includes('可选'), s1);
+assert.ok(s1.includes('Goal') && s1.includes('Workshop'), s1);
+assert.ok(document.getElementById('setup-status-step-2').textContent.includes('仅草稿'));
+assert.ok(document.getElementById('setup-status-step-3').textContent.includes('需手工配置'));
+assert.ok(document.getElementById('setup-status-step-4').textContent.includes('尚未运行'));
+// Real recorded state flips the labels — nothing is fabricated.
+setupGoalValidated = true;
+setupInputsState = {decision: 'NONE_NEEDED'};
+setupZcodeAcknowledged = true;
+setupReadinessState = true;
+renderSetupStepStatuses();
+const done1 = document.getElementById('setup-status-step-1').textContent;
+assert.ok(done1.includes('已验证'), done1);
+assert.ok(done1.includes('已记录') && done1.includes('不需要额外输入'), done1);
+assert.ok(document.getElementById('setup-status-step-3').textContent.includes('已确认（人工）'));
+assert.ok(document.getElementById('setup-status-step-4').textContent.includes('已验证'));
+// Registered inputs read differently from none-needed.
+setupInputsState = {decision: 'REGISTERED'};
+renderSetupStepStatuses();
+assert.ok(document.getElementById('setup-status-step-1').textContent.includes('已登记'));
+// A failing readiness run is shown as not ready, in English too.
+setupReadinessState = false;
+uiLanguage = 'en';
+renderSetupStepStatuses();
+const en4 = document.getElementById('setup-status-step-4').textContent;
+assert.ok(en4.includes('Not ready'), en4);
+'''
+        result = subprocess.run(["node"], input=harness, text=True,
+                                encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

@@ -69,6 +69,13 @@ The helper only generates and copies the bound prompt. It does not configure ZCo
 choose a model or cadence, enable the Automation, start the Runtime, create or activate a
 Project, or edit Runtime state. Keep the Automation paused through preflight.
 
+For v1.4 Phase 2, regenerate and replace the installed prompt after updating Runtime
+code. Fresh wakes now call `scripts/executor_entry.py` and receive a task view,
+attempt credential and paths. Existing installed prompts are not changed by a code
+update. Do not switch entry methods in the middle of an owning session; let it finish
+with its retained claim token. The adapter preserves the existing claim/fence and
+completion helpers. See [the Phase 2 report](v1.4-executor-entry-adapter.md).
+
 For environments without clipboard support, `-NoClipboard` performs validation and
 rendering but skips the copy. The manual fallback is:
 
@@ -169,43 +176,37 @@ state, the Automation can be paused again.
 
 Seeing `TO_ZCODE.md` does **not** authorize execution.
 
-The Executor must read the exact task identity and run the claim helper command specified
-by the task.
+The canonical prompt calls `executor_entry.py --contract-version 2`. Only READY
+with exit 0 returns an outcome contract and an opaque session to its owner. Every
+other result stops the wake; NO_WORK and DUPLICATE are quiet exits. Entry owns
+discovery, claim and workspace preparation. Claims remain permanent.
 
-Only:
-
-```text
-CLAIM_ACQUIRED
-exit code 0
-```
-
-allows the winning wake to begin the fenced attempt protocol. For a current fenced
-dispatch, acquisition returns a claim token that the owner must retain. The permanent
-claim is acquisition history, not lasting write authority.
-
-Exit code 10 (`CLAIM_EXISTS`) or 11 (`ALREADY_PROCESSED`) means this wake exits quietly.
-Any other claim-helper failure follows the fail-closed rules in the canonical prompt.
-
-Never delete a claim directory to "retry" a task.
-
-After acquisition, the owner must run `executor_fence.py prepare`, do all candidate work
-in the returned attempt-local workspace, run `executor_fence.py check` at the required
-checkpoints, and publish supported canonical outputs only through
-`executor_fence.py publish`. A successful earlier check never authorizes a later direct
-canonical write. See [Stale worker fencing](STALE_WORKER_FENCING.md) for exact commands,
-supported paths, and failure semantics; the installed canonical prompt remains the
-Executor's complete instruction set.
+V2 permits available native host tools for the outcome, within explicit task
+restrictions. Entry returns locations for native candidate work and scoped read-only
+inputs. `executor_work.py` supplies optional filesystem/fetch/render utilities,
+`checkpoint` before native work batches, and semantic `finish`. Runtime checks
+authority internally; no Executor-authored identity/hash/staging fields are required.
+Host availability is session-dependent, and native calls are not intercepted or
+automatically cancelled. Autonomy changes working style, not task authority.
+Missing optional browser dependencies no longer deny entry to the whole task.
+This is a cooperative same-user boundary, not an OS sandbox of the ZCode host.
+See [Host-native Executor](v1.4-host-native-executor.md) and the historical
+[Executor contract V2](v1.4-executor-contract-v2.md). Historical V1 clients retain
+their Phase 2/3 checkpoint and finish rules; do not silently fall back to V1 when
+V2 rejects a task or capability.
 
 ## 8. Execution Scope
 
-The Automation must never operate outside its configured Runtime Root.
+The Automation's task authority belongs only to its configured Runtime and active
+project. Available host tools/dependencies may serve that task, including authorized
+web/browser operations; they confer no authority over another Runtime or project.
 
 Within that Runtime:
 
 - normal project work is scoped to the currently active project;
 - Runtime-core files are out of scope by default;
-- Runtime-core maintenance is allowed only when the current mechanically authorized task
-  explicitly grants a narrow Runtime-root scope;
+- V2's file adapter provides no Runtime-core write capability; a task description
+  cannot grant one;
 - another Runtime installation, production environment, test copy, backup, historical
   copy, or sibling Runtime tree is always out of scope unless it is itself the configured
   Runtime for a separate Automation.
@@ -220,12 +221,10 @@ The Executor must not directly publish authoritative completion.
 Legal path:
 
 ```text
-claim winner retains claim token
--> executor_fence.py prepare
--> attempt-local candidate work + executor_fence.py check checkpoints
--> executor_fence.py publish canonical outputs
--> completion staging
--> scripts/executor_completion.py commit --staging-dir "<staging dir>" --claim-token "<claim token>"
+executor_entry.py --contract-version 2 returns READY, contract and session
+-> native host tools in the attempt workspace, with checkpoints and optional utilities
+-> executor_work.py op: finish with semantic results
+-> Runtime publication, staging and completion commit
 -> COMPLETION_COMMITTED
 -> immediate Executor exit
 ```
@@ -233,8 +232,14 @@ claim winner retains claim token
 The Runtime owns the authoritative completion state and the
 `COMPLETION_COMMITTED -> COMPLETION_CONSUMED -> COMPLETION_SEALED` lifecycle.
 
-On a successful completion commit, the Executor stops that wake immediately. It does not
+Every finish result directs the Executor to stop that wake immediately. It does not
 wait for the Supervisor, poll for consumption, or choose the next stage.
+
+The [Phase 6 report](v1.4-host-native-executor.md) defines current capability
+modes and limits; the [Phase 3 report](v1.4-runtime-owned-completion.md) defines underlying
+publication/completion recovery. Regenerate and replace the installed automation prompt
+when deploying this code; the existing setup renderer uses the updated template.
+No automation scheduling or transport change is required.
 
 ## 10. Root Compatibility Files
 
@@ -288,13 +293,10 @@ User creates/activates project
 -> Supervisor atomically publishes a candidate TO_ZCODE.md task
 -> Runtime validates it and registers exact identity/hash authorization
 -> ZCode Scheduled Automation wakes
--> claim; winner receives claim token
--> executor_fence.py prepare
--> execute exactly one authorized stage in the attempt workspace
--> executor_fence.py check at required checkpoints
--> executor_fence.py publish canonical outputs
--> completion staging
--> executor_completion.py commit with --claim-token
+-> executor_entry.py --contract-version 2 returns READY, outcome contract and session
+-> executor_work.py operations: explore, inspect and improve within the contract
+-> executor_work.py finish with semantic result
+-> Runtime publication, staging and completion commit
 -> COMPLETION_COMMITTED
 -> Executor exits
 -> Orchestrator consumes + seals completion

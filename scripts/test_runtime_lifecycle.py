@@ -334,14 +334,24 @@ class ResumeLifecycleTests(unittest.TestCase):
         old_usage = [provider_usage.read_usage(self.root, turn, self.f.PROJECT) for turn in old_turns]
         self.assertEqual(sum(value.get('input_tokens') or 0 for value in old_usage), 17)
         self.paused()
-        self.assertIn(700120, self.f.read_runtime()['retired_message_ids'])
+        # QUOTA-PAUSE-PARK-V1: the pause parks the unclaimed dispatch; it is
+        # retired only later, as SUPERSEDED, once the successor registers.
+        self.assertNotIn(700120, self.f.read_runtime()['retired_message_ids'])
+        self.assertIn(700120, self.f.read_runtime()['parked_message_ids'])
         steer = sc.submit_intervention(self.root, b'consume exactly once after resume')
         self.tracked_resume()
         (self.root / 'allow-model').touch()
         self.wait_for(lambda: any(r.get('intervention_id') == steer['intervention_id'] and r.get('status') == 'CONSUMED' for r in sc.list_interventions(self.root, self.f.PROJECT)))
         record = next(r for r in sc.list_interventions(self.root, self.f.PROJECT) if r['intervention_id'] == steer['intervention_id'])
-        self.wait_for(lambda: self.f.read_runtime().get('authorized_dispatch', {}).get('MESSAGE_ID') == 700121)
-        runtime = self.f.read_runtime()
+        runtime = {}
+        def next_dispatch_visible():
+            nonlocal runtime
+            # The real scheduler replaces this file under the fence mutex.
+            # Read one coherent snapshot without racing Windows replacement IO.
+            with executor_fence.runtime_lock(self.root):
+                runtime = self.f.read_runtime()
+            return (runtime.get('authorized_dispatch') or {}).get('MESSAGE_ID') == 700121
+        self.wait_for(next_dispatch_visible)
         self.assertIn(700120, runtime['retired_message_ids'])
         self.assertEqual(runtime['authorized_dispatch']['MESSAGE_ID'], 700121)
         self.assertEqual(runtime['executor_receipts_consumed'], 1)

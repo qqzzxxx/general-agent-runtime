@@ -207,6 +207,463 @@ class HumanReviewResumeTests(unittest.TestCase):
         self.m.activate_project_scope()
         return self.m.read_project_state()
 
+    # --- pre-first-dispatch HUMAN_REVIEW resume ------------------------------
+
+    def _strip_to_pre_dispatch(self, *, consumed=602, write_pointer=True):
+        """Reshape the post-task fixture into the fresh-bootstrap HUMAN_REVIEW
+        scene: no Executor task was ever published; only the bootstrap
+        compatibility consumed pointer may exist."""
+        runtime = copy.deepcopy(self.runtime)
+        runtime["last_consumed_message_id"] = consumed
+        runtime["last_consumed_nonce"] = None
+        runtime["last_consumed_brief_sha256"] = None
+        runtime["last_dispatched_message_id"] = None
+        runtime["last_dispatched_nonce"] = None
+        runtime["authorized_dispatch"] = None
+        self.m.TO_ZCODE.unlink(missing_ok=True)
+        claim_dir = (
+            self.root / "handoff" / "executor_claims"
+            / f"{self.last_message_id}-fixture.claim"
+        )
+        if claim_dir.exists():
+            for child in claim_dir.iterdir():
+                child.unlink()
+            claim_dir.rmdir()
+        self.m.ZCODE_LAST_PROCESSED.unlink(missing_ok=True)
+        if write_pointer:
+            self.m.atomic_write(self.m.ZCODE_LAST_PROCESSED, f"{consumed}\n")
+        self._write_runtime(runtime)
+        return runtime
+
+    def test_sealed_post_task_review_resumes_with_removed_inbox(self):
+        # F-005: exhausting the Supervisor decision budget finalizes
+        # HUMAN_REVIEW and removes the stale inbox of the fully consumed and
+        # sealed dispatch. Apply must still work there; only a present-but-
+        # mismatched inbox is a conflict.
+        self.m.TO_ZCODE.unlink()
+        receipt = self._prepare()
+        self._apply()
+        self.m.activate_project_scope()
+        state = self.m.read_project_state()
+        self.assertEqual(state["status"], "SUPERVISOR_TURN")
+
+    def test_present_but_mismatched_inbox_still_rejected(self):
+        self.m.TO_ZCODE.write_text(
+            self.original_inbox + "tampered\n", encoding="utf-8")
+        self._prepare()
+        with self.assertRaisesRegex(r.ResumeError, "hash-mismatched"):
+            self._apply()
+
+    def test_pre_dispatch_human_review_prepares_and_applies(self):
+        self._strip_to_pre_dispatch(consumed=602)
+        receipt = self._prepare()
+        self.assertEqual(receipt["project_id"], self.project_id)
+        result = self._apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+        state = self._read_state()
+        self.assertEqual(state["status"], "SUPERVISOR_TURN")
+        self.assertEqual(state["human_review_resume"]["status"], "PENDING_SUPERVISOR_REVIEW")
+        self.assertIsNone(state["current_task"])
+        self.assertEqual(state["next_message_id"], 700100)
+
+    def test_pre_dispatch_resume_without_compat_pointer(self):
+        self._strip_to_pre_dispatch(consumed=602, write_pointer=False)
+        result = self._prepare_and_apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+
+    def test_pre_dispatch_pointer_mismatch_still_rejected(self):
+        self._strip_to_pre_dispatch(consumed=602)
+        self.m.atomic_write(self.m.ZCODE_LAST_PROCESSED, "700050\n")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_dispatched_but_unconsumed_still_rejected(self):
+        runtime = self._strip_to_pre_dispatch(consumed=602, write_pointer=False)
+        runtime["last_dispatched_message_id"] = 700100
+        self._write_runtime(runtime)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_mixed_authorized_dispatch_still_rejected(self):
+        runtime = self._strip_to_pre_dispatch(consumed=602)
+        runtime["authorized_dispatch"] = {
+            "schema_version": 1, "MESSAGE_ID": 700100, "NONCE": "ghost",
+        }
+        self._write_runtime(runtime)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_active_claim_blocks_pre_dispatch_resume(self):
+        self._strip_to_pre_dispatch(consumed=602)
+        ghost = self.root / "handoff" / "executor_claims" / "700100-ghost.claim"
+        ghost.mkdir()
+        self.m.atomic_json(ghost / "claim.json", {"MESSAGE_ID": 700100})
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_staged_completion_blocks_pre_dispatch_resume(self):
+        self._strip_to_pre_dispatch(consumed=602)
+        staged = self.root / "handoff" / "completion_ledger" / "staged" / "completion-700100-x"
+        staged.mkdir(parents=True)
+        (staged / "staging.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_unconsumed_ledger_entry_blocks_pre_dispatch_resume(self):
+        self._strip_to_pre_dispatch(consumed=602)
+        completion = r._load_completion_helper()
+        entry = {
+            "COMPLETION_PROTOCOL_VERSION": completion.COMPLETION_PROTOCOL_VERSION,
+            "STATUS": completion.STATUS_COMMITTED,
+            "MESSAGE_ID": 700100,
+        }
+        ledger = self.root / "handoff" / "completion_ledger"
+        ledger.mkdir(parents=True)
+        (ledger / "completion-700100-fixture.json").write_text(
+            json.dumps(entry), encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    # --- retired-unclaimed HUMAN_REVIEW resume (pause/timeout retirement) ----
+
+    def _reshape_retired_unclaimed(
+        self, *, reason="PAUSE_BEFORE_CLAIM", quarantine=True, expire=True,
+        live_inbox=False, retired_list=True, executor_retirements=True,
+    ):
+        """Reshape the post-task fixture into the retired-unclaimed scene: the
+        last dispatch (last_message_id + 1) was authorized, never claimed, and
+        closed by an authoritative control transaction (pause/intervention/
+        timeout), so it can never be consumed."""
+        runtime = copy.deepcopy(self.runtime)
+        dispatched_id = self.last_message_id + 1
+        dispatched_nonce = "fixture-retired-dispatch-nonce"
+        retired_task = {
+            "PROTOCOL_VERSION": 2,
+            "CLAIM_PROTOCOL_VERSION": 1,
+            "MESSAGE_ID": dispatched_id,
+            "TASK_ID": "fixture-retired-task",
+            "STAGE_ID": "fixture-retired-stage",
+            "ATTEMPT": 2,
+            "NONCE": dispatched_nonce,
+        }
+        inbox = (
+            f"MESSAGE_ID: {dispatched_id}\n"
+            f"TASK_ID: {retired_task['TASK_ID']}\n"
+            f"STAGE_ID: {retired_task['STAGE_ID']}\n\n"
+            "```json\n" + json.dumps(retired_task, ensure_ascii=False, indent=2) + "\n```\n"
+        )
+        self.m.atomic_write(self.m.TO_ZCODE, inbox)
+        inbox_hash = self.m.sha256(self.m.TO_ZCODE)
+        digest = hashlib.sha256(dispatched_nonce.encode("utf-8")).hexdigest()[:24]
+        archive_meta = {
+            "metadata_file": (
+                f"handoff/supervisor_dispatch_archive/{self.project_id}"
+                f"/dispatch-{dispatched_id}-{digest}.json"),
+            "archive_file": (
+                f"handoff/supervisor_dispatch_archive/{self.project_id}"
+                f"/dispatch-{dispatched_id}-{digest}.md"),
+            "authorization_file": (
+                f"handoff/supervisor_dispatch_archive/{self.project_id}"
+                f"/dispatch-{dispatched_id}-{digest}.authorized.json"),
+            "dispatch_sha256": inbox_hash,
+        }
+        for key, document in (
+            ("metadata_file", {
+                "schema_version": 1, "PROJECT_ID": self.project_id,
+                "MESSAGE_ID": dispatched_id, "TASK_ID": retired_task["TASK_ID"],
+                "STAGE_ID": retired_task["STAGE_ID"], "ATTEMPT": 2,
+                "NONCE": dispatched_nonce, "dispatch_sha256": inbox_hash}),
+            ("authorization_file", {
+                "schema_version": 1, "PROJECT_ID": self.project_id,
+                "MESSAGE_ID": dispatched_id,
+                "TASK_ID": retired_task["TASK_ID"], "STAGE_ID": retired_task["STAGE_ID"],
+                "ATTEMPT": 2, "NONCE": dispatched_nonce,
+                "dispatch_sha256": inbox_hash}),
+        ):
+            path = self.root / archive_meta[key]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8")
+        (self.root / archive_meta["archive_file"]).write_text(
+            inbox, encoding="utf-8", newline="\n")
+        runtime["last_dispatched_message_id"] = dispatched_id
+        runtime["last_dispatched_nonce"] = dispatched_nonce
+        runtime["authorized_dispatch"] = {
+            "schema_version": 1, "MESSAGE_ID": dispatched_id,
+            "TASK_ID": retired_task["TASK_ID"], "STAGE_ID": retired_task["STAGE_ID"],
+            "ATTEMPT": 2, "NONCE": dispatched_nonce, "TO_ZCODE_SHA256": inbox_hash,
+            "AUTHORIZED_AT": self.m.stamp(),
+            "EXPIRES_AT": "2020-01-01T00:00:00+00:00" if expire
+            else "2999-01-01T00:00:00+00:00",
+            "SUPERVISOR_DISPATCH_ARCHIVE": archive_meta,
+        }
+        runtime["retired_message_ids"] = [dispatched_id] if retired_list else []
+        runtime["executor_retirements"] = [{
+            "MESSAGE_ID": dispatched_id, "TASK_ID": retired_task["TASK_ID"],
+            "STAGE_ID": retired_task["STAGE_ID"], "ATTEMPT": 2,
+            "NONCE": dispatched_nonce, "RETIRED_AT": self.m.stamp(),
+            "REASON": reason, "SUPERSEDED_BY": None,
+        }] if executor_retirements else []
+        if quarantine:
+            quarantine_dir = self.root / "handoff" / "quarantine"
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
+            (quarantine_dir / f"to-zcode-{dispatched_id}-pause-{inbox_hash[:12]}.md") \
+                .write_text(inbox, encoding="utf-8", newline="\n")
+            self.m.TO_ZCODE.unlink()
+        elif not live_inbox:
+            self.m.TO_ZCODE.unlink()
+        self._write_runtime(runtime)
+        return runtime
+
+    def _retired_dispatch_id(self):
+        return self.last_message_id + 1
+
+    def test_pause_retired_unclaimed_human_review_resumes(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        result = self._prepare_and_apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+        state = self._read_state()
+        self.assertEqual(state["status"], "SUPERVISOR_TURN")
+        self.assertEqual(state["human_review_resume"]["status"], "PENDING_SUPERVISOR_REVIEW")
+        self.assertIsNone(state["current_task"])
+        runtime = json.loads(self.m.RUNTIME_STATE.read_text(encoding="utf-8"))
+        self.assertEqual(runtime["status"], "SUPERVISOR_TURN")
+        self.assertEqual(runtime["pending_supervisor_event"]["reason"],
+                         "HUMAN_DECISION_RESUME")
+
+    def test_retired_unclaimed_resume_is_exactly_once(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        self._prepare_and_apply()
+        with self.assertRaisesRegex(r.ResumeError, "duplicate resume"):
+            self._apply()
+
+    def test_timeout_retired_unclaimed_with_quarantined_inbox_resumes(self):
+        self._reshape_retired_unclaimed(reason="EXECUTOR_TIMEOUT")
+        result = self._prepare_and_apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+
+    def test_expired_authorization_without_quarantine_resumes(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM",
+                                        quarantine=False, live_inbox=False)
+        result = self._prepare_and_apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+
+    def test_timeout_retired_with_live_inbox_still_rejected(self):
+        self._reshape_retired_unclaimed(reason="EXECUTOR_TIMEOUT",
+                                        quarantine=False, live_inbox=True)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_claimed_retired_dispatch_still_rejected(self):
+        runtime = self._reshape_retired_unclaimed(reason="PAUSE_INTERRUPT")
+        claim = self.root / "handoff" / "executor_claims" / \
+            f"{self._retired_dispatch_id()}-ghost.claim"
+        claim.mkdir()
+        self.m.atomic_json(claim / "claim.json", {
+            "MESSAGE_ID": runtime["last_dispatched_message_id"],
+            "NONCE": runtime["last_dispatched_nonce"],
+        })
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_live_attempt_workspace_for_retired_dispatch_still_rejected(self):
+        runtime = self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        digest = hashlib.sha256(
+            runtime["last_dispatched_nonce"].encode("utf-8")).hexdigest()[:24]
+        workspace = self.project_root / "attempt_workspaces" / \
+            f"{self._retired_dispatch_id()}-{digest}"
+        workspace.mkdir(parents=True)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_quarantine_hash_mismatch_still_rejected(self):
+        dispatched_id = self._retired_dispatch_id()
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        quarantine = self.root / "handoff" / "quarantine" / \
+            f"to-zcode-{dispatched_id}-pause-{'0' * 12}.md"
+        quarantine.write_text("tampered quarantine copy\n", encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_archive_brief_hash_divergence_still_rejected(self):
+        runtime = self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        archive_file = self.root / \
+            runtime["authorized_dispatch"]["SUPERVISOR_DISPATCH_ARCHIVE"]["archive_file"]
+        archive_file.write_text(
+            archive_file.read_text(encoding="utf-8") + "late rewrite\n",
+            encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_retired_list_without_authoritative_record_still_rejected(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM",
+                                        executor_retirements=False)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_superseded_reason_still_rejected(self):
+        self._reshape_retired_unclaimed(reason="SUPERSEDED")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_unexpired_authorization_without_quarantine_still_rejected(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM",
+                                        quarantine=False, expire=False)
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_ledger_entry_for_retired_dispatch_still_rejected(self):
+        dispatched_id = self._retired_dispatch_id()
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        completion = r._load_completion_helper()
+        entry = {
+            "COMPLETION_PROTOCOL_VERSION": completion.COMPLETION_PROTOCOL_VERSION,
+            "STATUS": completion.STATUS_COMMITTED,
+            "MESSAGE_ID": dispatched_id,
+        }
+        ledger = self.root / "handoff" / "completion_ledger"
+        ledger.mkdir(parents=True, exist_ok=True)
+        (ledger / f"completion-{dispatched_id}-fixture.json").write_text(
+            json.dumps(entry), encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_completion_staging_for_retired_dispatch_still_rejected(self):
+        runtime = self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        staging = self.project_root / "completion_staging" / \
+            f"{self._retired_dispatch_id()}-fixture"
+        staging.mkdir(parents=True)
+        (staging / "staging.json").write_text(json.dumps({
+            "MESSAGE_ID": runtime["last_dispatched_message_id"],
+            "STATUS": "STAGING_READY",
+        }), encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_sealed_staging_archive_of_consumed_task_does_not_block(self):
+        # Production shape: the ledger keeps the staged copy of an already
+        # sealed task as a historical archive. It must not read as live work.
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        completion = r._load_completion_helper()
+        consumed_id = self.last_message_id
+        entry = {
+            "COMPLETION_PROTOCOL_VERSION": completion.COMPLETION_PROTOCOL_VERSION,
+            "STATUS": completion.STATUS_SEALED,
+            "MESSAGE_ID": consumed_id,
+        }
+        ledger = self.root / "handoff" / "completion_ledger"
+        ledger.mkdir(parents=True, exist_ok=True)
+        (ledger / f"completion-{consumed_id}-fixture.json").write_text(
+            json.dumps(entry), encoding="utf-8")
+        staged = ledger / "staged" / f"completion-{consumed_id}-fixture"
+        staged.mkdir(parents=True)
+        (staged / "staging.json").write_text(json.dumps({
+            "MESSAGE_ID": consumed_id, "STATUS": "STAGING_READY",
+        }), encoding="utf-8")
+        result = self._prepare_and_apply()
+        self.assertEqual(result["event"], "HUMAN_REVIEW_RESUMED_TO_SUPERVISOR")
+
+    def test_staged_copy_without_ledger_entry_still_rejected(self):
+        self._reshape_retired_unclaimed(reason="PAUSE_BEFORE_CLAIM")
+        staged = self.root / "handoff" / "completion_ledger" / "staged" / \
+            f"completion-{self.last_message_id}-orphan"
+        staged.mkdir(parents=True)
+        (staged / "staging.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(r.ResumeError, "not fully consumed"):
+            self._prepare_and_apply()
+
+    def test_retired_unclaimed_proof_never_matches_known_shapes(self):
+        # Non-regression canaries: the new proof must stay silent on the two
+        # established legal shapes and must never replace their own checks.
+        self.assertFalse(r._assert_retired_unclaimed_quiescent(self.m, self.runtime))
+        self._strip_to_pre_dispatch(consumed=602)
+        runtime = json.loads(self.m.RUNTIME_STATE.read_text(encoding="utf-8"))
+        self.assertFalse(r._assert_retired_unclaimed_quiescent(self.m, runtime))
+
+    def _prepare_and_apply(self):
+        self._prepare()
+        return self._apply()
+
+    def _read_pending(self):
+        return json.loads(self.m.RUNTIME_STATE.read_text(encoding="utf-8")).get(
+            "pending_supervisor_event")
+
+    def test_apply_rearms_durable_event_for_human_resume(self):
+        # The resume transaction owns the lifecycle change, so it must also
+        # replace any stale/exhausted durable event with the verified resume
+        # event under fresh budgets - otherwise the scheduler services the old
+        # event and the lifecycle guard blocks every wake.
+        self.runtime["pending_supervisor_event"] = {
+            "reason": "ORCHESTRATOR_START",
+            "event": {"runtime": "v2", "shared_file_executor": True},
+            "recorded_at": self.m.stamp(),
+            "decision_attempts": 2,
+            "retry_exhausted": True,
+        }
+        self._write_runtime(self.runtime)
+        self._prepare()
+        self._apply()
+        state = self._read_state()
+        pending = self._read_pending()
+        self.assertEqual(pending["reason"], "HUMAN_DECISION_RESUME")
+        self.assertFalse(pending["retry_exhausted"])
+        self.assertEqual(pending["decision_attempts"], 0)
+        self.assertEqual(pending["event"], self.m.human_decision_resume_event(state))
+        self.assertEqual(
+            pending["rearmed_by_receipt"], state["human_review_resume"]["receipt_id"])
+
+    def test_startup_reconcile_replaces_exhausted_event_after_resume(self):
+        # Pre-fix live shape: Apply committed the lifecycle while the exhausted
+        # durable event stayed owned; startup must re-arm it (audited), exactly
+        # once, and never without a verified pending receipt.
+        self._strip_to_pre_dispatch(consumed=602)
+        self._prepare()
+        self._apply()
+        state = self._read_state()
+        self.runtime["pending_supervisor_event"] = {
+            "reason": "ORCHESTRATOR_START",
+            "event": {"runtime": "v2", "shared_file_executor": True},
+            "recorded_at": self.m.stamp(),
+            "decision_attempts": 2,
+            "retry_exhausted": True,
+            "exhausted_at": self.m.stamp(),
+            "last_error": "fixture exhausted",
+        }
+        self._write_runtime(self.runtime)
+        merged = self.m.load_runtime()
+        self.assertTrue(
+            self.m.reconcile_exhausted_event_for_human_resume(merged, state))
+        pending = merged["pending_supervisor_event"]
+        self.assertEqual(pending["reason"], "HUMAN_DECISION_RESUME")
+        self.assertFalse(pending["retry_exhausted"])
+        self.assertEqual(pending["decision_attempts"], 0)
+        self.assertEqual(pending["event"], self.m.human_decision_resume_event(state))
+        self.assertEqual(pending["rearmed_from"]["last_error"], "fixture exhausted")
+        # Idempotent: the re-armed event is not exhausted, so no second replace.
+        self.assertFalse(
+            self.m.reconcile_exhausted_event_for_human_resume(merged, state))
+
+    def test_reconcile_ignores_non_exhausted_or_receiptless_states(self):
+        state = self._read_state()
+        self.runtime["pending_supervisor_event"] = {
+            "reason": "EXECUTOR_RESULT_READY",
+            "event": {"type": "EXECUTOR_RESULT_READY"},
+            "recorded_at": self.m.stamp(),
+            "decision_attempts": 1,
+            "retry_exhausted": False,
+        }
+        self._write_runtime(self.runtime)
+        merged = self.m.load_runtime()
+        # Active (not exhausted) event is never replaced...
+        self.assertFalse(
+            self.m.reconcile_exhausted_event_for_human_resume(merged, state))
+        # ...and without a pending verified receipt neither is an exhausted one.
+        self.runtime["pending_supervisor_event"]["retry_exhausted"] = True
+        self._write_runtime(self.runtime)
+        merged = self.m.load_runtime()
+        self.assertFalse(
+            self.m.reconcile_exhausted_event_for_human_resume(merged, state))
+
     def _fixture_goal_alignment(self, method_text):
         # GOAL-ANCHOR-V1: committed decisions carry the six-field alignment record.
         return {

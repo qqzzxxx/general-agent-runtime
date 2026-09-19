@@ -29,7 +29,7 @@ def install_driver(fixture):
     scripts = fixture.root / 'scripts'
     scripts.mkdir(exist_ok=True)
     for name in ('supervisor_control.py', 'runtime_lifecycle.py', 'executor_fence.py',
-                 'executor_completion.py', 'executor_claim.py'):
+                 'executor_completion.py', 'executor_claim.py', 'ordinary_dispatch.py'):
         shutil.copy2(SCRIPTS / name, scripts / name)
     source = '''import json, os, sys, time, uuid
 from pathlib import Path
@@ -49,14 +49,15 @@ def model(*args, **kwargs):
     (f.root / 'model-entered').write_text('yes')
     while not (f.root / 'allow-model').exists():
         time.sleep(0.02)
-    task = f.make_task(700121, 'fresh-resume-identity')
-    task['ISSUED_AT'] = o.stamp()
     state = o.read_project_state()
     decision = {'decision': 'CONTINUE', 'reason': 'fresh next action after resume'}
     state['decision_history'].append(decision)
-    state.update(status='WAITING_EXECUTOR', current_task={k: task[k] for k in fixture_module.sc.IDENTITY_KEYS}, last_supervisor_decision=decision)
+    state.update(status='WAITING_EXECUTOR', last_supervisor_decision=decision,
+                 ordinary_task_proposal={'logical_task': 'resume', 'logical_stage': 'next-action',
+                     'objective': 'Complete the next action after resume', 'inputs': [],
+                     'outputs': ['reports/resume.md'],
+                     'acceptance_criteria': ['Document the completed next action.']})
     o.atomic_json(o.PROJECT_STATE, state)
-    o.TO_ZCODE.write_bytes(fixture_module.wire(task))
     events = [{'type': 'thread.started', 'thread_id': str(uuid.uuid4())}, {'type': 'turn.started'}, {'type': 'turn.completed', 'usage': {'input_tokens': 11, 'output_tokens': 3}}]
     kwargs['stdout'].write((''.join(json.dumps(e)+'\\n' for e in events)).encode())
     return mock.Mock(returncode=0)

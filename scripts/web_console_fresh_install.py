@@ -5,15 +5,45 @@ release skeleton with *no* lifecycle footprint can be bootstrap-eligible before
 one exists. Missing state alone is never evidence of freshness. No marker or
 placeholder is written, and the ordinary preflight result is left unchanged on
 any uncertainty. This proof is recomputed by both readiness and the start gate.
+
+Two Console-owned artifacts are accepted beside the release skeleton because
+they exist by design the moment the Console serves a Runtime and never carry
+Runtime lifecycle state:
+
+- `web_console_data/` is the Console's own non-authoritative data directory
+  (setup drafts, instance metadata, server logs). The Setup wizard itself
+  cannot record Steps 1-3 without creating it, so requiring its absence would
+  make first-project bootstrap unreachable for any self-hosted Runtime.
+- `control/supervisor_control.json` is accepted only in its factory-neutral
+  form (see `_neutral_control_store`): zero counters, no pause history, and
+  nothing but the optional fixed-policy pair. Anything else in it — and every
+  other operational entry anywhere in the tree — still fails the proof.
 """
 from __future__ import annotations
 
 import errno
 import hashlib
+import json
 import os
 from pathlib import Path
 
 import web_console_runtime_create as creation
+
+# These execute or validate bootstrap / Runtime control. Console presentation,
+# documentation and test changes must not invalidate an already-created Runtime.
+CORE_SCRIPTS = (
+    "executor_claim.py", "executor_completion.py", "executor_fence.py",
+    "fv_sandbox.py", "migrate_goal_anchor.py", "preflight.py",
+    "resume_human_review.py", "start_project.py", "supervisor_control.py",
+    "provider_usage.py",
+)
+MAX_TREE_ENTRIES = 10000
+MAX_FILE_BYTES = 16 * 1024 * 1024
+
+CONSOLE_ROOT_ENTRIES = frozenset({"web_console_data"})
+CONSOLE_CONTROL_ENTRIES = frozenset({"supervisor_control.json"})
+NEUTRAL_PAUSE = {"status": "RUNNING", "requested_at": None, "mode": None,
+                 "resumed_at": None}
 
 # These execute or validate bootstrap / Runtime control. Console presentation,
 # documentation and test changes must not invalidate an already-created Runtime.
@@ -64,19 +94,70 @@ def _digest(path: Path) -> bytes:
         return digest.digest()
 
 
+def _neutral_control_store(path: Path) -> bool:
+    """True only for the factory-neutral SUPERVISOR-CONTROL-V1 store.
+
+    Neutral means the state `supervisor_control.load_control` would otherwise
+    synthesize on a missing file: zero revision and intervention generation,
+    no pause history, and no unknown fields. The optional fixed-policy pair
+    is validated by the Runtime's own helper so this check never grows a
+    divergent dialect. Any lifecycle-signaling content fails here and would
+    additionally fail the empty status-profile requirement upstream.
+    """
+    try:
+        if path.stat().st_size > MAX_FILE_BYTES:
+            return False
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False
+    if not isinstance(value, dict):
+        return False
+    allowed = {"schema_version", "revision", "intervention_generation",
+               "pause", "supervisor_model", "supervisor_reasoning_effort",
+               "updated_at"}
+    if set(value) - allowed:
+        return False
+    try:
+        import supervisor_control
+    except Exception:
+        return False  # Unverifiable control semantics fail closed.
+    if value.get("schema_version") != supervisor_control.CONTROL_SCHEMA_VERSION:
+        return False
+    if value.get("revision") != 0 \
+            or value.get("intervention_generation") != 0:
+        return False
+    if value.get("pause") != NEUTRAL_PAUSE:
+        return False
+    if ("supervisor_model" in value
+            or "supervisor_reasoning_effort" in value) \
+            and supervisor_control.supervisor_fixed_policy_from_control(
+                value) is None:
+        return False
+    return value.get("updated_at") is None \
+        or isinstance(value.get("updated_at"), str)
+
+
 def _prove_empty_release(root: Path, installation: Path) -> bool:
     # Exact top-level / control / handoff inventories exclude *all* operational
     # history, even empty projects/logs directories, malformed pointers, orphaned
     # ledgers, locks, dispatches, STOP and HUMAN_REVIEW flags. Unknown means blocked.
+    # The only accepted extras are the Console-owned entries above, and the
+    # control-plane store only in its factory-neutral form.
     expected_root = (set(creation.RELEASE_FILES)
                      | set(creation.RELEASE_DIRECTORIES) | {"control", "handoff"})
-    for directory, expected in (
-            (root, expected_root),
-            (root / "control", set(creation.CONTROL_SEED_FILES)),
-            (root / "handoff", set(creation.HANDOFF_SEED_FILES))):
+    for directory, expected, console_allowed in (
+            (root, expected_root, CONSOLE_ROOT_ENTRIES),
+            (root / "control", set(creation.CONTROL_SEED_FILES),
+             CONSOLE_CONTROL_ENTRIES),
+            (root / "handoff", set(creation.HANDOFF_SEED_FILES),
+             frozenset())):
         if creation.is_reparse(directory) or not directory.is_dir():
             return False
-        if {p.name for p in directory.iterdir()} != expected:
+        extra = {p.name for p in directory.iterdir()} - expected
+        if not extra <= console_allowed:
+            return False
+        if "supervisor_control.json" in extra and not _neutral_control_store(
+                directory / "supervisor_control.json"):
             return False
     # Reject reparse ancestors rather than accepting an alias into another tree.
     for path in (root, *root.parents):

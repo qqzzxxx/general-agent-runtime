@@ -246,8 +246,14 @@ class PublicationProvenanceTests(unittest.TestCase):
         collect = fence.collect_locked
         def expiring_collect(*args):
             manifest = collect(*args)
-            self.fx.runtime["authorized_dispatch"]["EXPIRES_AT"] = "2000-01-01T00:00:00+00:00"
-            self.fx.o.save_runtime(self.fx.runtime)
+            # PICKUP-EXECUTION-LIFECYCLE: the post-IO recheck enforces the
+            # execution budget (CLAIMED_AT + MAX_TIME); exhaust that clock.
+            _, claim_path = completion.load_claim(self.root, identity)
+            claim_data = json.loads(
+                claim_path.joinpath("claim.json").read_text(encoding="utf-8-sig"))
+            claim_data["CLAIMED_AT"] = "2000-01-01T00:00:00+00:00"
+            claim_path.joinpath("claim.json").write_text(
+                json.dumps(claim_data), encoding="utf-8")
             return manifest
         with patch.object(fence, "collect_locked", expiring_collect):
             with self.assertRaisesRegex(completion.CompletionError, "expired"):

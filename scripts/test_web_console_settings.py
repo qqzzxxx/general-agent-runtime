@@ -100,11 +100,17 @@ class SettingsValidationTests(unittest.TestCase):
                                            partial=True)
 
     def test_effort_must_be_empty_or_a_supported_value(self):
-        for effort in ("", "LOW", "MEDIUM", "HIGH"):
+        for effort in ("", "LOW", "MEDIUM", "HIGH", "XHIGH"):
             values = wset.validate_settings_payload(
                 {"supervisor_reasoning_effort": effort}, partial=True)
             self.assertEqual(values["supervisor_reasoning_effort"], effort)
-        for effort in ("low", "ULTRA", "HIGHEST", "EXTRA_HIGH", 7):
+        # The UI sends the CLI-canonical lowercase form; storage stays
+        # uppercase.
+        self.assertEqual(
+            wset.validate_settings_payload(
+                {"supervisor_reasoning_effort": "xhigh"},
+                partial=True)["supervisor_reasoning_effort"], "XHIGH")
+        for effort in ("ULTRA", "HIGHEST", "EXTRA_HIGH", "x ultra", 7):
             with self.assertRaises(wset.SettingsError):
                 wset.validate_settings_payload(
                     {"supervisor_reasoning_effort": effort}, partial=True)

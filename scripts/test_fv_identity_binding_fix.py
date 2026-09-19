@@ -30,6 +30,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import executor_claim as claim_helper
 import executor_completion as completion_helper
+import final_verification_contract as contract
 import supervisor_control as supervisor_helper
 
 
@@ -213,9 +214,21 @@ class FVIdentityBindingTests(unittest.TestCase):
             },
         }
 
+    def record_gate_provenance(self, task):
+        """HUMAN-DECISION-FV-BRIDGE-V1: this fixture short-circuits the Supervisor
+        decision path, so record the Runtime-prepared gate identity exactly as
+        final_verification_contract.prepare() would before validation enforces
+        provenance."""
+        gate = task.get("FINAL_VERIFICATION_GATE")
+        if isinstance(gate, dict) and gate.get("CLAIMS_HASH"):
+            contract.record_prepared_identity(
+                o.ROOT, self.runtime, {key: task[key] for key in o.IDENTITY_KEYS},
+                gate["CLAIMS_HASH"], o.stamp())
+
     def authorize(self, task, state):
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(task))
+        self.record_gate_provenance(task)
         o.register_dispatched_task(self.runtime, state)
 
     def receipt(self, task, overall="PASS"):
@@ -424,6 +437,7 @@ class FVIdentityBindingTests(unittest.TestCase):
         state["current_task"] = {key: repeat[key] for key in o.IDENTITY_KEYS}
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(repeat))
+        self.record_gate_provenance(repeat)
         with self.assertRaisesRegex(RuntimeError, "Identical Final Verification re-dispatch rejected"):
             o.validate_dispatch_payload(self.runtime, state, repeat)
 
@@ -443,6 +457,7 @@ class FVIdentityBindingTests(unittest.TestCase):
         state = self.state_for(repeat, fv_status="REVERIFY")
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(repeat))
+        self.record_gate_provenance(repeat)
         o.validate_dispatch_payload(self.runtime, state, repeat)
 
     # 7c. A newer consumed receipt (changed artifact) re-enables re-verification.
@@ -455,6 +470,7 @@ class FVIdentityBindingTests(unittest.TestCase):
         state = self.state_for(repeat, fv_status="REVERIFY")
         o.atomic_json(o.PROJECT_STATE, state)
         o.atomic_write(o.TO_ZCODE, wire(repeat))
+        self.record_gate_provenance(repeat)
         o.validate_dispatch_payload(self.runtime, state, repeat)
 
     # 7d. Ledger-proven consumption repairs a lost runtime binding (bounded recovery).

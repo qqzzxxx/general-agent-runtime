@@ -49,15 +49,57 @@ class SupervisorPanelStructureTests(unittest.TestCase):
         self.assertIn("never interrupts an active call", self.text)
         self.assertIn("queued", self.text.lower())
 
-    def test_config_effort_choices_are_the_supported_runtime_set(self):
-        section = re.search(
-            r'id="sv-config-effort"[\s\S]{0,1200}?</select>', self.text)
-        self.assertIsNotNone(section,
-                             "the effort selector must exist with its options")
-        for effort in ("LOW", "MEDIUM", "HIGH"):
-            self.assertIn(f'value="{effort}"', section.group(0), effort)
-        self.assertNotIn('value="ULTRA"', section.group(0))
-        self.assertNotIn('value="HIGHEST"', section.group(0))
+    def test_config_model_is_a_fixed_choice_control(self):
+        # The Supervisor model is a select populated from the fixed product
+        # menu — never a free-text input that could take a typo'd id.
+        self.assertRegex(
+            self.text,
+            r'<select id="sv-config-model" aria-label="Supervisor model">'
+            r'</select>')
+        self.assertNotRegex(
+            self.text,
+            r'<input[^>]*id="sv-config-model"')
+        self.assertRegex(
+            self.text,
+            r'const SUPERVISOR_MODEL_MENU = \[\s*'
+            r'\{ value: "gpt-5\.6-sol", display: "GPT-5\.6 Sol" \},\s*'
+            r'\{ value: "gpt-6-astra", display: "GPT-6 Astra" \},\s*\];')
+        for banned in ("gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5",
+                       "gpt-reserve"):
+            self.assertNotIn(f'value: "{banned}"', self.text, banned)
+
+    def test_config_effort_choices_are_the_product_menu(self):
+        # Only 中/高/极高 (medium/high/xhigh) are offered, each labelled with
+        # its canonical value; other CLI-supported efforts stay unexposed.
+        self.assertRegex(
+            self.text,
+            r'const SUPERVISOR_EFFORT_MENU = \[\s*'
+            r'\{ value: "medium", zh: "中", en: "Medium" \},\s*'
+            r'\{ value: "high", zh: "高", en: "High" \},\s*'
+            r'\{ value: "xhigh", zh: "极高", en: "Ultra-high" \},\s*\];')
+        for banned in ('value: "low"', 'value: "max"', 'value: "ultra"',
+                       'value: "EXTRA_HIGH"', 'value: "HIGHEST"'):
+            self.assertNotIn(banned, self.text, banned)
+        self.assertIn("supervisorEffortOptionText", self.text)
+        # The queue form is filled from the product menu, not from the
+        # backend's full supported list.
+        self.assertIn(
+            'fillSupervisorEffortSelect(document.getElementById('
+            '"sv-config-effort"),', self.text)
+
+    def test_config_view_supports_legacy_value_display(self):
+        # Stored values outside the menu stay visible as explicit legacy
+        # options; nothing is silently rewritten on load.
+        self.assertIn("supervisorLegacySuffix", self.text)
+        self.assertIn("legacy value: outside the current menu", self.text)
+        self.assertIn("旧值：不在当前菜单", self.text)
+        self.assertIn(
+            'fillSupervisorModelSelect(document.getElementById('
+            '"settings-runtime-model"),', self.text)
+        self.assertIn(
+            'fillSupervisorModelSelect(document.getElementById('
+            '"settings-global-model"),', self.text)
+        self.assertIn("supervisorModelMenuValue(model) === null", self.text)
 
     def test_draft_prefill_is_labelled_non_authoritative(self):
         self.assertIn("setup draft", self.text)

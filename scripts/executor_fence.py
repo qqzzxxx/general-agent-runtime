@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -85,6 +85,49 @@ def completion_module():
     return executor_completion
 
 
+def token_cli_args(argv, option):
+    """Opaque URL-safe tokens may begin with '-'; keep them argparse values."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    index = 0
+    while index < len(args) - 1:
+        if args[index] == option:
+            args[index:index + 2] = [option + "=" + args[index + 1]]
+        index += 1
+    return args
+
+
+def _authorization_deadline(auth: dict, claim, state) -> datetime:
+    """PICKUP-EXECUTION-LIFECYCLE: the clock this attempt is bounded by.
+
+    An unclaimed dispatch is bounded by its pickup authorization (EXPIRES_AT).
+    A claimed attempt is bounded by its execution budget, CLAIMED_AT (durable
+    in claim.json) plus MAX_TIME (recorded on the authorization; the live task
+    mirror is the legacy fallback). An authorization without any execution-
+    clock fact keeps the legacy combined window, where EXPIRES_AT bounded both
+    waiting and execution.
+    """
+    expires = datetime.fromisoformat(str(auth["EXPIRES_AT"]))
+    claimed_at = None
+    if isinstance(claim, dict) and claim.get("CLAIMED_AT"):
+        try:
+            parsed = datetime.fromisoformat(
+                str(claim["CLAIMED_AT"]).replace("Z", "+00:00"))
+            claimed_at = parsed if parsed.tzinfo is not None else None
+        except (TypeError, ValueError):
+            claimed_at = None
+    max_seconds = auth.get("MAX_TIME")
+    if claimed_at is not None and type(max_seconds) is int and max_seconds > 0:
+        return claimed_at + timedelta(seconds=max_seconds)
+    if claimed_at is not None and isinstance(state, dict):
+        mirror = state.get("current_task")
+        if isinstance(mirror, dict) and type(mirror.get("MAX_TIME")) is int \
+                and mirror["MAX_TIME"] > 0:
+            return claimed_at + timedelta(seconds=mirror["MAX_TIME"])
+    if expires.tzinfo is None:
+        raise FenceError("attempt_expired")
+    return expires
+
+
 def check_locked(root: Path, identity: dict, *, require_claim=True, claim_token=None):
     """Fresh check, never a reusable authorization token. Caller holds mutex."""
     c = completion_module()
@@ -109,21 +152,17 @@ def check_locked(root: Path, identity: dict, *, require_claim=True, claim_token=
             raise FenceError("runtime_stop_or_human_review")
         if runtime.get("status") in {"STOPPED_BY_USER", "HUMAN_REVIEW", "DEADLINE_REACHED", "ORCHESTRATOR_ERROR"}:
             raise FenceError("runtime_not_running")
-        expires = datetime.fromisoformat(auth["EXPIRES_AT"])
-        if expires.tzinfo is None or datetime.now(timezone.utc) >= expires:
-            raise FenceError("attempt_expired")
         state = c._check_live_lifecycle(root, pid, identity)
+        claim, _ = c.load_claim(root, identity)
+        if datetime.now(timezone.utc) >= _authorization_deadline(auth, claim, state):
+            raise FenceError("attempt_expired")
         if state.get("deadline_at"):
             deadline = datetime.fromisoformat(state["deadline_at"].replace("Z", "+00:00"))
             if deadline.tzinfo is None or datetime.now(timezone.utc) >= deadline:
                 raise FenceError("project_deadline_reached")
         c._check_ledger_absent(root, identity)
         if require_claim:
-            claim = c._check_claim(root, identity)
-            if (not isinstance(claim_token, str) or not claim_token
-                    or not hmac.compare_digest(hashlib.sha256(claim_token.encode()).hexdigest(),
-                                               str(claim.get("CLAIM_TOKEN_SHA256") or ""))):
-                raise FenceError("claim_owner_token_mismatch")
+            check_claim_owner(root, identity, claim_token)
         import executor_claim
         ok, reason = executor_claim.verify_authorized_dispatch(
             root, *[identity[key] for key in IDENTITY_KEYS],
@@ -136,6 +175,15 @@ def check_locked(root: Path, identity: dict, *, require_claim=True, claim_token=
     except (c.CompletionError, supervisor_control.ControlError,
             KeyError, TypeError, ValueError) as exc:
         raise FenceError(str(exc)) from exc
+
+
+def check_claim_owner(root: Path, identity: dict, claim_token):
+    """Prove retained ownership only; this never grants live publication authority."""
+    claim = completion_module()._check_claim(root, identity)
+    if (not isinstance(claim_token, str) or not 1 <= len(claim_token) <= 256
+            or not hmac.compare_digest(hashlib.sha256(claim_token.encode()).hexdigest(),
+                                       str(claim.get("CLAIM_TOKEN_SHA256") or ""))):
+        raise FenceError("claim_owner_token_mismatch")
 
 
 def attempt_root(project: Path, identity: dict) -> Path:
@@ -212,6 +260,28 @@ def publication_record(root: Path, identity: dict, relative: str) -> Path:
             c.commit_id_for(identity["MESSAGE_ID"], identity["NONCE"]) / f"{digest}.json")
 
 
+def publication_policy(root: Path, identity: dict, relative: str) -> bool:
+    """Check sealed task restrictions under the Runtime lock; return FV read-only.
+
+    Applies at the publication boundary, including low-level compatibility calls.
+    Host tool access is never a grant to publish Runtime files or repair FV inputs.
+    """
+    c = completion_module()
+    auth = c.read_runtime_state(root)["authorized_dispatch"]
+    import final_verification_contract as fv
+    if "SUPERVISOR_DISPATCH_ARCHIVE" not in auth:
+        return False  # Existing fenced legacy recovery has no sealed execution policy.
+    task = fv.archived_task(root, auth)
+    if task.get("EXECUTION", {}).get("capabilities", {}).get("filesystem", "workspace") != "workspace":
+        raise FenceError("publication requires workspace capability")
+    is_read_only = (task.get("FINAL_VERIFICATION_GATE") or {}).get("EXECUTION_MODE") == "LIVE_READ_ONLY"
+    if is_read_only:
+        name = attempt_root(Path("."), identity).name
+        if not any(relative.startswith(f"{area}/verification/{name}/") for area in ("evidence", "reports")):
+            raise FenceError("FV publication is limited to new attempt-specific verification evidence/reports")
+    return is_read_only
+
+
 def publish(root: Path, identity: dict, relative: str, expected_sha256: str, *, claim_token=None) -> Path:
     """Publish one copied snapshot, serialized with retirement; no shared inode."""
     root = Path(root).resolve()
@@ -220,6 +290,9 @@ def publish(root: Path, identity: dict, relative: str, expected_sha256: str, *, 
         pid, project = check_locked(root, identity, claim_token=claim_token)
         source = output_path(attempt_root(project, identity), relative)
         target = output_path(project, relative)
+        read_only = publication_policy(root, identity, relative)
+        if read_only and target.exists():
+            raise FenceError("FV cannot replace an existing canonical file")
         if not source.is_file() or source.stat().st_size > c.EVIDENCE_MAX_FILE_BYTES:
             raise FenceError("candidate_missing_or_too_large")
         data = source.read_bytes()
@@ -236,7 +309,13 @@ def publish(root: Path, identity: dict, relative: str, expected_sha256: str, *, 
             # Recheck after snapshot IO: in particular, the deadline may have passed.
             check_locked(root, identity, claim_token=claim_token)
             output_path(project, relative)
-            os.replace(temp, target)
+            publication_policy(root, identity, relative)
+            if read_only:
+                # Atomic creation: a target appearing during IO cannot be replaced.
+                os.link(temp, target)
+                temp.unlink()
+            else:
+                os.replace(temp, target)
             c._atomic_write(publication_record(root, identity, relative), json.dumps({
                 **identity, "PROJECT_ID": pid, "path": relative, "sha256": digest,
                 "PUBLISHED_AT": c.now_iso(),

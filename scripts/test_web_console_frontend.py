@@ -55,7 +55,11 @@ class StaticFrontendTests(unittest.TestCase):
         self.assertTrue(INDEX.is_file())
         self.assertIn("<!DOCTYPE html>", self.text)
         self.assertIn('<meta charset="utf-8">', self.text)
-        self.assertIn("General Agent Runtime v1.3", self.text)
+        # Product brand plus the explicit development-state marker; the
+        # Console must never claim a released version it is not.
+        self.assertIn("General Agent Runtime", self.text)
+        self.assertIn("v1.4 Dev", self.text)
+        self.assertNotIn("General Agent Runtime v1.3", self.text)
 
     def test_no_external_dependencies(self):
         self.assertNotIn("http://", self.text)

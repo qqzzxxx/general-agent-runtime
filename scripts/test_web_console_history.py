@@ -464,15 +464,167 @@ class RoundDetailTests(unittest.TestCase):
         codes = [entry["code"] for entry in detail["honesty"]["control"]]
         self.assertIn("COMPLETION_TIMEOUT", codes)
 
+    def test_non_dict_completion_document_degrades_to_unavailable(self):
+        # A control plane that answers `feedback` with valid JSON of the
+        # wrong top-level type must degrade to an unavailable completion
+        # block plus an honesty note — never crash the composition and
+        # never invent completion data.
+        for malformed in ([{"unexpected": "shape"}], "ok", 7, True):
+            with self.subTest(document=malformed):
+                dispatch, completion, interventions = self.results()
+                completion["document"] = malformed
+                detail = wch.interpret_round_detail(
+                    700501, dispatch_result=dispatch,
+                    completion_result=completion,
+                    interventions_result=interventions,
+                    decision={"available": False})
+                self.assertTrue(detail["found"])
+                self.assertFalse(detail["completion"]["available"])
+                self.assertIsNone(detail["completion"]["receipt"])
+                self.assertIsNone(detail["completion"]["status"])
+                self.assertIn("the completion query returned unusable output",
+                              detail["honesty"]["notes"])
+                self.assertTrue(detail["dispatch"]["available"])
+
     def test_artifact_metadata_comes_from_verified_runtime_publications(self):
+        dispatch, completion, interventions = self.results()
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "ok", "records": [], "reason": None})
+        self.assertTrue(detail["artifacts"]["available"])
+        self.assertEqual(detail["artifacts"]["state"], "final")
+        self.assertEqual(detail["artifacts"]["paths"],
+                         [{"path": "reports/x.md", "sha256": "b" * 64,
+                           "status": "final", "message_id": 700501,
+                           "task_id": "TASK-T", "stage_id": "stage-t",
+                           "attempt": 1, "published_at": None,
+                           "commit_id": "completion-700501-abc"}])
+        self.assertIn("historical bytes are not retained",
+                      detail["artifacts"]["note"].lower())
+
+    def test_final_publication_ids_come_from_the_verified_entry(self):
+        completion = self.results()[1]
+        completion["document"]["COMMIT_ID"] = "completion-700501-xyz"
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=self.results()[0],
+            completion_result=completion,
+            interventions_result=self.results()[2],
+            decision={"available": False})
+        path = detail["artifacts"]["paths"][0]
+        self.assertEqual(path["commit_id"], "completion-700501-xyz")
+        self.assertEqual(path["message_id"], 700501)
+        self.assertEqual(path["status"], "final")
+
+    def test_dispatched_no_completion_with_publications_is_provisional(self):
+        dispatch, completion, interventions = self.results(
+            with_completion=False)
+        completion["document"] = {"ok": False, "error": "no authoritative "
+                                  "Executor completion for MESSAGE_ID=700501",
+                                  "error_type": "ControlError"}
+        records = [{"path": "evidence/partial.txt", "sha256": "c" * 64,
+                    "published_at": "2026-09-12T01:01:00+00:00",
+                    "task_id": "TASK-T", "stage_id": "stage-t", "attempt": 1,
+                    "commit_id": "completion-700501-" + "0" * 24,
+                    "message_id": 700501}]
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "ok", "records": records, "reason": None})
+        block = detail["artifacts"]
+        self.assertFalse(block["available"])
+        self.assertEqual(block["state"], "provisional")
+        self.assertFalse(block["complete"])
+        self.assertEqual(block["paths"][0]["path"], "evidence/partial.txt")
+        self.assertEqual(block["paths"][0]["status"], "provisional")
+        self.assertIn("provisional", block["note"].lower())
+
+    def test_dispatched_no_completion_without_publications_says_none(self):
+        dispatch, completion, interventions = self.results(
+            with_completion=False)
+        completion["document"] = {"ok": False, "error": "no authoritative "
+                                  "Executor completion for MESSAGE_ID=700501",
+                                  "error_type": "ControlError"}
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "ok", "records": [], "reason": None})
+        block = detail["artifacts"]
+        self.assertFalse(block["available"])
+        self.assertEqual(block["state"], "none")
+        self.assertEqual(block["paths"], [])
+        self.assertIn("has not published", block["note"])
+
+    def test_untrusted_completion_never_presents_final_metadata(self):
+        dispatch, completion, interventions = self.results(
+            completion_integrity="HASH_MISMATCH")
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "ok", "records": [], "reason": None})
+        block = detail["artifacts"]
+        self.assertFalse(block["available"])
+        self.assertEqual(block["state"], "unavailable")
+        self.assertEqual(block["paths"], [])
+        self.assertIn("HASH_MISMATCH", block["reason"])
+        self.assertIn("not presented as final", block["reason"])
+
+    def test_untrusted_completion_still_shows_provisional_records(self):
+        dispatch, completion, interventions = self.results(
+            completion_integrity="HASH_MISMATCH")
+        records = [{"path": "reports/r.md", "sha256": "b" * 64,
+                    "published_at": "2026-09-12T01:01:00+00:00",
+                    "task_id": "TASK-T", "stage_id": "stage-t", "attempt": 1,
+                    "commit_id": "completion-700501-" + "0" * 24,
+                    "message_id": 700501}]
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "ok", "records": records, "reason": None})
+        block = detail["artifacts"]
+        self.assertFalse(block["available"])
+        self.assertEqual(block["state"], "provisional")
+        self.assertTrue(all(path["status"] == "provisional"
+                            for path in block["paths"]))
+        self.assertIn("HASH_MISMATCH", block["reason"])
+
+    def test_unverified_dispatch_identity_hides_precompletion_lookup(self):
+        dispatch, completion, interventions = self.results(
+            with_completion=False, dispatch_integrity="CORRUPT",
+            error="metadata is corrupt")
+        completion["document"] = {"ok": False, "error": "no authoritative "
+                                  "Executor completion for MESSAGE_ID=700501",
+                                  "error_type": "ControlError"}
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications={"state": "invalid", "records": [],
+                          "reason": "DISPATCH_IDENTITY_UNAVAILABLE"})
+        block = detail["artifacts"]
+        self.assertEqual(block["state"], "unavailable")
+        self.assertIn("DISPATCH_IDENTITY_UNAVAILABLE", block["reason"])
+
+    def test_unusable_publication_projection_degrades_honestly(self):
+        dispatch, completion, interventions = self.results(
+            with_completion=False)
+        completion["document"] = {"ok": False, "error": "no authoritative "
+                                  "Executor completion for MESSAGE_ID=700501",
+                                  "error_type": "ControlError"}
+        detail = wch.interpret_round_detail(
+            700501, dispatch_result=dispatch, completion_result=completion,
+            interventions_result=interventions, decision={"available": False},
+            publications="not a dict")
+        block = detail["artifacts"]
+        self.assertEqual(block["state"], "unavailable")
+        self.assertIn("invalid publication projection", block["reason"])
+
+    def test_artifacts_without_publications_argument_still_composes(self):
         dispatch, completion, interventions = self.results()
         detail = wch.interpret_round_detail(
             700501, dispatch_result=dispatch, completion_result=completion,
             interventions_result=interventions, decision={"available": False})
         self.assertTrue(detail["artifacts"]["available"])
-        self.assertEqual(detail["artifacts"]["paths"],
-                         [{"path": "reports/x.md", "sha256": "b" * 64}])
-        self.assertIn("historical bytes are not retained", detail["artifacts"]["note"].lower())
+        self.assertEqual(detail["artifacts"]["state"], "final")
 
     def test_exact_dispatch_only_from_authorized_valid(self):
         dispatch, completion, interventions = self.results(
